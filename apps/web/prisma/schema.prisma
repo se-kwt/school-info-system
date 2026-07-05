@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  parent
+  teacher
+  admin
+  accountant
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+}
+
+enum AssignmentStatusValue {
+  pending
+  submitted
+  overdue
+}
+
+enum FeeStatus {
+  paid
+  partial
+  unpaid
+}
+
+model School {
+  id            Int            @id @default(autoincrement())
+  name          String
+  users         User[]
+  students      Student[]
+  classes       Class[]
+  exams         Exam[]
+  feeStructures FeeStructure[]
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  phone    String @unique
+  role     Role
+  name     String
+  school   School @relation(fields: [schoolId], references: [id])
+  schoolId Int
+
+  parentLinks        ParentStudent[]
+  classesTaught      ClassTeacher[]
+  attendanceMarked   Attendance[]    @relation("MarkedBy")
+  assignmentsCreated Assignment[]
+  feePaymentsRecorded FeePayment[]   @relation("RecordedBy")
+  notifications      Notification[]
+}
+
+model Student {
+  id          Int      @id @default(autoincrement())
+  school      School   @relation(fields: [schoolId], references: [id])
+  schoolId    Int
+  name        String
+  dob         DateTime
+  class       Class    @relation(fields: [classId], references: [id])
+  classId     Int
+  section     String
+  admissionNo String   @unique
+
+  parentLinks        ParentStudent[]
+  attendance         Attendance[]
+  assignmentStatuses AssignmentStatus[]
+  marks              Mark[]
+  feePayments        FeePayment[]
+}
+
+model ParentStudent {
+  id           Int     @id @default(autoincrement())
+  parent       User    @relation(fields: [parentUserId], references: [id])
+  parentUserId Int
+  student      Student @relation(fields: [studentId], references: [id])
+  studentId    Int
+
+  @@unique([parentUserId, studentId])
+}
+
+model Class {
+  id       Int    @id @default(autoincrement())
+  school   School @relation(fields: [schoolId], references: [id])
+  schoolId Int
+  name     String
+  section  String
+
+  students         Student[]
+  teacherLinks     ClassTeacher[]
+  assignments      Assignment[]
+  timetableEntries TimetableEntry[]
+  feeStructures    FeeStructure[]
+
+  @@unique([schoolId, name, section])
+}
+
+model ClassTeacher {
+  id            Int    @id @default(autoincrement())
+  class         Class  @relation(fields: [classId], references: [id])
+  classId       Int
+  teacher       User   @relation(fields: [teacherUserId], references: [id])
+  teacherUserId Int
+  subject       String
+
+  @@unique([classId, teacherUserId, subject])
+}
+
+model Attendance {
+  id         Int               @id @default(autoincrement())
+  student    Student           @relation(fields: [studentId], references: [id])
+  studentId  Int
+  date       DateTime
+  status     AttendanceStatus
+  markedBy   User              @relation("MarkedBy", fields: [markedById], references: [id])
+  markedById Int
+  note       String?
+
+  @@unique([studentId, date])
+}
+
+model Assignment {
+  id          Int      @id @default(autoincrement())
+  class       Class    @relation(fields: [classId], references: [id])
+  classId     Int
+  subject     String
+  title       String
+  description String?
+  dueDate     DateTime
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById Int
+
+  statuses AssignmentStatus[]
+}
+
+model AssignmentStatus {
+  id           Int                   @id @default(autoincrement())
+  assignment   Assignment            @relation(fields: [assignmentId], references: [id])
+  assignmentId Int
+  student      Student               @relation(fields: [studentId], references: [id])
+  studentId    Int
+  status       AssignmentStatusValue @default(pending)
+
+  @@unique([assignmentId, studentId])
+}
+
+model Exam {
+  id       Int      @id @default(autoincrement())
+  school   School   @relation(fields: [schoolId], references: [id])
+  schoolId Int
+  name     String
+  term     String
+  examDate DateTime
+
+  marks Mark[]
+}
+
+model Mark {
+  id            Int     @id @default(autoincrement())
+  exam          Exam    @relation(fields: [examId], references: [id])
+  examId        Int
+  student       Student @relation(fields: [studentId], references: [id])
+  studentId     Int
+  subject       String
+  marksObtained Float
+  maxMarks      Float
+  grade         String
+
+  @@unique([examId, studentId, subject])
+}
+
+model TimetableEntry {
+  id            Int   @id @default(autoincrement())
+  class         Class @relation(fields: [classId], references: [id])
+  classId       Int
+  dayOfWeek     Int
+  period        Int
+  subject       String
+  teacherUserId Int
+}
+
+model FeeStructure {
+  id       Int      @id @default(autoincrement())
+  school   School   @relation(fields: [schoolId], references: [id])
+  schoolId Int
+  class    Class    @relation(fields: [classId], references: [id])
+  classId  Int
+  term     String
+  amount   Float
+  dueDate  DateTime
+
+  payments FeePayment[]
+}
+
+model FeePayment {
+  id             Int          @id @default(autoincrement())
+  student        Student      @relation(fields: [studentId], references: [id])
+  studentId      Int
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
+  feeStructureId Int
+  amountPaid     Float
+  paidDate       DateTime?
+  recordedBy     User         @relation("RecordedBy", fields: [recordedById], references: [id])
+  recordedById   Int
+  status         FeeStatus    @default(unpaid)
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    Int
+  type      String
+  title     String
+  body      String
+  relatedId Int?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model OtpCode {
+  id        Int       @id @default(autoincrement())
+  phone     String
+  codeHash  String
+  salt      String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
