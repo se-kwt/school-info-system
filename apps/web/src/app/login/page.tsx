@@ -1,0 +1,111 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+
+type Step = "phone" | "otp";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [step, setStep] = useState<Step>("phone");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSendCode(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+
+    const response = await fetch("/api/auth/send-otp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+
+    if (response.status === 200) {
+      setStep("otp");
+      return;
+    }
+    if (response.status === 404) {
+      setError("Phone number is not registered");
+      return;
+    }
+    setError("Enter a phone number");
+  }
+
+  async function handleVerifyCode(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+
+    const response = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ phone, code }),
+    });
+
+    if (response.status === 200) {
+      router.push("/dashboard");
+      return;
+    }
+    if (response.status === 401) {
+      setError("Incorrect or expired code. Try again");
+      return;
+    }
+    setError("Enter the code");
+  }
+
+  function handleChangeNumber() {
+    setStep("phone");
+    setCode("");
+    setError(null);
+  }
+
+  if (step === "phone") {
+    return (
+      <main className="mx-auto mt-24 max-w-sm p-6">
+        <h1 className="mb-4 text-xl font-semibold text-gray-800">Staff Login</h1>
+        <form onSubmit={handleSendCode} className="flex flex-col gap-3">
+          <input
+            type="tel"
+            aria-label="Phone number"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            className="rounded border border-gray-300 px-3 py-2"
+            placeholder="Phone number"
+          />
+          <button type="submit" className="rounded bg-blue-600 px-3 py-2 text-white">
+            Send code
+          </button>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </form>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto mt-24 max-w-sm p-6">
+      <h1 className="mb-4 text-xl font-semibold text-gray-800">Enter code</h1>
+      <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
+        <input
+          type="text"
+          aria-label="Verification code"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          className="rounded border border-gray-300 px-3 py-2"
+          placeholder="6-digit code"
+        />
+        <button type="submit" className="rounded bg-blue-600 px-3 py-2 text-white">
+          Verify
+        </button>
+        <button
+          type="button"
+          onClick={handleChangeNumber}
+          className="text-sm text-gray-500 underline"
+        >
+          Change number
+        </button>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </form>
+    </main>
+  );
+}
