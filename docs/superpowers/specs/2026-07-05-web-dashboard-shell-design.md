@@ -83,3 +83,9 @@ Consistent with how Foundation was tested — Vitest unit tests for pure logic, 
 - Parent mobile app (separate sub-project).
 - Real SMS/WhatsApp delivery (still `ConsoleSmsSender` from Foundation).
 - Any dashboard widgets, charts, or summary data on `/dashboard` itself.
+
+## 8. Tracked Follow-ups From the Whole-Branch Review (not blocking)
+
+- **`/api/auth/verify-otp` (Foundation) is now unused by the web login flow.** `/api/auth/session` duplicates its body-parsing/validation logic, differing only in the success branch (cookie vs. JSON token). If `verify-otp` isn't consumed elsewhere (e.g. a future mobile app), consider deprecating it so there aren't two divergent OTP-verification entry points to keep in sync.
+- **The login page collapses distinct failure statuses into one generic message** — e.g. an unexpected 500 from `send-otp` shows the same "Enter a phone number" hint as a genuine validation error. Low impact for a staff-only tool, but worth a distinct "Something went wrong" branch in a later pass.
+- **`user.name` has no fallback** if it were ever null (schema currently doesn't allow it, so this is purely defensive) — `user.name ?? "Staff"` would guard against a blank header if that ever changes.
