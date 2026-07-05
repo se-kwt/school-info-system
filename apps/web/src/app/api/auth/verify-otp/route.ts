@@ -3,7 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { verifyOtp } from "@/lib/auth/verify-otp";
 
 export async function POST(request: Request) {
-  const { phone, code } = await request.json();
+  let phone: string | undefined;
+  let code: string | undefined;
+  try {
+    ({ phone, code } = await request.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
   if (!phone || !code) {
     return NextResponse.json({ error: "phone and code are required" }, { status: 400 });
   }

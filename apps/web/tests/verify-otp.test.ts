@@ -4,6 +4,7 @@ import { sendOtp } from "../src/lib/auth/send-otp";
 import { verifyOtp } from "../src/lib/auth/verify-otp";
 import { verifySessionToken } from "../src/lib/auth/jwt";
 import type { SmsSender } from "../src/lib/auth/sms-sender";
+import { POST as verifyOtpRoute } from "../src/app/api/auth/verify-otp/route";
 
 class FakeSmsSender implements SmsSender {
   public lastMessage = "";
@@ -95,5 +96,19 @@ describe("verifyOtp", () => {
     const secondAttempt = await verifyOtp("+15550005555", code, { prisma });
 
     expect(secondAttempt).toEqual({ ok: false, error: "NOT_FOUND" });
+  });
+
+  it("returns a clean 400 JSON error for a malformed request body instead of throwing", async () => {
+    const request = new Request("http://localhost/api/auth/verify-otp", {
+      method: "POST",
+      body: "not-json",
+      headers: { "content-type": "application/json" },
+    });
+
+    const response = await verifyOtpRoute(request);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toEqual({ error: "Invalid request body" });
   });
 });
