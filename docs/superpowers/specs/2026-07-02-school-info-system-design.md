@@ -186,3 +186,11 @@ Further user stories and the full epic/task breakdown will be produced in the im
 - **OTP delivery reliability:** SMS delivery can be inconsistent in some regions/carriers — mitigate by adding WhatsApp OTP as a fallback channel if SMS delivery issues surface in the pilot.
 - **Multi-child/multi-parent data model complexity:** The `parent_student` many-to-many needs careful UI handling (child-switcher) to avoid confusing parents with more than one child at the school.
 - **Fee status disputes:** Manual payment recording (no gateway in MVP) means human error risk in marking payments — mitigate with a payment history audit trail (`recorded_by`, `paid_date` already in schema) and a simple correction/edit flow.
+
+**Tracked follow-ups from the Foundation build (not blocking, must be addressed before the login/notifications sub-project ships to real users):**
+- **OTP brute-force exposure:** `verify-otp` increments an `attempts` counter but nothing enforces a lockout, and a fresh OTP request resets the attempt count — a real per-phone rate limit (on both send-otp and verify-otp) is needed before launch, not just a per-record threshold.
+- **User-enumeration oracle on send-otp:** returning 404 for unregistered phone numbers lets anyone probe which numbers belong to the school. Standard fix: always return `{ success: true }` and only actually send an SMS if the phone is registered.
+- **`OtpCode` has no `schoolId`** — the only table without one (defensible since it's pre-auth and phone-keyed, but it's an exception to the "every table carries schoolId" rule and should be a documented, deliberate exception, not an oversight).
+- **`User.phone` / `Student.admissionNo` are globally unique, not per-school** — fine for the single-school MVP, but blocks two different schools reusing the same admission-number scheme or having overlapping phone numbers once Phase 3 multi-tenancy lands. Will need a migration + backfill at that point.
+- **`jwt.verify` has no explicit `algorithms: ["HS256"]` allowlist** — safe today (only HMAC secrets are used), cheap one-line hardening to add opportunistically.
+- **`TimetableEntry.teacherUserId` has no FK relation to `User`** — orphaned teacher references are possible; add the relation before timetable features are built.
