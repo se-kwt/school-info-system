@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { getNavItemsForRole } from "../src/lib/dashboard/nav-items";
 
 describe("getNavItemsForRole", () => {
-  it("returns six items for teacher, excluding Fees", () => {
+  it("returns six items for teacher, excluding Classes, Staff, and Fees", () => {
     const items = getNavItemsForRole("teacher");
     expect(items.map((item) => item.href)).toEqual([
       "/dashboard",
@@ -14,10 +14,12 @@ describe("getNavItemsForRole", () => {
     ]);
   });
 
-  it("returns all seven items for admin", () => {
+  it("returns all nine items for admin, including Classes and Staff", () => {
     const items = getNavItemsForRole("admin");
     expect(items.map((item) => item.href)).toEqual([
       "/dashboard",
+      "/dashboard/classes",
+      "/dashboard/staff",
       "/dashboard/students",
       "/dashboard/attendance",
       "/dashboard/assignments",

@@ -7,6 +7,8 @@ export interface NavItem {
 
 const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/classes", label: "Classes" },
+  { href: "/dashboard/staff", label: "Staff" },
   { href: "/dashboard/students", label: "Students" },
   { href: "/dashboard/attendance", label: "Attendance" },
   { href: "/dashboard/assignments", label: "Assignments" },
@@ -26,6 +28,8 @@ const NAV_HREFS_BY_ROLE: Record<SessionClaims["role"], string[]> = {
   ],
   admin: [
     "/dashboard",
+    "/dashboard/classes",
+    "/dashboard/staff",
     "/dashboard/students",
     "/dashboard/attendance",
     "/dashboard/assignments",
