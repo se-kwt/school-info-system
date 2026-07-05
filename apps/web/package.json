@@ -19,7 +19,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@prisma/client": "^7.8.0",
+    "@prisma/client": "5.20.0",
     "jsonwebtoken": "^9.0.3",
     "next": "^14.2.35",
     "react": "^18.3.1",
@@ -27,12 +27,12 @@
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^26.1.0",
-    "@types/react": "^19.2.17",
+    "@types/node": "20.16.11",
+    "@types/react": "18.3.12",
     "dotenv": "^17.4.2",
-    "prisma": "^7.8.0",
+    "prisma": "5.20.0",
     "tsx": "^4.23.0",
-    "typescript": "^6.0.3",
+    "typescript": "5.6.3",
     "vitest": "^4.1.9"
   }
 }
