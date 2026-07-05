@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { sendOtp } from "../src/lib/auth/send-otp";
+import { POST as sendOtpRoute } from "../src/app/api/auth/send-otp/route";
 import type { SmsSender } from "../src/lib/auth/sms-sender";
 
 class FakeSmsSender implements SmsSender {
@@ -43,5 +44,19 @@ describe("sendOtp", () => {
     await expect(sendOtp("+15559999999", { prisma, smsSender })).rejects.toThrow(
       "PHONE_NOT_REGISTERED"
     );
+  });
+
+  it("returns a clean 400 JSON error for a malformed request body instead of throwing", async () => {
+    const request = new Request("http://localhost/api/auth/send-otp", {
+      method: "POST",
+      body: "not-json",
+      headers: { "content-type": "application/json" },
+    });
+
+    const response = await sendOtpRoute(request);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toEqual({ error: "Invalid request body" });
   });
 });
