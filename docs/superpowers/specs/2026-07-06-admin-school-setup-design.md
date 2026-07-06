@@ -107,3 +107,11 @@ Consistent with the project's established approach — Vitest tests for the API 
 - A dedicated "reassign teacher" or "re-link parent" screen.
 - Creating additional schools.
 - Bulk import (e.g. CSV upload of a student roster) — every record is created one at a time through these forms for now.
+
+## 7. Tracked Follow-ups From the Whole-Branch Review (not blocking)
+
+The final review found and fixed two Important issues before merge (cross-tenant `classId` validation, and a duplicate-check race that could surface a raw 500 instead of a clean 409 — both now fixed). The following were accepted as documented follow-ups rather than fixed in this branch:
+
+- **`User.phone` and `Student.admissionNo` are globally unique, not school-scoped.** This is a pre-existing Foundation schema decision (already tracked in the Foundation design spec), but this plan is the first to expose it to end users: an admin registering a phone number or admission number already used by a *different* school gets a generic "already registered" error, which both leaks that a record exists in another tenant and blocks a legitimately-distinct value in their own school. Will need a migration to composite `[schoolId, phone]` / `[schoolId, admissionNo]` uniqueness before real multi-school use.
+- **Duplicated route/lib boilerplate** — the `try/catch (err) { if (err instanceof AuthError) ... }` wrapper is repeated in all six Classes/Staff/Students route handlers. A shared `withApiAuth` wrapper would remove the repetition.
+- **Minor UI inconsistency** — `CreateClassForm` lays out horizontally (`flex gap-2`) while `CreateStaffForm`/`CreateStudentForm` lay out vertically (`flex flex-col gap-2`); worth unifying when these forms are next touched.
