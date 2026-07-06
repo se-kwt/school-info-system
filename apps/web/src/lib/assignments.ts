@@ -182,4 +182,112 @@ export async function editAssignment(
   return { ok: true };
 }
 
+export interface StatusEntry {
+  studentId: number;
+  name: string;
+  status: "pending" | "submitted" | "overdue";
+}
+
+export type GetStatusesResult =
+  | { ok: true; statuses: StatusEntry[] }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "NOT_ASSIGNED" };
+
+export async function getAssignmentStatuses(
+  prisma: PrismaClient,
+  params: {
+    assignmentId: number;
+    schoolId: number;
+    role: SessionClaims["role"];
+    userId: number;
+  }
+): Promise<GetStatusesResult> {
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: params.assignmentId },
+    include: { class: true },
+  });
+  if (!assignment || assignment.class.schoolId !== params.schoolId) {
+    return { ok: false, error: "NOT_FOUND" };
+  }
+
+  if (params.role === "teacher") {
+    const link = await prisma.classTeacher.findFirst({
+      where: { classId: assignment.classId, teacherUserId: params.userId },
+    });
+    if (!link) {
+      return { ok: false, error: "NOT_ASSIGNED" };
+    }
+  }
+
+  const statuses = await prisma.assignmentStatus.findMany({
+    where: { assignmentId: params.assignmentId },
+    include: { student: true },
+    orderBy: { student: { name: "asc" } },
+  });
+
+  return {
+    ok: true,
+    statuses: statuses.map((s) => ({
+      studentId: s.studentId,
+      name: s.student.name,
+      status: displayStatus(s.status, assignment.dueDate),
+    })),
+  };
+}
+
+export type UpdateStatusesResult =
+  | { ok: true }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "NOT_ASSIGNED" }
+  | { ok: false; error: "STUDENT_MISMATCH" };
+
+export async function updateAssignmentStatuses(
+  prisma: PrismaClient,
+  params: {
+    assignmentId: number;
+    teacherUserId: number;
+    entries: Array<{ studentId: number; status: "pending" | "submitted" }>;
+  }
+): Promise<UpdateStatusesResult> {
+  const assignment = await prisma.assignment.findUnique({ where: { id: params.assignmentId } });
+  if (!assignment) {
+    return { ok: false, error: "NOT_FOUND" };
+  }
+
+  const link = await prisma.classTeacher.findFirst({
+    where: { classId: assignment.classId, teacherUserId: params.teacherUserId },
+  });
+  if (!link) {
+    return { ok: false, error: "NOT_ASSIGNED" };
+  }
+
+  const studentCount = await prisma.student.count({
+    where: {
+      classId: assignment.classId,
+      id: { in: params.entries.map((entry) => entry.studentId) },
+    },
+  });
+  if (studentCount !== params.entries.length) {
+    return { ok: false, error: "STUDENT_MISMATCH" };
+  }
+
+  await prisma.$transaction(
+    params.entries.map((entry) =>
+      prisma.assignmentStatus.upsert({
+        where: {
+          assignmentId_studentId: { assignmentId: params.assignmentId, studentId: entry.studentId },
+        },
+        create: {
+          assignmentId: params.assignmentId,
+          studentId: entry.studentId,
+          status: entry.status,
+        },
+        update: { status: entry.status },
+      })
+    )
+  );
+
+  return { ok: true };
+}
+
 export { displayStatus, isOverdue };

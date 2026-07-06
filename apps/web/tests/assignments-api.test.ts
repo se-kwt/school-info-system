@@ -13,6 +13,10 @@ import { prisma, resetDb } from "./helpers/db";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getAssignments, POST as postAssignments } from "../src/app/api/assignments/route";
 import { PATCH as patchAssignment } from "../src/app/api/assignments/[id]/route";
+import {
+  GET as getStatuses,
+  POST as postStatuses,
+} from "../src/app/api/assignments/[id]/statuses/route";
 
 describe("/api/assignments", () => {
   beforeEach(async () => {
@@ -374,6 +378,244 @@ describe("/api/assignments/[id]", () => {
       headers: { "content-type": "application/json" },
     });
     const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(403);
+  });
+});
+
+describe("/api/assignments/[id]/statuses", () => {
+  beforeEach(async () => {
+    await resetDb();
+    cookieStore.get.mockReset();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  async function seedAssignmentWithStudents() {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 5", section: "A" },
+    });
+    const teacher = await prisma.user.create({
+      data: { phone: "+15550021111", role: "teacher", name: "Test Teacher", schoolId: school.id },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+    });
+    const student = await prisma.student.create({
+      data: {
+        schoolId: school.id,
+        name: "Test Student",
+        dob: new Date("2016-01-01"),
+        classId: klass.id,
+        section: "A",
+        admissionNo: "SCH-600",
+      },
+    });
+    const assignment = await prisma.assignment.create({
+      data: {
+        classId: klass.id,
+        subject: "Math",
+        title: "Chapter 3 worksheet",
+        dueDate: new Date("2026-08-01"),
+        createdById: teacher.id,
+      },
+    });
+    await prisma.assignmentStatus.create({
+      data: { assignmentId: assignment.id, studentId: student.id, status: "pending" },
+    });
+    return { school, klass, teacher, student, assignment };
+  }
+
+  function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
+    const token = signSessionToken({ userId, role, schoolId });
+    cookieStore.get.mockReturnValue({ value: token });
+  }
+
+  it("returns the roster with computed status", async () => {
+    const { school, teacher, student, assignment } = await seedAssignmentWithStudents();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`);
+    const response = await getStatuses(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.statuses).toEqual([
+      { studentId: student.id, name: "Test Student", status: "pending" },
+    ]);
+  });
+
+  it("computes overdue for a past-due pending row", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 5", section: "A" },
+    });
+    const teacher = await prisma.user.create({
+      data: { phone: "+15550022222", role: "teacher", name: "Test Teacher", schoolId: school.id },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+    });
+    const student = await prisma.student.create({
+      data: {
+        schoolId: school.id,
+        name: "Test Student",
+        dob: new Date("2016-01-01"),
+        classId: klass.id,
+        section: "A",
+        admissionNo: "SCH-601",
+      },
+    });
+    const assignment = await prisma.assignment.create({
+      data: {
+        classId: klass.id,
+        subject: "Math",
+        title: "Overdue worksheet",
+        dueDate: new Date("2020-01-01"),
+        createdById: teacher.id,
+      },
+    });
+    await prisma.assignmentStatus.create({
+      data: { assignmentId: assignment.id, studentId: student.id, status: "pending" },
+    });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`);
+    const response = await getStatuses(request, { params: { id: String(assignment.id) } });
+    const body = await response.json();
+    expect(body.statuses[0].status).toBe("overdue");
+  });
+
+  it("returns 404 for a nonexistent assignment id", async () => {
+    const { school, teacher } = await seedAssignmentWithStudents();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request("http://localhost/api/assignments/999999/statuses");
+    const response = await getStatuses(request, { params: { id: "999999" } });
+    expect(response.status).toBe(404);
+  });
+
+  it("rejects a teacher not assigned to the class with 403", async () => {
+    const { school, assignment } = await seedAssignmentWithStudents();
+    const otherTeacher = await prisma.user.create({
+      data: { phone: "+15550023333", role: "teacher", name: "Other Teacher", schoolId: school.id },
+    });
+    loginAs(otherTeacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`);
+    const response = await getStatuses(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(403);
+  });
+
+  it("allows admin to view the roster", async () => {
+    const { school, student, assignment } = await seedAssignmentWithStudents();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550024444", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`);
+    const response = await getStatuses(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.statuses[0].studentId).toBe(student.id);
+  });
+
+  it("updates statuses without duplicating rows on re-save", async () => {
+    const { school, teacher, student, assignment } = await seedAssignmentWithStudents();
+    loginAs(teacher.id, "teacher", school.id);
+
+    async function save(status: string) {
+      const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`, {
+        method: "POST",
+        body: JSON.stringify({ entries: [{ studentId: student.id, status }] }),
+        headers: { "content-type": "application/json" },
+      });
+      return postStatuses(request, { params: { id: String(assignment.id) } });
+    }
+
+    await save("submitted");
+    const secondResponse = await save("pending");
+    expect(secondResponse.status).toBe(200);
+
+    const rows = await prisma.assignmentStatus.findMany({ where: { assignmentId: assignment.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("pending");
+  });
+
+  it("rejects a studentId outside the class with 400, all-or-nothing", async () => {
+    const { school, klass, teacher, assignment } = await seedAssignmentWithStudents();
+    const otherClass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 6", section: "B" },
+    });
+    const otherStudent = await prisma.student.create({
+      data: {
+        schoolId: school.id,
+        name: "Other Student",
+        dob: new Date("2015-01-01"),
+        classId: otherClass.id,
+        section: "B",
+        admissionNo: "SCH-602",
+      },
+    });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`, {
+      method: "POST",
+      body: JSON.stringify({ entries: [{ studentId: otherStudent.id, status: "submitted" }] }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postStatuses(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(400);
+
+    const rows = await prisma.assignmentStatus.findMany({ where: { studentId: otherStudent.id } });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("rejects \"overdue\" as an input status with 400", async () => {
+    const { school, teacher, student, assignment } = await seedAssignmentWithStudents();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`, {
+      method: "POST",
+      body: JSON.stringify({ entries: [{ studentId: student.id, status: "overdue" }] }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postStatuses(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a teacher not assigned to the class with 403 on POST", async () => {
+    const { school, student, assignment } = await seedAssignmentWithStudents();
+    const otherTeacher = await prisma.user.create({
+      data: { phone: "+15550025555", role: "teacher", name: "Other Teacher", schoolId: school.id },
+    });
+    loginAs(otherTeacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`, {
+      method: "POST",
+      body: JSON.stringify({ entries: [{ studentId: student.id, status: "submitted" }] }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postStatuses(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(403);
+  });
+
+  it("rejects an admin attempting to POST with 403", async () => {
+    const { school, student, assignment } = await seedAssignmentWithStudents();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550026666", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`, {
+      method: "POST",
+      body: JSON.stringify({ entries: [{ studentId: student.id, status: "submitted" }] }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postStatuses(request, { params: { id: String(assignment.id) } });
     expect(response.status).toBe(403);
   });
 });
