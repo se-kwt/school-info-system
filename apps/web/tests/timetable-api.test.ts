@@ -12,6 +12,10 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getTimetable, POST as postTimetable } from "../src/app/api/timetable/route";
+import {
+  PATCH as patchTimetable,
+  DELETE as deleteTimetable,
+} from "../src/app/api/timetable/[id]/route";
 
 describe("/api/timetable", () => {
   beforeEach(async () => {
@@ -294,5 +298,189 @@ describe("/api/timetable", () => {
     const request = new Request("http://localhost/api/timetable");
     const response = await getTimetable(request);
     expect(response.status).toBe(400);
+  });
+});
+
+describe("/api/timetable/[id]", () => {
+  beforeEach(async () => {
+    await resetDb();
+    cookieStore.get.mockReset();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  async function seedEntry() {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 5", section: "A" },
+    });
+    const teacher = await prisma.user.create({
+      data: { phone: "+15550051111", role: "teacher", name: "Test Teacher", schoolId: school.id },
+    });
+    const entry = await prisma.timetableEntry.create({
+      data: { classId: klass.id, dayOfWeek: 1, period: 1, subject: "Math", teacherUserId: teacher.id },
+    });
+    return { school, klass, teacher, entry };
+  }
+
+  function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
+    const token = signSessionToken({ userId, role, schoolId });
+    cookieStore.get.mockReturnValue({ value: token });
+  }
+
+  it("updates the subject and teacher", async () => {
+    const { school, entry } = await seedEntry();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550052222", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ subject: "Science" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    expect(response.status).toBe(200);
+
+    const updated = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
+    expect(updated?.subject).toBe("Science");
+  });
+
+  it("unsets the teacher when teacherUserId is explicitly null", async () => {
+    const { school, entry } = await seedEntry();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550053333", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ teacherUserId: null }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    expect(response.status).toBe(200);
+
+    const updated = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
+    expect(updated?.teacherUserId).toBeNull();
+  });
+
+  it("leaves the teacher unchanged when teacherUserId is omitted", async () => {
+    const { school, entry, teacher } = await seedEntry();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550054444", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ subject: "Science" }),
+      headers: { "content-type": "application/json" },
+    });
+    await patchTimetable(request, { params: { id: String(entry.id) } });
+
+    const updated = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
+    expect(updated?.teacherUserId).toBe(teacher.id);
+  });
+
+  it("rejects an invalid teacherUserId with 400", async () => {
+    const { school, entry } = await seedEntry();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550055555", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ teacherUserId: 999999 }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 404 for a nonexistent or cross-school entry id", async () => {
+    const { school } = await seedEntry();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550056666", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/timetable/999999", {
+      method: "PATCH",
+      body: JSON.stringify({ subject: "Doesn't matter" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchTimetable(request, { params: { id: "999999" } });
+    expect(response.status).toBe(404);
+  });
+
+  it("rejects an empty body with 400", async () => {
+    const { school, entry } = await seedEntry();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550057777", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({}),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a teacher attempting to PATCH with 403", async () => {
+    const { school, entry, teacher } = await seedEntry();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ subject: "Doesn't matter" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    expect(response.status).toBe(403);
+  });
+
+  it("deletes the entry", async () => {
+    const { school, entry } = await seedEntry();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550058888", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/timetable/${entry.id}`, { method: "DELETE" });
+    const response = await deleteTimetable(request, { params: { id: String(entry.id) } });
+    expect(response.status).toBe(200);
+
+    const found = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
+    expect(found).toBeNull();
+  });
+
+  it("returns 404 deleting a nonexistent or cross-school entry id", async () => {
+    const { school } = await seedEntry();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550059999", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/timetable/999999", { method: "DELETE" });
+    const response = await deleteTimetable(request, { params: { id: "999999" } });
+    expect(response.status).toBe(404);
+  });
+
+  it("rejects a teacher attempting to DELETE with 403", async () => {
+    const { school, entry, teacher } = await seedEntry();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/timetable/${entry.id}`, { method: "DELETE" });
+    const response = await deleteTimetable(request, { params: { id: String(entry.id) } });
+    expect(response.status).toBe(403);
   });
 });

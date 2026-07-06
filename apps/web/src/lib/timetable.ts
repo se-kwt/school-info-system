@@ -116,3 +116,65 @@ export async function createTimetableEntry(
     throw err;
   }
 }
+
+export type EditTimetableEntryResult =
+  | { ok: true }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "INVALID_TEACHER" };
+
+export async function editTimetableEntry(
+  prisma: PrismaClient,
+  params: {
+    entryId: number;
+    schoolId: number;
+    fields: {
+      subject?: string;
+      teacherUserId?: number | null;
+    };
+  }
+): Promise<EditTimetableEntryResult> {
+  const entry = await prisma.timetableEntry.findUnique({
+    where: { id: params.entryId },
+    include: { class: true },
+  });
+  if (!entry || entry.class.schoolId !== params.schoolId) {
+    return { ok: false, error: "NOT_FOUND" };
+  }
+
+  const data: { subject?: string; teacherUserId?: number | null } = {};
+  if (params.fields.subject !== undefined) {
+    data.subject = params.fields.subject;
+  }
+  if (params.fields.teacherUserId !== undefined) {
+    if (params.fields.teacherUserId !== null) {
+      const teacher = await prisma.user.findFirst({
+        where: { id: params.fields.teacherUserId, schoolId: params.schoolId, role: "teacher" },
+      });
+      if (!teacher) {
+        return { ok: false, error: "INVALID_TEACHER" };
+      }
+    }
+    data.teacherUserId = params.fields.teacherUserId;
+  }
+
+  await prisma.timetableEntry.update({ where: { id: params.entryId }, data });
+  return { ok: true };
+}
+
+export type DeleteTimetableEntryResult = { ok: true } | { ok: false; error: "NOT_FOUND" };
+
+export async function deleteTimetableEntry(
+  prisma: PrismaClient,
+  params: { entryId: number; schoolId: number }
+): Promise<DeleteTimetableEntryResult> {
+  const entry = await prisma.timetableEntry.findUnique({
+    where: { id: params.entryId },
+    include: { class: true },
+  });
+  if (!entry || entry.class.schoolId !== params.schoolId) {
+    return { ok: false, error: "NOT_FOUND" };
+  }
+
+  await prisma.timetableEntry.delete({ where: { id: params.entryId } });
+  return { ok: true };
+}
