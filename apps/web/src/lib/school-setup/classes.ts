@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { isUniqueConstraintViolation } from "./prisma-errors";
 
 export interface ClassSummary {
   id: number;
@@ -28,9 +29,16 @@ export async function createClass(
     return { ok: false, error: "DUPLICATE" };
   }
 
-  const created = await prisma.class.create({
-    data: { schoolId, name: input.name, section: input.section },
-    select: { id: true, name: true, section: true },
-  });
-  return { ok: true, class: created };
+  try {
+    const created = await prisma.class.create({
+      data: { schoolId, name: input.name, section: input.section },
+      select: { id: true, name: true, section: true },
+    });
+    return { ok: true, class: created };
+  } catch (err) {
+    if (isUniqueConstraintViolation(err)) {
+      return { ok: false, error: "DUPLICATE" };
+    }
+    throw err;
+  }
 }

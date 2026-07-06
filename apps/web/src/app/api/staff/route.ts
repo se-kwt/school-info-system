@@ -58,6 +58,9 @@ export async function POST(request: Request) {
       subject,
     });
     if (!result.ok) {
+      if (result.error === "INVALID_CLASS") {
+        return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
+      }
       return NextResponse.json({ error: "This phone number is already registered" }, { status: 409 });
     }
 

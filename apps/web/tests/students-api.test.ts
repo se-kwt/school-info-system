@@ -170,4 +170,28 @@ describe("/api/students", () => {
     const postResponse = await postStudents(postRequest);
     expect(postResponse.status).toBe(400);
   });
+
+  it("rejects a classId belonging to a different school with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherClass = await prisma.class.create({
+      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
+    });
+
+    const postRequest = new Request("http://localhost/api/students", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Cross Tenant",
+        dob: "2016-01-01",
+        classId: otherClass.id,
+        admissionNo: "SCH-999",
+        parentPhone: "+15558889999",
+        parentName: "Some Parent",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const postResponse = await postStudents(postRequest);
+    expect(postResponse.status).toBe(400);
+  });
 });

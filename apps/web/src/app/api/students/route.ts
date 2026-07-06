@@ -62,6 +62,9 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+      if (result.error === "INVALID_CLASS") {
+        return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
+      }
       return NextResponse.json(
         { error: "parentName is required to create a new parent account" },
         { status: 400 }
