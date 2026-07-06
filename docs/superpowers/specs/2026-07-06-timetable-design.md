@@ -98,7 +98,7 @@ Body: `{ classId: number; dayOfWeek: number; period: number; subject: string; te
 - `400 { error: "The selected class does not exist" }` if `classId` doesn't belong to `claims.schoolId`.
 - `400 { error: "dayOfWeek must be between 1 and 6" }` if out of range.
 - `400 { error: "The selected teacher does not exist at this school" }` if `teacherUserId` is provided but isn't a teacher at `claims.schoolId`.
-- `400 { error: "A period already exists for this class, day, and period number" }` on a unique-constraint violation (caught and mapped, not surfaced raw).
+- `409 { error: "A period already exists for this class, day, and period number" }` on a unique-constraint violation (caught and mapped, not surfaced raw) — matching the existing `POST /api/classes` convention for duplicate-constraint conflicts.
 - Success `200 { id: number }`.
 
 ### `PATCH /api/timetable/:id`
@@ -124,6 +124,6 @@ Requires `requireApiRole(["admin"])`. Teacher always `403`.
 Following the established Vitest + real-seeded-data + `vi.hoisted` cookie-mocking pattern:
 
 - `GET /api/timetable`: teacher's own class, teacher not assigned (`403`), admin any class in school, cross-school `classId` (`400`), missing `classId` (`400`), entries sorted by day then period, a period with no teacher returns `teacherUserId: null, teacherName: null`.
-- `POST /api/timetable`: creates the entry, missing-field `400`s, cross-school `classId` (`400`), out-of-range `dayOfWeek` (`400`), invalid `teacherUserId` (`400`), duplicate `(classId, dayOfWeek, period)` rejected with `400` (verified no duplicate row created), teacher attempting `POST` (`403`), entry created with no `teacherUserId` round-trips as `null`.
+- `POST /api/timetable`: creates the entry, missing-field `400`s, cross-school `classId` (`400`), out-of-range `dayOfWeek` (`400`), invalid `teacherUserId` (`400`), duplicate `(classId, dayOfWeek, period)` rejected with `409` (verified no duplicate row created), teacher attempting `POST` (`403`), entry created with no `teacherUserId` round-trips as `null`.
 - `PATCH /api/timetable/:id`: updates `subject`/`teacherUserId`, nonexistent/cross-school id (`404`), empty body (`400`), invalid `teacherUserId` (`400`), `dayOfWeek`/`period`/`classId` in body ignored (verified unchanged), teacher attempting `PATCH` (`403`).
 - `DELETE /api/timetable/:id`: removes the row (verified via direct Prisma query), nonexistent/cross-school id (`404`), teacher attempting `DELETE` (`403`).
