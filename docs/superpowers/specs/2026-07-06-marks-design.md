@@ -32,7 +32,7 @@ No database schema changes — `Exam` and `Mark` already exist from Foundation.
 
 **`/dashboard/marks`** (single page, both roles):
 
-1. **Exam selector** — dropdown listing all exams in the school (exams aren't scoped to a class, so both roles see the same list via `listExams`).
+1. **Exam selector** — dropdown listing all exams in the school (exams aren't scoped to a class, so both roles see the same list via `listExams`). **Admin only:** a "New Exam" form next to the selector (name, term, exam date) — submitting posts and adds the new exam to the selector's options, matching the inline create-form pattern used by Assignments' "New Assignment" control.
 2. **Class selector** — dropdown. Teacher: `getClassesForTeacher(prisma, claims.userId)`. Admin: `listClasses(prisma, claims.schoolId)`.
 3. **Breakdown table** — always visible, always read-only, for both roles: rows are students in the selected class, columns are every subject with at least one `Mark` row for this class+exam combination. Each cell shows `marksObtained/maxMarks (grade)`; a student/subject combination with no row yet shows "—".
 4. **Teacher only: "Enter Marks" panel**, below the table:
