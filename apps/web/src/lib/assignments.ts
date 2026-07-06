@@ -137,4 +137,49 @@ export async function createAssignment(
   return { ok: true, id: assignment.id };
 }
 
+export type EditAssignmentResult =
+  | { ok: true }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "FORBIDDEN" };
+
+export async function editAssignment(
+  prisma: PrismaClient,
+  params: {
+    assignmentId: number;
+    teacherUserId: number;
+    schoolId: number;
+    fields: {
+      subject?: string;
+      title?: string;
+      description?: string;
+      dueDate?: string;
+    };
+  }
+): Promise<EditAssignmentResult> {
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: params.assignmentId },
+    include: { class: true },
+  });
+  if (!assignment || assignment.class.schoolId !== params.schoolId) {
+    return { ok: false, error: "NOT_FOUND" };
+  }
+  if (assignment.createdById !== params.teacherUserId) {
+    return { ok: false, error: "FORBIDDEN" };
+  }
+
+  const data: {
+    subject?: string;
+    title?: string;
+    description?: string;
+    dueDate?: Date;
+  } = {};
+  if (params.fields.subject !== undefined) data.subject = params.fields.subject;
+  if (params.fields.title !== undefined) data.title = params.fields.title;
+  if (params.fields.description !== undefined) data.description = params.fields.description;
+  if (params.fields.dueDate !== undefined) data.dueDate = new Date(params.fields.dueDate);
+
+  await prisma.assignment.update({ where: { id: params.assignmentId }, data });
+  return { ok: true };
+}
+
 export { displayStatus, isOverdue };

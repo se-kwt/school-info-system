@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getAssignments, POST as postAssignments } from "../src/app/api/assignments/route";
+import { PATCH as patchAssignment } from "../src/app/api/assignments/[id]/route";
 
 describe("/api/assignments", () => {
   beforeEach(async () => {
@@ -256,5 +257,123 @@ describe("/api/assignments", () => {
     const request = new Request("http://localhost/api/assignments");
     const response = await getAssignments(request);
     expect(response.status).toBe(400);
+  });
+});
+
+describe("/api/assignments/[id]", () => {
+  beforeEach(async () => {
+    await resetDb();
+    cookieStore.get.mockReset();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  async function seedAssignment() {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 5", section: "A" },
+    });
+    const teacher = await prisma.user.create({
+      data: { phone: "+15550011111", role: "teacher", name: "Test Teacher", schoolId: school.id },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+    });
+    const assignment = await prisma.assignment.create({
+      data: {
+        classId: klass.id,
+        subject: "Math",
+        title: "Chapter 3 worksheet",
+        dueDate: new Date("2026-08-01"),
+        createdById: teacher.id,
+      },
+    });
+    return { school, klass, teacher, assignment };
+  }
+
+  function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
+    const token = signSessionToken({ userId, role, schoolId });
+    cookieStore.get.mockReturnValue({ value: token });
+  }
+
+  it("lets the creator edit title, subject, description, and due date", async () => {
+    const { school, teacher, assignment } = await seedAssignment();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Chapter 3 worksheet (revised)", dueDate: "2026-08-05" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(200);
+
+    const updated = await prisma.assignment.findUnique({ where: { id: assignment.id } });
+    expect(updated?.title).toBe("Chapter 3 worksheet (revised)");
+    expect(updated?.dueDate.toISOString().slice(0, 10)).toBe("2026-08-05");
+  });
+
+  it("rejects a different teacher assigned to the same class with 403", async () => {
+    const { school, klass, assignment } = await seedAssignment();
+    const otherTeacher = await prisma.user.create({
+      data: { phone: "+15550012222", role: "teacher", name: "Other Teacher", schoolId: school.id },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: klass.id, teacherUserId: otherTeacher.id, subject: "Science" },
+    });
+    loginAs(otherTeacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Hijacked title" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 404 for a nonexistent or cross-school assignment id", async () => {
+    const { school, teacher } = await seedAssignment();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request("http://localhost/api/assignments/999999", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Doesn't matter" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchAssignment(request, { params: { id: "999999" } });
+    expect(response.status).toBe(404);
+  });
+
+  it("rejects an empty body with 400", async () => {
+    const { school, teacher, assignment } = await seedAssignment();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({}),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects an admin attempting to PATCH with 403", async () => {
+    const { school, assignment } = await seedAssignment();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550013333", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Doesn't matter" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(403);
   });
 });
