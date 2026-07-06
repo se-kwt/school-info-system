@@ -272,4 +272,46 @@ describe("/api/attendance", () => {
     const body = await response.json();
     expect(body.students[0].monthPercent).toBe(80);
   });
+
+  it("excludes attendance from a different month when computing monthPercent for a date on the 1st", async () => {
+    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+
+    // Two days in the previous month, both "absent" -- must NOT count toward July's percentage.
+    await prisma.attendance.create({
+      data: {
+        studentId: student.id,
+        date: new Date(Date.UTC(2026, 5, 29)), // June 29, 2026
+        status: "absent",
+        markedById: teacher.id,
+      },
+    });
+    await prisma.attendance.create({
+      data: {
+        studentId: student.id,
+        date: new Date(Date.UTC(2026, 5, 30)), // June 30, 2026
+        status: "absent",
+        markedById: teacher.id,
+      },
+    });
+    // One day in July, "present" -- should be the ONLY day counted for July's percentage.
+    await prisma.attendance.create({
+      data: {
+        studentId: student.id,
+        date: new Date(Date.UTC(2026, 6, 1)), // July 1, 2026
+        status: "present",
+        markedById: teacher.id,
+      },
+    });
+
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(
+      `http://localhost/api/attendance?classId=${klass.id}&date=2026-07-01`
+    );
+    const response = await getAttendance(request);
+    const body = await response.json();
+
+    // If June's 2 absent days leaked into July's window, this would be far below 100.
+    expect(body.students[0].monthPercent).toBe(100);
+  });
 });

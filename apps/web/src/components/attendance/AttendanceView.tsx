@@ -78,11 +78,13 @@ export function AttendanceView({
       }),
     });
 
-    if (response.status === 200) {
+    if (response.ok) {
       setMessage("Attendance saved");
       const refreshed = await fetch(`/api/attendance?classId=${classId}&date=${date}`);
-      const body = await refreshed.json();
-      setStudents(body.students);
+      if (refreshed.ok) {
+        const body = await refreshed.json();
+        setStudents(body.students);
+      }
       return;
     }
     const body = await response.json();

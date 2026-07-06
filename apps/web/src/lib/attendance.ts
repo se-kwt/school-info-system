@@ -40,9 +40,9 @@ export async function getAttendanceRoster(
     }
   }
 
-  const targetDate = new Date(params.date);
-  const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-  const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
+  const [year, month] = params.date.split("-").map(Number);
+  const monthStart = new Date(Date.UTC(year, month - 1, 1));
+  const monthEnd = new Date(Date.UTC(year, month, 1));
 
   const students = await prisma.student.findMany({
     where: { classId: params.classId },
