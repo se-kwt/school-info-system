@@ -63,6 +63,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const result = await updateAssignmentStatuses(prisma, {
       assignmentId,
+      schoolId: claims.schoolId,
       teacherUserId: claims.userId,
       entries: entries as Array<{ studentId: number; status: "pending" | "submitted" }>,
     });

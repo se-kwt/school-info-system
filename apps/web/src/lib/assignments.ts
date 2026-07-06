@@ -245,12 +245,16 @@ export async function updateAssignmentStatuses(
   prisma: PrismaClient,
   params: {
     assignmentId: number;
+    schoolId: number;
     teacherUserId: number;
     entries: Array<{ studentId: number; status: "pending" | "submitted" }>;
   }
 ): Promise<UpdateStatusesResult> {
-  const assignment = await prisma.assignment.findUnique({ where: { id: params.assignmentId } });
-  if (!assignment) {
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: params.assignmentId },
+    include: { class: true },
+  });
+  if (!assignment || assignment.class.schoolId !== params.schoolId) {
     return { ok: false, error: "NOT_FOUND" };
   }
 
