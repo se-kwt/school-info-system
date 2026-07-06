@@ -105,11 +105,6 @@ export async function createAssignment(
     return { ok: false, error: "NOT_ASSIGNED" };
   }
 
-  const students = await prisma.student.findMany({
-    where: { classId: params.classId },
-    select: { id: true },
-  });
-
   const assignment = await prisma.$transaction(async (tx) => {
     const created = await tx.assignment.create({
       data: {
@@ -121,6 +116,12 @@ export async function createAssignment(
         createdById: params.teacherUserId,
       },
     });
+
+    const students = await tx.student.findMany({
+      where: { classId: params.classId },
+      select: { id: true },
+    });
+
     if (students.length > 0) {
       await tx.assignmentStatus.createMany({
         data: students.map((student) => ({
