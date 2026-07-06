@@ -50,4 +50,14 @@ describe("requireDashboardRole", () => {
     expect(() => requireDashboardRole(["admin", "accountant"])).toThrow("NEXT_REDIRECT:/dashboard");
     expect(redirectMock).toHaveBeenCalledWith("/dashboard");
   });
+
+  it("redirects to /login (not /dashboard) for a valid session with a non-staff role, to avoid a redirect loop", () => {
+    const token = signSessionToken({ userId: 1, role: "parent", schoolId: 1 });
+    cookieStore.get.mockReturnValue({ value: token });
+
+    expect(() => requireDashboardRole(["teacher", "admin", "accountant"])).toThrow(
+      "NEXT_REDIRECT:/login"
+    );
+    expect(redirectMock).toHaveBeenCalledWith("/login");
+  });
 });
