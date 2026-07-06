@@ -76,3 +76,100 @@ export async function getMarksForClassExam(
 
   return { ok: true, subjects, students: studentRows };
 }
+
+export function computeGrade(marksObtained: number, maxMarks: number): string {
+  const percentage = (marksObtained / maxMarks) * 100;
+  if (percentage >= 90) return "A";
+  if (percentage >= 75) return "B";
+  if (percentage >= 60) return "C";
+  if (percentage >= 40) return "D";
+  return "F";
+}
+
+export type EnterMarksResult =
+  | { ok: true }
+  | { ok: false; error: "INVALID_EXAM" }
+  | { ok: false; error: "NOT_ASSIGNED" }
+  | { ok: false; error: "STUDENT_MISMATCH" }
+  | { ok: false; error: "INVALID_MAX_MARKS" }
+  | { ok: false; error: "INVALID_MARKS_RANGE" };
+
+export async function enterMarks(
+  prisma: PrismaClient,
+  params: {
+    classId: number;
+    examId: number;
+    subject: string;
+    maxMarks: number;
+    teacherUserId: number;
+    schoolId: number;
+    entries: Array<{ studentId: number; marksObtained: number }>;
+  }
+): Promise<EnterMarksResult> {
+  const exam = await prisma.exam.findFirst({
+    where: { id: params.examId, schoolId: params.schoolId },
+  });
+  if (!exam) {
+    return { ok: false, error: "INVALID_EXAM" };
+  }
+
+  const link = await prisma.classTeacher.findFirst({
+    where: {
+      classId: params.classId,
+      subject: params.subject,
+      teacherUserId: params.teacherUserId,
+    },
+  });
+  if (!link) {
+    return { ok: false, error: "NOT_ASSIGNED" };
+  }
+
+  const studentCount = await prisma.student.count({
+    where: {
+      classId: params.classId,
+      id: { in: params.entries.map((entry) => entry.studentId) },
+    },
+  });
+  if (studentCount !== params.entries.length) {
+    return { ok: false, error: "STUDENT_MISMATCH" };
+  }
+
+  if (params.maxMarks <= 0) {
+    return { ok: false, error: "INVALID_MAX_MARKS" };
+  }
+
+  for (const entry of params.entries) {
+    if (entry.marksObtained < 0 || entry.marksObtained > params.maxMarks) {
+      return { ok: false, error: "INVALID_MARKS_RANGE" };
+    }
+  }
+
+  await prisma.$transaction(
+    params.entries.map((entry) =>
+      prisma.mark.upsert({
+        where: {
+          examId_studentId_subject: {
+            examId: params.examId,
+            studentId: entry.studentId,
+            subject: params.subject,
+          },
+        },
+        create: {
+          examId: params.examId,
+          studentId: entry.studentId,
+          subject: params.subject,
+          marksObtained: entry.marksObtained,
+          maxMarks: params.maxMarks,
+          grade: computeGrade(entry.marksObtained, params.maxMarks),
+        },
+        update: {
+          marksObtained: entry.marksObtained,
+          maxMarks: params.maxMarks,
+          grade: computeGrade(entry.marksObtained, params.maxMarks),
+        },
+      })
+    )
+  );
+
+  return { ok: true };
+}

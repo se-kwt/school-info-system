@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
-import { getMarksForClassExam } from "@/lib/marks";
+import { getMarksForClassExam, enterMarks } from "@/lib/marks";
 
 export async function GET(request: Request) {
   try {
@@ -39,6 +39,72 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ subjects: result.subjects, students: result.students });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const claims = requireApiRole(["teacher"]);
+
+    let classId: number | undefined;
+    let examId: number | undefined;
+    let subject: string | undefined;
+    let maxMarks: number | undefined;
+    let entries: Array<{ studentId: number; marksObtained: number }> | undefined;
+    try {
+      ({ classId, examId, subject, maxMarks, entries } = await request.json());
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    if (!classId || !examId || !subject || !maxMarks || !entries || entries.length === 0) {
+      return NextResponse.json(
+        { error: "classId, examId, subject, maxMarks, and entries are required" },
+        { status: 400 }
+      );
+    }
+
+    const result = await enterMarks(prisma, {
+      classId,
+      examId,
+      subject,
+      maxMarks,
+      teacherUserId: claims.userId,
+      schoolId: claims.schoolId,
+      entries,
+    });
+
+    if (!result.ok) {
+      if (result.error === "INVALID_EXAM") {
+        return NextResponse.json({ error: "The selected exam does not exist" }, { status: 400 });
+      }
+      if (result.error === "NOT_ASSIGNED") {
+        return NextResponse.json(
+          { error: "You are not assigned to this class and subject" },
+          { status: 403 }
+        );
+      }
+      if (result.error === "STUDENT_MISMATCH") {
+        return NextResponse.json(
+          { error: "One or more students do not belong to this class" },
+          { status: 400 }
+        );
+      }
+      if (result.error === "INVALID_MAX_MARKS") {
+        return NextResponse.json({ error: "maxMarks must be greater than 0" }, { status: 400 });
+      }
+      return NextResponse.json(
+        { error: "marksObtained must be between 0 and maxMarks" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
