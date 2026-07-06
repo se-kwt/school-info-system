@@ -214,6 +214,8 @@ model FeePayment {
   recordedBy     User         @relation("RecordedBy", fields: [recordedById], references: [id])
   recordedById   Int
   status         FeeStatus    @default(unpaid)
+
+  @@unique([studentId, feeStructureId])
 }
 
 model Notification {
