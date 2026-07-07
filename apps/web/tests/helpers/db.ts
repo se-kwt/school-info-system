@@ -15,8 +15,13 @@ export async function resetDb(): Promise<void> {
   await prisma.attendance.deleteMany();
   await prisma.classTeacher.deleteMany();
   await prisma.parentStudent.deleteMany();
+  await prisma.promotionLogEntry.deleteMany();
+  await prisma.promotionMapping.deleteMany();
+  await prisma.promotionRun.deleteMany();
+  await prisma.enrollment.deleteMany();
   await prisma.student.deleteMany();
   await prisma.class.deleteMany();
+  await prisma.academicYear.deleteMany();
   await prisma.user.deleteMany();
   await prisma.school.deleteMany();
 }
