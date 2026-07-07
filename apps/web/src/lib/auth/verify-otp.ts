@@ -39,6 +39,9 @@ export async function verifyOtp(
   });
 
   const user = await deps.prisma.user.findUniqueOrThrow({ where: { phone } });
+  if (user.status === "inactive") {
+    return { ok: false, error: "NOT_FOUND" };
+  }
 
   const token = signSessionToken({
     userId: user.id,

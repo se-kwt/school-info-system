@@ -46,6 +46,25 @@ describe("sendOtp", () => {
     );
   });
 
+  it("rejects a deactivated user's phone exactly like an unregistered one", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: {
+        phone: "+15550002222",
+        role: "teacher",
+        name: "Deactivated Teacher",
+        schoolId: school.id,
+        status: "inactive",
+      },
+    });
+
+    const smsSender = new FakeSmsSender();
+    await expect(sendOtp("+15550002222", { prisma, smsSender })).rejects.toThrow(
+      "PHONE_NOT_REGISTERED"
+    );
+    expect(smsSender.sentMessages).toHaveLength(0);
+  });
+
   it("returns a clean 400 JSON error for a malformed request body instead of throwing", async () => {
     const request = new Request("http://localhost/api/auth/send-otp", {
       method: "POST",

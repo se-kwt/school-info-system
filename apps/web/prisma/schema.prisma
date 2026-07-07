@@ -14,6 +14,11 @@ enum Role {
   accountant
 }
 
+enum UserStatus {
+  active
+  inactive
+}
+
 enum AttendanceStatus {
   present
   absent
@@ -75,11 +80,12 @@ model School {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  phone    String @unique
+  id       Int        @id @default(autoincrement())
+  phone    String     @unique
   role     Role
   name     String
-  school   School @relation(fields: [schoolId], references: [id])
+  status   UserStatus @default(active)
+  school   School     @relation(fields: [schoolId], references: [id])
   schoolId Int
 
   parentLinks         ParentStudent[]
@@ -126,6 +132,7 @@ model Class {
   schoolId Int
   name     String
   section  String
+  archived Boolean @default(false)
 
   teacherLinks     ClassTeacher[]
   assignments      Assignment[]

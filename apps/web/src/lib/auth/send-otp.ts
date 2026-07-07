@@ -9,7 +9,7 @@ export async function sendOtp(
   deps: { prisma: PrismaClient; smsSender: SmsSender }
 ): Promise<{ success: true }> {
   const user = await deps.prisma.user.findUnique({ where: { phone } });
-  if (!user) {
+  if (!user || user.status === "inactive") {
     throw new Error("PHONE_NOT_REGISTERED");
   }
 

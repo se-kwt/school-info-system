@@ -1,10 +1,11 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, StudentStatus } from "@prisma/client";
 import { isUniqueConstraintViolation } from "./prisma-errors";
 
 export interface StudentSummary {
   id: number;
   name: string;
   admissionNo: string;
+  status: StudentStatus;
   class: { name: string; section: string } | null;
   parents: { name: string; phone: string }[];
 }
@@ -29,11 +30,9 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
       id: student.id,
       name: student.name,
       admissionNo: student.admissionNo,
+      status: student.status,
       class: enrollment ? { name: enrollment.class.name, section: enrollment.class.section } : null,
-      parents: student.parentLinks.map((link) => ({
-        name: link.parent.name,
-        phone: link.parent.phone,
-      })),
+      parents: student.parentLinks.map((link) => ({ name: link.parent.name, phone: link.parent.phone })),
     };
   });
 }
@@ -77,21 +76,11 @@ export async function createStudent(
         }));
 
       const createdStudent = await tx.student.create({
-        data: {
-          schoolId,
-          name: input.name,
-          dob: new Date(input.dob),
-          admissionNo: input.admissionNo,
-        },
+        data: { schoolId, name: input.name, dob: new Date(input.dob), admissionNo: input.admissionNo },
       });
 
       await tx.enrollment.create({
-        data: {
-          studentId: createdStudent.id,
-          classId: input.classId,
-          academicYearId,
-          status: "active",
-        },
+        data: { studentId: createdStudent.id, classId: input.classId, academicYearId, status: "active" },
       });
 
       await tx.parentStudent.create({
@@ -109,4 +98,122 @@ export async function createStudent(
     if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
     throw err;
   }
+}
+
+export type EditStudentResult =
+  | { ok: true }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
+  | { ok: false; error: "INVALID_CLASS" }
+  | { ok: false; error: "NO_ACTIVE_ENROLLMENT" };
+
+export async function editStudent(
+  prisma: PrismaClient,
+  params: {
+    studentId: number;
+    schoolId: number;
+    academicYearId: number | null;
+    fields: { name?: string; dob?: string; admissionNo?: string; classId?: number };
+  }
+): Promise<EditStudentResult> {
+  const student = await prisma.student.findFirst({ where: { id: params.studentId, schoolId: params.schoolId } });
+  if (!student) return { ok: false, error: "NOT_FOUND" };
+
+  if (params.fields.admissionNo && params.fields.admissionNo !== student.admissionNo) {
+    const existing = await prisma.student.findUnique({ where: { admissionNo: params.fields.admissionNo } });
+    if (existing) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
+  }
+
+  if (params.fields.classId !== undefined) {
+    if (!params.academicYearId) return { ok: false, error: "NO_ACTIVE_ENROLLMENT" };
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { studentId_academicYearId: { studentId: params.studentId, academicYearId: params.academicYearId } },
+    });
+    if (!enrollment) return { ok: false, error: "NO_ACTIVE_ENROLLMENT" };
+
+    const targetClass = await prisma.class.findFirst({
+      where: { id: params.fields.classId, schoolId: params.schoolId },
+    });
+    if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const data: { name?: string; dob?: Date; admissionNo?: string } = {};
+    if (params.fields.name !== undefined) data.name = params.fields.name;
+    if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
+    if (params.fields.admissionNo !== undefined) data.admissionNo = params.fields.admissionNo;
+    if (Object.keys(data).length > 0) {
+      await tx.student.update({ where: { id: params.studentId }, data });
+    }
+
+    if (params.fields.classId !== undefined && params.academicYearId) {
+      await tx.enrollment.update({
+        where: {
+          studentId_academicYearId: { studentId: params.studentId, academicYearId: params.academicYearId },
+        },
+        data: { classId: params.fields.classId },
+      });
+    }
+  });
+
+  return { ok: true };
+}
+
+export type DeleteStudentResult =
+  | { ok: true; deleted: true }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "HAS_HISTORY" };
+
+export async function deleteStudent(
+  prisma: PrismaClient,
+  params: { studentId: number; schoolId: number }
+): Promise<DeleteStudentResult> {
+  const student = await prisma.student.findFirst({ where: { id: params.studentId, schoolId: params.schoolId } });
+  if (!student) return { ok: false, error: "NOT_FOUND" };
+
+  const [attendanceCount, markCount, feePaymentCount, assignmentStatusCount, promotionLogCount, enrollmentCount] =
+    await Promise.all([
+      prisma.attendance.count({ where: { studentId: params.studentId } }),
+      prisma.mark.count({ where: { studentId: params.studentId } }),
+      prisma.feePayment.count({ where: { studentId: params.studentId } }),
+      prisma.assignmentStatus.count({ where: { studentId: params.studentId } }),
+      prisma.promotionLogEntry.count({ where: { studentId: params.studentId } }),
+      prisma.enrollment.count({ where: { studentId: params.studentId } }),
+    ]);
+
+  const hasHistory =
+    attendanceCount + markCount + feePaymentCount + assignmentStatusCount + promotionLogCount > 0 ||
+    enrollmentCount > 1;
+  if (hasHistory) return { ok: false, error: "HAS_HISTORY" };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.enrollment.deleteMany({ where: { studentId: params.studentId } });
+    await tx.parentStudent.deleteMany({ where: { studentId: params.studentId } });
+    await tx.student.delete({ where: { id: params.studentId } });
+  });
+
+  return { ok: true, deleted: true };
+}
+
+export type DeactivateStudentResult = { ok: true } | { ok: false; error: "NOT_FOUND" };
+
+export async function deactivateStudent(
+  prisma: PrismaClient,
+  params: { studentId: number; schoolId: number; academicYearId: number | null }
+): Promise<DeactivateStudentResult> {
+  const student = await prisma.student.findFirst({ where: { id: params.studentId, schoolId: params.schoolId } });
+  if (!student) return { ok: false, error: "NOT_FOUND" };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.student.update({ where: { id: params.studentId }, data: { status: "inactive" } });
+    if (params.academicYearId) {
+      await tx.enrollment.updateMany({
+        where: { studentId: params.studentId, academicYearId: params.academicYearId },
+        data: { status: "inactive" },
+      });
+    }
+  });
+
+  return { ok: true };
 }
