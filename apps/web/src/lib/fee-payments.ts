@@ -48,3 +48,87 @@ export async function getFeeRoster(
 
   return { ok: true, students: result };
 }
+
+export function computeFeeStatus(amountPaid: number, amount: number): FeeStatus {
+  if (amountPaid <= 0) return "unpaid";
+  if (amountPaid < amount) return "partial";
+  return "paid";
+}
+
+export type RecordPaymentResult =
+  | { ok: true; amountPaid: number; status: FeeStatus }
+  | { ok: false; error: "INVALID_FEE_STRUCTURE" }
+  | { ok: false; error: "STUDENT_MISMATCH" }
+  | { ok: false; error: "INVALID_AMOUNT" }
+  | { ok: false; error: "EXCEEDS_AMOUNT_DUE" };
+
+export async function recordPayment(
+  prisma: PrismaClient,
+  params: {
+    feeStructureId: number;
+    studentId: number;
+    schoolId: number;
+    recordedById: number;
+    amount: number;
+  }
+): Promise<RecordPaymentResult> {
+  const feeStructure = await prisma.feeStructure.findFirst({
+    where: { id: params.feeStructureId, schoolId: params.schoolId },
+  });
+  if (!feeStructure) {
+    return { ok: false, error: "INVALID_FEE_STRUCTURE" };
+  }
+
+  const student = await prisma.student.findFirst({
+    where: { id: params.studentId, classId: feeStructure.classId },
+  });
+  if (!student) {
+    return { ok: false, error: "STUDENT_MISMATCH" };
+  }
+
+  if (params.amount <= 0) {
+    return { ok: false, error: "INVALID_AMOUNT" };
+  }
+
+  const existing = await prisma.feePayment.findUnique({
+    where: {
+      studentId_feeStructureId: {
+        studentId: params.studentId,
+        feeStructureId: params.feeStructureId,
+      },
+    },
+  });
+  const existingAmountPaid = existing ? existing.amountPaid : 0;
+  const newAmountPaid = existingAmountPaid + params.amount;
+
+  if (newAmountPaid > feeStructure.amount) {
+    return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
+  }
+
+  const status = computeFeeStatus(newAmountPaid, feeStructure.amount);
+
+  await prisma.feePayment.upsert({
+    where: {
+      studentId_feeStructureId: {
+        studentId: params.studentId,
+        feeStructureId: params.feeStructureId,
+      },
+    },
+    create: {
+      studentId: params.studentId,
+      feeStructureId: params.feeStructureId,
+      amountPaid: newAmountPaid,
+      paidDate: new Date(),
+      recordedById: params.recordedById,
+      status,
+    },
+    update: {
+      amountPaid: newAmountPaid,
+      paidDate: new Date(),
+      recordedById: params.recordedById,
+      status,
+    },
+  });
+
+  return { ok: true, amountPaid: newAmountPaid, status };
+}
