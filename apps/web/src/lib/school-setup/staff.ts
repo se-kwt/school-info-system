@@ -222,3 +222,16 @@ export async function deactivateStaff(
 
   return { ok: true };
 }
+
+export type ActivateStaffResult = { ok: true } | { ok: false; error: "NOT_FOUND" };
+
+export async function activateStaff(
+  prisma: PrismaClient,
+  params: { userId: number; schoolId: number }
+): Promise<ActivateStaffResult> {
+  const user = await prisma.user.findFirst({ where: { id: params.userId, schoolId: params.schoolId } });
+  if (!user) return { ok: false, error: "NOT_FOUND" };
+
+  await prisma.user.update({ where: { id: params.userId }, data: { status: "active" } });
+  return { ok: true };
+}

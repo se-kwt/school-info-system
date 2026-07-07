@@ -130,3 +130,18 @@ export async function archiveClass(
   await prisma.class.update({ where: { id: params.classId }, data: { archived: true } });
   return { ok: true };
 }
+
+export type UnarchiveClassResult = { ok: true } | { ok: false; error: "NOT_FOUND" };
+
+export async function unarchiveClass(
+  prisma: PrismaClient,
+  params: { classId: number; schoolId: number }
+): Promise<UnarchiveClassResult> {
+  const klass = await prisma.class.findFirst({
+    where: { id: params.classId, schoolId: params.schoolId },
+  });
+  if (!klass) return { ok: false, error: "NOT_FOUND" };
+
+  await prisma.class.update({ where: { id: params.classId }, data: { archived: false } });
+  return { ok: true };
+}

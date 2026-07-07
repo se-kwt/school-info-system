@@ -15,6 +15,7 @@ import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getStaff, POST as postStaff } from "../src/app/api/staff/route";
 import { PATCH as patchStaff, DELETE as deleteStaffRoute } from "../src/app/api/staff/[id]/route";
 import { PATCH as deactivateStaffRoute } from "../src/app/api/staff/[id]/deactivate/route";
+import { PATCH as activateStaffRoute } from "../src/app/api/staff/[id]/activate/route";
 
 describe("/api/staff", () => {
   beforeEach(async () => {
@@ -349,5 +350,37 @@ describe("/api/staff/[id]", () => {
     const request = new Request(`http://localhost/api/staff/${admin.id}/deactivate`, { method: "PATCH" });
     const response = await deactivateStaffRoute(request, { params: { id: String(admin.id) } });
     expect(response.status).toBe(403);
+  });
+
+  it("reactivates a deactivated staff member", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const { admin, teacher } = await seedAdminAndTeacher(school.id);
+    loginAs(admin.id, school.id);
+
+    await deactivateStaffRoute(
+      new Request(`http://localhost/api/staff/${teacher.id}/deactivate`, { method: "PATCH" }),
+      { params: { id: String(teacher.id) } }
+    );
+
+    const request = new Request(`http://localhost/api/staff/${teacher.id}/activate`, { method: "PATCH" });
+    const response = await activateStaffRoute(request, { params: { id: String(teacher.id) } });
+    expect(response.status).toBe(200);
+
+    const updated = await prisma.user.findUnique({ where: { id: teacher.id } });
+    expect(updated?.status).toBe("active");
+  });
+
+  it("returns 404 activating a cross-school staff id", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const { admin } = await seedAdminAndTeacher(school.id);
+    loginAs(admin.id, school.id);
+    const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherStaff = await prisma.user.create({
+      data: { phone: "+15559991003", role: "teacher", name: "Cross Tenant", schoolId: otherSchool.id },
+    });
+
+    const request = new Request(`http://localhost/api/staff/${otherStaff.id}/activate`, { method: "PATCH" });
+    const response = await activateStaffRoute(request, { params: { id: String(otherStaff.id) } });
+    expect(response.status).toBe(404);
   });
 });

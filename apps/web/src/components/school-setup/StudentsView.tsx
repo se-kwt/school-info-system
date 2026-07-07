@@ -125,6 +125,16 @@ export function StudentsView({
     await refresh();
   }
 
+  async function handleActivate(id: number) {
+    setError(null);
+    const response = await fetch(`/api/students/${id}/activate`, { method: "PATCH" });
+    if (!response.ok) {
+      setError((await response.json()).error);
+      return;
+    }
+    await refresh();
+  }
+
   return (
     <div className="mt-4">
       {isAdmin && (
@@ -221,9 +231,18 @@ export function StudentsView({
                     <button type="button" onClick={() => startEdit(student)} className="mr-3 text-blue-600 underline">
                       Edit
                     </button>
-                    <button type="button" onClick={() => handleDelete(student.id)} className="text-red-600 underline">
+                    <button type="button" onClick={() => handleDelete(student.id)} className="mr-3 text-red-600 underline">
                       Delete
                     </button>
+                    {student.status !== "active" && (
+                      <button
+                        type="button"
+                        onClick={() => handleActivate(student.id)}
+                        className="text-green-700 underline"
+                      >
+                        Activate
+                      </button>
+                    )}
                   </td>
                 )}
               </tr>

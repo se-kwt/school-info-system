@@ -15,6 +15,7 @@ import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getStudents, POST as postStudents } from "../src/app/api/students/route";
 import { PATCH as patchStudent, DELETE as deleteStudentRoute } from "../src/app/api/students/[id]/route";
 import { PATCH as deactivateStudentRoute } from "../src/app/api/students/[id]/deactivate/route";
+import { PATCH as activateStudentRoute } from "../src/app/api/students/[id]/activate/route";
 
 describe("/api/students", () => {
   beforeEach(async () => {
@@ -381,6 +382,37 @@ describe("/api/students/[id]", () => {
       where: { studentId_academicYearId: { studentId: student.id, academicYearId: year.id } },
     });
     expect(enrollment?.status).toBe("inactive");
+  });
+
+  it("reactivates a deactivated student and their active-year enrollment", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    await loginAsAdmin(school.id);
+    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 5", section: "A" } });
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "To Reactivate",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-REACT-1",
+    });
+
+    await deactivateStudentRoute(
+      new Request(`http://localhost/api/students/${student.id}/deactivate`, { method: "PATCH" }),
+      { params: { id: String(student.id) } }
+    );
+
+    const request = new Request(`http://localhost/api/students/${student.id}/activate`, { method: "PATCH" });
+    const response = await activateStudentRoute(request, { params: { id: String(student.id) } });
+    expect(response.status).toBe(200);
+
+    const updatedStudent = await prisma.student.findUnique({ where: { id: student.id } });
+    expect(updatedStudent?.status).toBe("active");
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { studentId_academicYearId: { studentId: student.id, academicYearId: year.id } },
+    });
+    expect(enrollment?.status).toBe("active");
   });
 
   it("returns 404 for a cross-school student id", async () => {

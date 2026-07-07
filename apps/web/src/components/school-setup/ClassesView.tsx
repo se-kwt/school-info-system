@@ -90,6 +90,16 @@ export function ClassesView({ initialClasses }: { initialClasses: ClassRow[] }) 
     await refresh();
   }
 
+  async function handleUnarchive(id: number) {
+    setError(null);
+    const response = await fetch(`/api/classes/${id}/unarchive`, { method: "PATCH" });
+    if (!response.ok) {
+      setError((await response.json()).error);
+      return;
+    }
+    await refresh();
+  }
+
   return (
     <div className="mt-4">
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -140,9 +150,18 @@ export function ClassesView({ initialClasses }: { initialClasses: ClassRow[] }) 
                   <button type="button" onClick={() => startEdit(klass)} className="mr-3 text-blue-600 underline">
                     Edit
                   </button>
-                  <button type="button" onClick={() => handleDelete(klass.id)} className="text-red-600 underline">
+                  <button type="button" onClick={() => handleDelete(klass.id)} className="mr-3 text-red-600 underline">
                     Delete
                   </button>
+                  {klass.archived && (
+                    <button
+                      type="button"
+                      onClick={() => handleUnarchive(klass.id)}
+                      className="text-green-700 underline"
+                    >
+                      Unarchive
+                    </button>
+                  )}
                 </td>
               </tr>
               {editingId === klass.id && (

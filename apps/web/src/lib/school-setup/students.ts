@@ -217,3 +217,25 @@ export async function deactivateStudent(
 
   return { ok: true };
 }
+
+export type ActivateStudentResult = { ok: true } | { ok: false; error: "NOT_FOUND" };
+
+export async function activateStudent(
+  prisma: PrismaClient,
+  params: { studentId: number; schoolId: number; academicYearId: number | null }
+): Promise<ActivateStudentResult> {
+  const student = await prisma.student.findFirst({ where: { id: params.studentId, schoolId: params.schoolId } });
+  if (!student) return { ok: false, error: "NOT_FOUND" };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.student.update({ where: { id: params.studentId }, data: { status: "active" } });
+    if (params.academicYearId) {
+      await tx.enrollment.updateMany({
+        where: { studentId: params.studentId, academicYearId: params.academicYearId, status: "inactive" },
+        data: { status: "active" },
+      });
+    }
+  });
+
+  return { ok: true };
+}

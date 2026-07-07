@@ -15,6 +15,7 @@ import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getClasses, POST as postClasses } from "../src/app/api/classes/route";
 import { PATCH as patchClass, DELETE as deleteClassRoute } from "../src/app/api/classes/[id]/route";
 import { PATCH as archiveClassRoute } from "../src/app/api/classes/[id]/archive/route";
+import { PATCH as unarchiveClassRoute } from "../src/app/api/classes/[id]/unarchive/route";
 
 describe("/api/classes", () => {
   beforeEach(async () => {
@@ -229,6 +230,36 @@ describe("/api/classes/[id]", () => {
 
     const updated = await prisma.class.findUnique({ where: { id: klass.id } });
     expect(updated?.archived).toBe(true);
+  });
+
+  it("unarchives a class", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 9", section: "A", archived: true },
+    });
+
+    const request = new Request(`http://localhost/api/classes/${klass.id}/unarchive`, { method: "PATCH" });
+    const response = await unarchiveClassRoute(request, { params: { id: String(klass.id) } });
+    expect(response.status).toBe(200);
+
+    const updated = await prisma.class.findUnique({ where: { id: klass.id } });
+    expect(updated?.archived).toBe(false);
+  });
+
+  it("returns 404 unarchiving a cross-school class id", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherClass = await prisma.class.create({
+      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A", archived: true },
+    });
+
+    const request = new Request(`http://localhost/api/classes/${otherClass.id}/unarchive`, {
+      method: "PATCH",
+    });
+    const response = await unarchiveClassRoute(request, { params: { id: String(otherClass.id) } });
+    expect(response.status).toBe(404);
   });
 
   it("returns 404 for a cross-school class id on PATCH/DELETE/archive", async () => {
