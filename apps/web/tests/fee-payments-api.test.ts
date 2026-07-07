@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createActiveYear, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getFeePayments, POST as postFeePayments } from "../src/app/api/fee-payments/route";
 
@@ -26,29 +27,29 @@ describe("GET /api/fee-payments", () => {
 
   async function seedSchoolWithFeeStructure() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
-    const student = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Test Student",
-        dob: new Date("2016-01-01"),
-        classId: klass.id,
-        section: "A",
-        admissionNo: "SCH-900",
-      },
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Test Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-900",
     });
     const feeStructure = await prisma.feeStructure.create({
       data: {
         schoolId: school.id,
+        academicYearId: year.id,
         classId: klass.id,
         term: "Term 1",
         amount: 5000,
         dueDate: new Date("2026-09-01"),
       },
     });
-    return { school, klass, student, feeStructure };
+    return { school, year, klass, student, feeStructure };
   }
 
   function loginAs(userId: number, role: "admin" | "accountant", schoolId: number) {
@@ -115,12 +116,14 @@ describe("GET /api/fee-payments", () => {
   it("rejects a feeStructureId from a different school with 400", async () => {
     const { school } = await seedSchoolWithFeeStructure();
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherYear = await createActiveYear(prisma, otherSchool.id, "2026-27-other");
     const otherClass = await prisma.class.create({
       data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
     });
     const otherFeeStructure = await prisma.feeStructure.create({
       data: {
         schoolId: otherSchool.id,
+        academicYearId: otherYear.id,
         classId: otherClass.id,
         term: "Term 1",
         amount: 1000,
@@ -165,29 +168,29 @@ describe("POST /api/fee-payments", () => {
 
   async function seedSchoolWithFeeStructure() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
-    const student = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Test Student",
-        dob: new Date("2016-01-01"),
-        classId: klass.id,
-        section: "A",
-        admissionNo: "SCH-901",
-      },
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Test Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-901",
     });
     const feeStructure = await prisma.feeStructure.create({
       data: {
         schoolId: school.id,
+        academicYearId: year.id,
         classId: klass.id,
         term: "Term 1",
         amount: 5000,
         dueDate: new Date("2026-09-01"),
       },
     });
-    return { school, klass, student, feeStructure };
+    return { school, year, klass, student, feeStructure };
   }
 
   function loginAs(userId: number, role: "admin" | "accountant", schoolId: number) {
@@ -287,19 +290,17 @@ describe("POST /api/fee-payments", () => {
   });
 
   it("rejects a studentId that doesn't belong to the fee structure's class with 400", async () => {
-    const { school, feeStructure } = await seedSchoolWithFeeStructure();
+    const { school, year, feeStructure } = await seedSchoolWithFeeStructure();
     const otherClass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 6", section: "B" },
     });
-    const otherStudent = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Other Student",
-        dob: new Date("2015-01-01"),
-        classId: otherClass.id,
-        section: "B",
-        admissionNo: "SCH-902",
-      },
+    const otherStudent = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: otherClass.id,
+      academicYearId: year.id,
+      name: "Other Student",
+      dob: new Date("2015-01-01"),
+      admissionNo: "SCH-902",
     });
     const admin = await prisma.user.create({
       data: { phone: "+15550115555", role: "admin", name: "Test Admin", schoolId: school.id },
@@ -338,12 +339,14 @@ describe("POST /api/fee-payments", () => {
   it("rejects a feeStructureId from a different school with 400", async () => {
     const { school, student } = await seedSchoolWithFeeStructure();
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherYear = await createActiveYear(prisma, otherSchool.id, "2026-27-other");
     const otherClass = await prisma.class.create({
       data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
     });
     const otherFeeStructure = await prisma.feeStructure.create({
       data: {
         schoolId: otherSchool.id,
+        academicYearId: otherYear.id,
         classId: otherClass.id,
         term: "Term 1",
         amount: 1000,

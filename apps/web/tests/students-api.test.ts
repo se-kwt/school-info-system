@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createActiveYear, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getStudents, POST as postStudents } from "../src/app/api/students/route";
 
@@ -34,6 +35,7 @@ describe("/api/students", () => {
 
   it("creates a student linked to an existing parent", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 3", section: "A" },
@@ -62,6 +64,7 @@ describe("/api/students", () => {
 
   it("creates a student and a new parent in one request", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 4", section: "A" },
@@ -93,19 +96,18 @@ describe("/api/students", () => {
 
   it("rejects a duplicate admission number with 409", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
-    await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Existing Student",
-        dob: new Date("2016-01-01"),
-        classId: klass.id,
-        section: klass.section,
-        admissionNo: "SCH-003",
-      },
+    await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Existing Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-003",
     });
 
     const postRequest = new Request("http://localhost/api/students", {
@@ -126,6 +128,7 @@ describe("/api/students", () => {
 
   it("rejects a parentPhone belonging to a non-parent role with 409", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 6", section: "A" },
@@ -151,6 +154,7 @@ describe("/api/students", () => {
 
   it("rejects a new parentPhone with no parentName with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 7", section: "A" },
@@ -173,6 +177,7 @@ describe("/api/students", () => {
 
   it("rejects a classId belonging to a different school with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
     const otherClass = await prisma.class.create({

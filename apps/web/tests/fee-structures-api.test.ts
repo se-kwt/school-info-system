@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createActiveYear } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import {
   GET as getFeeStructures,
@@ -34,6 +35,7 @@ describe("/api/fee-structures", () => {
 
   it("creates a fee structure and lists it", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -63,6 +65,7 @@ describe("/api/fee-structures", () => {
 
   it("rejects a missing field with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -82,6 +85,7 @@ describe("/api/fee-structures", () => {
 
   it("rejects a classId from a different school with 400 on create", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
     const otherClass = await prisma.class.create({
       data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
@@ -131,11 +135,19 @@ describe("/api/fee-structures", () => {
 
   it("allows an accountant to GET the list", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
     await prisma.feeStructure.create({
-      data: { schoolId: school.id, classId: klass.id, term: "Term 1", amount: 5000, dueDate: new Date("2026-09-01") },
+      data: {
+        schoolId: school.id,
+        academicYearId: year.id,
+        classId: klass.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: new Date("2026-09-01"),
+      },
     });
     const accountant = await prisma.user.create({
       data: { phone: "+15550095555", role: "accountant", name: "Test Accountant", schoolId: school.id },

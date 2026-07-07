@@ -15,6 +15,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/marks", label: "Exams & Marks" },
   { href: "/dashboard/timetable", label: "Timetable" },
   { href: "/dashboard/fees", label: "Fees" },
+  { href: "/dashboard/academic-years", label: "Academic Years" },
 ];
 
 const NAV_HREFS_BY_ROLE: Record<SessionClaims["role"], string[]> = {
@@ -36,6 +37,7 @@ const NAV_HREFS_BY_ROLE: Record<SessionClaims["role"], string[]> = {
     "/dashboard/marks",
     "/dashboard/timetable",
     "/dashboard/fees",
+    "/dashboard/academic-years",
   ],
   accountant: ["/dashboard", "/dashboard/fees"],
   parent: [],

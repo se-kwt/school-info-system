@@ -13,10 +13,11 @@ export async function getStudentsForParent(
 
 export async function getClassesForTeacher(
   prisma: PrismaClient,
-  teacherUserId: number
+  teacherUserId: number,
+  academicYearId: number
 ): Promise<Class[]> {
   const links = await prisma.classTeacher.findMany({
-    where: { teacherUserId },
+    where: { teacherUserId, academicYearId },
     include: { class: true },
     distinct: ["classId"],
   });

@@ -1,5 +1,6 @@
-import type { PrismaClient, AssignmentStatusValue } from "@prisma/client";
+import type { AssignmentStatusValue, PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "./auth/jwt";
+import { getEnrolledStudents } from "./enrollment";
 
 function isOverdue(dueDate: Date): boolean {
   const todayStart = new Date(new Date().toISOString().slice(0, 10));
@@ -10,9 +11,7 @@ function displayStatus(
   status: AssignmentStatusValue,
   dueDate: Date
 ): "pending" | "submitted" | "overdue" {
-  if (status === "pending" && isOverdue(dueDate)) {
-    return "overdue";
-  }
+  if (status === "pending" && isOverdue(dueDate)) return "overdue";
   return status;
 }
 
@@ -40,49 +39,47 @@ export async function listAssignments(
     schoolId: number;
     role: SessionClaims["role"];
     userId: number;
+    academicYearId: number;
   }
 ): Promise<ListAssignmentsResult> {
   if (params.role === "teacher") {
     const link = await prisma.classTeacher.findFirst({
-      where: { classId: params.classId, teacherUserId: params.userId },
+      where: {
+        classId: params.classId,
+        teacherUserId: params.userId,
+        academicYearId: params.academicYearId,
+      },
     });
-    if (!link) {
-      return { ok: false, error: "NOT_ASSIGNED" };
-    }
+    if (!link) return { ok: false, error: "NOT_ASSIGNED" };
   } else {
     const klass = await prisma.class.findFirst({
       where: { id: params.classId, schoolId: params.schoolId },
     });
-    if (!klass) {
-      return { ok: false, error: "INVALID_CLASS" };
-    }
+    if (!klass) return { ok: false, error: "INVALID_CLASS" };
   }
 
   const assignments = await prisma.assignment.findMany({
-    where: { classId: params.classId },
+    where: { classId: params.classId, academicYearId: params.academicYearId },
     include: { statuses: true },
     orderBy: { dueDate: "desc" },
   });
 
-  const result: AssignmentSummary[] = assignments.map((assignment) => {
-    const submittedCount = assignment.statuses.filter((s) => s.status === "submitted").length;
-    const hasOverdue = assignment.statuses.some(
-      (s) => s.status === "pending" && isOverdue(assignment.dueDate)
-    );
-    return {
+  return {
+    ok: true,
+    assignments: assignments.map((assignment) => ({
       id: assignment.id,
       subject: assignment.subject,
       title: assignment.title,
       description: assignment.description,
       dueDate: assignment.dueDate.toISOString().slice(0, 10),
       createdById: assignment.createdById,
-      submittedCount,
+      submittedCount: assignment.statuses.filter((s) => s.status === "submitted").length,
       totalCount: assignment.statuses.length,
-      hasOverdue,
-    };
-  });
-
-  return { ok: true, assignments: result };
+      hasOverdue: assignment.statuses.some(
+        (s) => s.status === "pending" && isOverdue(assignment.dueDate)
+      ),
+    })),
+  };
 }
 
 export type CreateAssignmentResult = { ok: true; id: number } | { ok: false; error: "NOT_ASSIGNED" };
@@ -96,14 +93,17 @@ export async function createAssignment(
     title: string;
     description?: string;
     dueDate: string;
+    academicYearId: number;
   }
 ): Promise<CreateAssignmentResult> {
   const link = await prisma.classTeacher.findFirst({
-    where: { classId: params.classId, teacherUserId: params.teacherUserId },
+    where: {
+      classId: params.classId,
+      teacherUserId: params.teacherUserId,
+      academicYearId: params.academicYearId,
+    },
   });
-  if (!link) {
-    return { ok: false, error: "NOT_ASSIGNED" };
-  }
+  if (!link) return { ok: false, error: "NOT_ASSIGNED" };
 
   const assignment = await prisma.$transaction(async (tx) => {
     const created = await tx.assignment.create({
@@ -114,17 +114,17 @@ export async function createAssignment(
         description: params.description ?? null,
         dueDate: new Date(params.dueDate),
         createdById: params.teacherUserId,
+        academicYearId: params.academicYearId,
       },
     });
 
-    const students = await tx.student.findMany({
-      where: { classId: params.classId },
-      select: { id: true },
+    const enrolled = await getEnrolledStudents(tx as PrismaClient, {
+      classId: params.classId,
+      academicYearId: params.academicYearId,
     });
-
-    if (students.length > 0) {
+    if (enrolled.length > 0) {
       await tx.assignmentStatus.createMany({
-        data: students.map((student) => ({
+        data: enrolled.map((student) => ({
           assignmentId: created.id,
           studentId: student.id,
           status: "pending" as const,
@@ -148,31 +148,17 @@ export async function editAssignment(
     assignmentId: number;
     teacherUserId: number;
     schoolId: number;
-    fields: {
-      subject?: string;
-      title?: string;
-      description?: string;
-      dueDate?: string;
-    };
+    fields: { subject?: string; title?: string; description?: string; dueDate?: string };
   }
 ): Promise<EditAssignmentResult> {
   const assignment = await prisma.assignment.findUnique({
     where: { id: params.assignmentId },
     include: { class: true },
   });
-  if (!assignment || assignment.class.schoolId !== params.schoolId) {
-    return { ok: false, error: "NOT_FOUND" };
-  }
-  if (assignment.createdById !== params.teacherUserId) {
-    return { ok: false, error: "FORBIDDEN" };
-  }
+  if (!assignment || assignment.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
+  if (assignment.createdById !== params.teacherUserId) return { ok: false, error: "FORBIDDEN" };
 
-  const data: {
-    subject?: string;
-    title?: string;
-    description?: string;
-    dueDate?: Date;
-  } = {};
+  const data: { subject?: string; title?: string; description?: string; dueDate?: Date } = {};
   if (params.fields.subject !== undefined) data.subject = params.fields.subject;
   if (params.fields.title !== undefined) data.title = params.fields.title;
   if (params.fields.description !== undefined) data.description = params.fields.description;
@@ -206,17 +192,17 @@ export async function getAssignmentStatuses(
     where: { id: params.assignmentId },
     include: { class: true },
   });
-  if (!assignment || assignment.class.schoolId !== params.schoolId) {
-    return { ok: false, error: "NOT_FOUND" };
-  }
+  if (!assignment || assignment.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
 
   if (params.role === "teacher") {
     const link = await prisma.classTeacher.findFirst({
-      where: { classId: assignment.classId, teacherUserId: params.userId },
+      where: {
+        classId: assignment.classId,
+        teacherUserId: params.userId,
+        academicYearId: assignment.academicYearId,
+      },
     });
-    if (!link) {
-      return { ok: false, error: "NOT_ASSIGNED" };
-    }
+    if (!link) return { ok: false, error: "NOT_ASSIGNED" };
   }
 
   const statuses = await prisma.assignmentStatus.findMany({
@@ -254,26 +240,26 @@ export async function updateAssignmentStatuses(
     where: { id: params.assignmentId },
     include: { class: true },
   });
-  if (!assignment || assignment.class.schoolId !== params.schoolId) {
-    return { ok: false, error: "NOT_FOUND" };
-  }
+  if (!assignment || assignment.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
 
   const link = await prisma.classTeacher.findFirst({
-    where: { classId: assignment.classId, teacherUserId: params.teacherUserId },
-  });
-  if (!link) {
-    return { ok: false, error: "NOT_ASSIGNED" };
-  }
-
-  const studentCount = await prisma.student.count({
     where: {
       classId: assignment.classId,
-      id: { in: params.entries.map((entry) => entry.studentId) },
+      teacherUserId: params.teacherUserId,
+      academicYearId: assignment.academicYearId,
     },
   });
-  if (studentCount !== params.entries.length) {
-    return { ok: false, error: "STUDENT_MISMATCH" };
-  }
+  if (!link) return { ok: false, error: "NOT_ASSIGNED" };
+
+  const enrolledCount = await prisma.enrollment.count({
+    where: {
+      classId: assignment.classId,
+      academicYearId: assignment.academicYearId,
+      status: "active",
+      studentId: { in: params.entries.map((entry) => entry.studentId) },
+    },
+  });
+  if (enrolledCount !== params.entries.length) return { ok: false, error: "STUDENT_MISMATCH" };
 
   await prisma.$transaction(
     params.entries.map((entry) =>
@@ -281,11 +267,7 @@ export async function updateAssignmentStatuses(
         where: {
           assignmentId_studentId: { assignmentId: params.assignmentId, studentId: entry.studentId },
         },
-        create: {
-          assignmentId: params.assignmentId,
-          studentId: entry.studentId,
-          status: entry.status,
-        },
+        create: { assignmentId: params.assignmentId, studentId: entry.studentId, status: entry.status },
         update: { status: entry.status },
       })
     )

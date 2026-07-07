@@ -5,30 +5,37 @@ export interface StudentSummary {
   id: number;
   name: string;
   admissionNo: string;
-  class: { name: string; section: string };
+  class: { name: string; section: string } | null;
   parents: { name: string; phone: string }[];
 }
 
 export async function listStudents(prisma: PrismaClient, schoolId: number): Promise<StudentSummary[]> {
+  const activeYear = await prisma.academicYear.findFirst({ where: { schoolId, status: "active" } });
   const students = await prisma.student.findMany({
     where: { schoolId },
     include: {
-      class: true,
       parentLinks: { include: { parent: true } },
+      enrollments: {
+        where: activeYear ? { academicYearId: activeYear.id } : { id: -1 },
+        include: { class: true },
+      },
     },
     orderBy: { name: "asc" },
   });
 
-  return students.map((student) => ({
-    id: student.id,
-    name: student.name,
-    admissionNo: student.admissionNo,
-    class: { name: student.class.name, section: student.class.section },
-    parents: student.parentLinks.map((link) => ({
-      name: link.parent.name,
-      phone: link.parent.phone,
-    })),
-  }));
+  return students.map((student) => {
+    const enrollment = student.enrollments[0];
+    return {
+      id: student.id,
+      name: student.name,
+      admissionNo: student.admissionNo,
+      class: enrollment ? { name: enrollment.class.name, section: enrollment.class.section } : null,
+      parents: student.parentLinks.map((link) => ({
+        name: link.parent.name,
+        phone: link.parent.phone,
+      })),
+    };
+  });
 }
 
 export type CreateStudentResult =
@@ -41,6 +48,7 @@ export type CreateStudentResult =
 export async function createStudent(
   prisma: PrismaClient,
   schoolId: number,
+  academicYearId: number,
   input: {
     name: string;
     dob: string;
@@ -50,25 +58,15 @@ export async function createStudent(
     parentName?: string;
   }
 ): Promise<CreateStudentResult> {
-  const existingAdmission = await prisma.student.findUnique({
-    where: { admissionNo: input.admissionNo },
-  });
-  if (existingAdmission) {
-    return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
-  }
+  const existingAdmission = await prisma.student.findUnique({ where: { admissionNo: input.admissionNo } });
+  if (existingAdmission) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
 
   const existingParent = await prisma.user.findUnique({ where: { phone: input.parentPhone } });
-  if (existingParent && existingParent.role !== "parent") {
-    return { ok: false, error: "PHONE_WRONG_ROLE" };
-  }
-  if (!existingParent && !input.parentName) {
-    return { ok: false, error: "PARENT_NAME_REQUIRED" };
-  }
+  if (existingParent && existingParent.role !== "parent") return { ok: false, error: "PHONE_WRONG_ROLE" };
+  if (!existingParent && !input.parentName) return { ok: false, error: "PARENT_NAME_REQUIRED" };
 
   const targetClass = await prisma.class.findFirst({ where: { id: input.classId, schoolId } });
-  if (!targetClass) {
-    return { ok: false, error: "INVALID_CLASS" };
-  }
+  if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
 
   try {
     const student = await prisma.$transaction(async (tx) => {
@@ -83,9 +81,16 @@ export async function createStudent(
           schoolId,
           name: input.name,
           dob: new Date(input.dob),
-          classId: input.classId,
-          section: targetClass.section,
           admissionNo: input.admissionNo,
+        },
+      });
+
+      await tx.enrollment.create({
+        data: {
+          studentId: createdStudent.id,
+          classId: input.classId,
+          academicYearId,
+          status: "active",
         },
       });
 
@@ -101,9 +106,7 @@ export async function createStudent(
       student: { id: student.id, name: student.name, admissionNo: student.admissionNo },
     };
   } catch (err) {
-    if (isUniqueConstraintViolation(err)) {
-      return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
-    }
+    if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
     throw err;
   }
 }

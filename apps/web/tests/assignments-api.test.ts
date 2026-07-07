@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createActiveYear, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getAssignments, POST as postAssignments } from "../src/app/api/assignments/route";
 import { PATCH as patchAssignment } from "../src/app/api/assignments/[id]/route";
@@ -31,6 +32,7 @@ describe("/api/assignments", () => {
 
   async function seedSchoolWithClassAndTeacher() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -38,19 +40,17 @@ describe("/api/assignments", () => {
       data: { phone: "+15550001111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
     });
-    const student = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Test Student",
-        dob: new Date("2016-01-01"),
-        classId: klass.id,
-        section: "A",
-        admissionNo: "SCH-500",
-      },
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Test Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-500",
     });
-    return { school, klass, teacher, student };
+    return { school, year, klass, teacher, student };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -138,20 +138,19 @@ describe("/api/assignments", () => {
   });
 
   it("lists assignments for a class the teacher teaches, with submission counts", async () => {
-    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
-    const otherStudent = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Second Student",
-        dob: new Date("2016-01-01"),
-        classId: klass.id,
-        section: "A",
-        admissionNo: "SCH-501",
-      },
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    const otherStudent = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Second Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-501",
     });
     const assignment = await prisma.assignment.create({
       data: {
         classId: klass.id,
+        academicYearId: year.id,
         subject: "Math",
         title: "Chapter 3 worksheet",
         dueDate: new Date("2026-08-01"),
@@ -182,10 +181,11 @@ describe("/api/assignments", () => {
   });
 
   it("flags hasOverdue when a pending status has a past due date", async () => {
-    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
     const assignment = await prisma.assignment.create({
       data: {
         classId: klass.id,
+        academicYearId: year.id,
         subject: "Math",
         title: "Overdue worksheet",
         dueDate: new Date("2020-01-01"),
@@ -216,10 +216,11 @@ describe("/api/assignments", () => {
   });
 
   it("allows admin to list any class in their school", async () => {
-    const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school, year, klass, teacher } = await seedSchoolWithClassAndTeacher();
     await prisma.assignment.create({
       data: {
         classId: klass.id,
+        academicYearId: year.id,
         subject: "Math",
         title: "Chapter 3 worksheet",
         dueDate: new Date("2026-08-01"),
@@ -277,6 +278,7 @@ describe("/api/assignments/[id]", () => {
 
   async function seedAssignment() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -284,18 +286,19 @@ describe("/api/assignments/[id]", () => {
       data: { phone: "+15550011111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
     });
     const assignment = await prisma.assignment.create({
       data: {
         classId: klass.id,
+        academicYearId: year.id,
         subject: "Math",
         title: "Chapter 3 worksheet",
         dueDate: new Date("2026-08-01"),
         createdById: teacher.id,
       },
     });
-    return { school, klass, teacher, assignment };
+    return { school, year, klass, teacher, assignment };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -321,12 +324,17 @@ describe("/api/assignments/[id]", () => {
   });
 
   it("rejects a different teacher assigned to the same class with 403", async () => {
-    const { school, klass, assignment } = await seedAssignment();
+    const { school, year, klass, assignment } = await seedAssignment();
     const otherTeacher = await prisma.user.create({
       data: { phone: "+15550012222", role: "teacher", name: "Other Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: otherTeacher.id, subject: "Science" },
+      data: {
+        classId: klass.id,
+        teacherUserId: otherTeacher.id,
+        subject: "Science",
+        academicYearId: year.id,
+      },
     });
     loginAs(otherTeacher.id, "teacher", school.id);
 
@@ -395,6 +403,7 @@ describe("/api/assignments/[id]/statuses", () => {
 
   async function seedAssignmentWithStudents() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -402,21 +411,20 @@ describe("/api/assignments/[id]/statuses", () => {
       data: { phone: "+15550021111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
     });
-    const student = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Test Student",
-        dob: new Date("2016-01-01"),
-        classId: klass.id,
-        section: "A",
-        admissionNo: "SCH-600",
-      },
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Test Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-600",
     });
     const assignment = await prisma.assignment.create({
       data: {
         classId: klass.id,
+        academicYearId: year.id,
         subject: "Math",
         title: "Chapter 3 worksheet",
         dueDate: new Date("2026-08-01"),
@@ -426,7 +434,7 @@ describe("/api/assignments/[id]/statuses", () => {
     await prisma.assignmentStatus.create({
       data: { assignmentId: assignment.id, studentId: student.id, status: "pending" },
     });
-    return { school, klass, teacher, student, assignment };
+    return { school, year, klass, teacher, student, assignment };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -449,6 +457,7 @@ describe("/api/assignments/[id]/statuses", () => {
 
   it("computes overdue for a past-due pending row", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -456,21 +465,20 @@ describe("/api/assignments/[id]/statuses", () => {
       data: { phone: "+15550022222", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
     });
-    const student = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Test Student",
-        dob: new Date("2016-01-01"),
-        classId: klass.id,
-        section: "A",
-        admissionNo: "SCH-601",
-      },
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Test Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-601",
     });
     const assignment = await prisma.assignment.create({
       data: {
         classId: klass.id,
+        academicYearId: year.id,
         subject: "Math",
         title: "Overdue worksheet",
         dueDate: new Date("2020-01-01"),
@@ -546,19 +554,17 @@ describe("/api/assignments/[id]/statuses", () => {
   });
 
   it("rejects a studentId outside the class with 400, all-or-nothing", async () => {
-    const { school, klass, teacher, assignment } = await seedAssignmentWithStudents();
+    const { school, year, klass, teacher, assignment } = await seedAssignmentWithStudents();
     const otherClass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 6", section: "B" },
     });
-    const otherStudent = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Other Student",
-        dob: new Date("2015-01-01"),
-        classId: otherClass.id,
-        section: "B",
-        admissionNo: "SCH-602",
-      },
+    const otherStudent = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: otherClass.id,
+      academicYearId: year.id,
+      name: "Other Student",
+      dob: new Date("2015-01-01"),
+      admissionNo: "SCH-602",
     });
     loginAs(teacher.id, "teacher", school.id);
 

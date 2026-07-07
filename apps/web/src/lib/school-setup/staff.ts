@@ -10,10 +10,12 @@ export interface StaffSummary {
 }
 
 export async function listStaff(prisma: PrismaClient, schoolId: number): Promise<StaffSummary[]> {
+  const activeYear = await prisma.academicYear.findFirst({ where: { schoolId, status: "active" } });
   const users = await prisma.user.findMany({
     where: { schoolId, role: { in: ["teacher", "admin", "accountant"] } },
     include: {
       classesTaught: {
+        where: activeYear ? { academicYearId: activeYear.id } : { id: -1 },
         include: { class: true },
         take: 1,
       },
@@ -29,11 +31,7 @@ export async function listStaff(prisma: PrismaClient, schoolId: number): Promise
       phone: user.phone,
       role: user.role,
       classAssignment: assignment
-        ? {
-            className: assignment.class.name,
-            section: assignment.class.section,
-            subject: assignment.subject,
-          }
+        ? { className: assignment.class.name, section: assignment.class.section, subject: assignment.subject }
         : null,
     };
   });
@@ -47,18 +45,15 @@ export type CreateStaffResult =
 export async function createStaff(
   prisma: PrismaClient,
   schoolId: number,
+  academicYearId: number,
   input: { name: string; phone: string; role: Role; classId?: number; subject?: string }
 ): Promise<CreateStaffResult> {
   const existing = await prisma.user.findUnique({ where: { phone: input.phone } });
-  if (existing) {
-    return { ok: false, error: "DUPLICATE_PHONE" };
-  }
+  if (existing) return { ok: false, error: "DUPLICATE_PHONE" };
 
   if (input.role === "teacher" && input.classId) {
     const targetClass = await prisma.class.findFirst({ where: { id: input.classId, schoolId } });
-    if (!targetClass) {
-      return { ok: false, error: "INVALID_CLASS" };
-    }
+    if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
   }
 
   try {
@@ -69,21 +64,21 @@ export async function createStaff(
 
       if (input.role === "teacher" && input.classId && input.subject) {
         await tx.classTeacher.create({
-          data: { classId: input.classId, teacherUserId: created.id, subject: input.subject },
+          data: {
+            classId: input.classId,
+            teacherUserId: created.id,
+            subject: input.subject,
+            academicYearId,
+          },
         });
       }
 
       return created;
     });
 
-    return {
-      ok: true,
-      staff: { id: staff.id, name: staff.name, phone: staff.phone, role: staff.role },
-    };
+    return { ok: true, staff: { id: staff.id, name: staff.name, phone: staff.phone, role: staff.role } };
   } catch (err) {
-    if (isUniqueConstraintViolation(err)) {
-      return { ok: false, error: "DUPLICATE_PHONE" };
-    }
+    if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE_PHONE" };
     throw err;
   }
 }

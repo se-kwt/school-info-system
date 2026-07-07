@@ -23,10 +23,17 @@ export async function listExams(prisma: PrismaClient, schoolId: number): Promise
 export async function createExam(
   prisma: PrismaClient,
   schoolId: number,
+  academicYearId: number,
   input: { name: string; term: string; examDate: string }
 ): Promise<{ id: number }> {
   const created = await prisma.exam.create({
-    data: { schoolId, name: input.name, term: input.term, examDate: new Date(input.examDate) },
+    data: {
+      schoolId,
+      academicYearId,
+      name: input.name,
+      term: input.term,
+      examDate: new Date(input.examDate),
+    },
   });
   return { id: created.id };
 }

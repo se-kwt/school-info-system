@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { listTimetableEntries, createTimetableEntry } from "@/lib/timetable";
+import { resolveAcademicYear } from "@/lib/academic-years";
 
 export async function GET(request: Request) {
   try {
@@ -18,9 +19,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "classId is required" }, { status: 400 });
     }
 
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+
     const result = await listTimetableEntries(prisma, {
       classId,
       schoolId: claims.schoolId,
+      academicYearId: yearResult.academicYear.id,
       role: claims.role,
       userId: claims.userId,
     });
@@ -63,8 +70,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+
     const result = await createTimetableEntry(prisma, {
       schoolId: claims.schoolId,
+      academicYearId: yearResult.academicYear.id,
       classId,
       dayOfWeek,
       period,

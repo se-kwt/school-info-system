@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createActiveYear } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getStaff, POST as postStaff } from "../src/app/api/staff/route";
 
@@ -34,6 +35,7 @@ describe("/api/staff", () => {
 
   it("creates a non-teacher staff member and lists them", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
 
     const postRequest = new Request("http://localhost/api/staff", {
@@ -57,6 +59,7 @@ describe("/api/staff", () => {
 
   it("creates a teacher with a class assignment and reflects it in the list", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 7", section: "A" },
@@ -93,6 +96,7 @@ describe("/api/staff", () => {
 
   it("rejects a duplicate phone with 409", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     await prisma.user.create({
       data: { phone: "+15559990003", role: "teacher", name: "Existing Teacher", schoolId: school.id },
@@ -109,6 +113,7 @@ describe("/api/staff", () => {
 
   it("rejects a teacher with a classId but no subject with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 8", section: "A" },
@@ -142,6 +147,7 @@ describe("/api/staff", () => {
 
   it("rejects a classId belonging to a different school with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
     const otherClass = await prisma.class.create({

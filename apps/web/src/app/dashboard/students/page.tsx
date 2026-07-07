@@ -31,7 +31,7 @@ export default async function StudentsPage() {
               <td className="border-b border-gray-100 py-2">{student.name}</td>
               <td className="border-b border-gray-100 py-2">{student.admissionNo}</td>
               <td className="border-b border-gray-100 py-2">
-                {student.class.name} {student.class.section}
+                {student.class ? `${student.class.name} ${student.class.section}` : "Unassigned"}
               </td>
               <td className="border-b border-gray-100 py-2">
                 {student.parents.map((parent) => `${parent.name} (${parent.phone})`).join(", ") ||

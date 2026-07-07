@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createActiveYear, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getAttendance, POST as postAttendance } from "../src/app/api/attendance/route";
 
@@ -26,6 +27,7 @@ describe("/api/attendance", () => {
 
   async function seedSchoolWithClassAndTeacher() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -33,19 +35,17 @@ describe("/api/attendance", () => {
       data: { phone: "+15550001111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
     });
-    const student = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Test Student",
-        dob: new Date("2016-01-01"),
-        classId: klass.id,
-        section: "A",
-        admissionNo: "SCH-500",
-      },
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Test Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-500",
     });
-    return { school, klass, teacher, student };
+    return { school, year, klass, teacher, student };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -117,7 +117,7 @@ describe("/api/attendance", () => {
   });
 
   it("rejects a missing date with 400", async () => {
-    const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school, year, klass, teacher } = await seedSchoolWithClassAndTeacher();
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request(`http://localhost/api/attendance?classId=${klass.id}`);
@@ -172,19 +172,17 @@ describe("/api/attendance", () => {
   });
 
   it("rejects a studentId that doesn't belong to the class with 400", async () => {
-    const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school, year, klass, teacher } = await seedSchoolWithClassAndTeacher();
     const otherClass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 6", section: "B" },
     });
-    const otherStudent = await prisma.student.create({
-      data: {
-        schoolId: school.id,
-        name: "Other Student",
-        dob: new Date("2015-01-01"),
-        classId: otherClass.id,
-        section: "B",
-        admissionNo: "SCH-501",
-      },
+    const otherStudent = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: otherClass.id,
+      academicYearId: year.id,
+      name: "Other Student",
+      dob: new Date("2015-01-01"),
+      admissionNo: "SCH-501",
     });
     loginAs(teacher.id, "teacher", school.id);
 

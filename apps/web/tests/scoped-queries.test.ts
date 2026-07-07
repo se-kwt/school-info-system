@@ -35,7 +35,7 @@ describe("scoped queries", () => {
   it("returns only the classes a given teacher is assigned to", async () => {
     const fixtures = await createSeedFixtures(prisma);
 
-    const classes = await getClassesForTeacher(prisma, fixtures.teacher.id);
+    const classes = await getClassesForTeacher(prisma, fixtures.teacher.id, fixtures.academicYear.id);
 
     expect(classes).toHaveLength(1);
     expect(classes[0].id).toBe(fixtures.classA.id);

@@ -4,12 +4,14 @@ import { listClasses } from "@/lib/school-setup/classes";
 import { listStaff } from "@/lib/school-setup/staff";
 import { prisma } from "@/lib/prisma";
 import { TimetableView } from "@/components/timetable/TimetableView";
+import { getActiveAcademicYear } from "@/lib/academic-years";
 
 export default async function TimetablePage() {
   const claims = requireDashboardRole(["teacher", "admin"]);
+  const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
   const classes =
     claims.role === "teacher"
-      ? (await getClassesForTeacher(prisma, claims.userId)).map((klass) => ({
+      ? (await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)).map((klass) => ({
           id: klass.id,
           name: klass.name,
           section: klass.section,
