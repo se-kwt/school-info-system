@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 
 type Role = "teacher" | "admin" | "accountant";
 
+const inputClass =
+  "rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:outline-none";
+
 export function CreateStaffForm({
   classes,
 }: {
@@ -51,13 +54,13 @@ export function CreateStaffForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <input
         type="text"
         aria-label="Staff name"
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
         placeholder="Name"
       />
       <input
@@ -65,14 +68,14 @@ export function CreateStaffForm({
         aria-label="Staff phone"
         value={phone}
         onChange={(event) => setPhone(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
         placeholder="Phone number"
       />
       <select
         aria-label="Role"
         value={role}
         onChange={(event) => setRole(event.target.value as Role)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
       >
         <option value="teacher">Teacher</option>
         <option value="admin">Admin</option>
@@ -84,7 +87,7 @@ export function CreateStaffForm({
             aria-label="Assign class"
             value={classId}
             onChange={(event) => setClassId(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
+            className={inputClass}
           >
             <option value="">No class assignment</option>
             {classes.map((klass) => (
@@ -98,15 +101,18 @@ export function CreateStaffForm({
             aria-label="Subject"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
+            className={inputClass}
             placeholder="Subject (required if assigning a class)"
           />
         </>
       )}
-      <button type="submit" className="rounded bg-blue-600 px-3 py-2 text-white">
+      <button
+        type="submit"
+        className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+      >
         Create Staff
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="w-full text-xs text-red-500">{error}</p>}
     </form>
   );
 }
