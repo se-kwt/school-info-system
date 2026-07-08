@@ -24,8 +24,11 @@ export default async function TimetablePage() {
       : [];
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-gray-800">Timetable</h1>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-lg font-bold tracking-tight text-neutral-900">Timetable</h1>
+        <p className="text-xs text-neutral-400">Weekly periods by class.</p>
+      </div>
       <TimetableView
         classes={classes}
         teachers={teachers}

@@ -25,6 +25,9 @@ interface TimetableEntry {
 const DAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAYS = [1, 2, 3, 4, 5, 6];
 
+const inputClass =
+  "rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:outline-none";
+
 export function TimetableView({
   classes,
   teachers,
@@ -139,12 +142,12 @@ export function TimetableView({
   }
 
   return (
-    <div className="mt-4">
+    <div className="flex flex-col gap-4">
       <select
         aria-label="Class"
         value={classId}
         onChange={(event) => setClassId(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className="w-fit rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none"
       >
         {classes.map((klass) => (
           <option key={klass.id} value={klass.id}>
@@ -153,18 +156,21 @@ export function TimetableView({
         ))}
       </select>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {message && <p className="text-xs text-emerald-600">{message}</p>}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {DAYS.map((day) => (
-          <div key={day} className="rounded border border-gray-200 p-3">
-            <h2 className="font-medium text-gray-800">{DAY_NAMES[day]}</h2>
-            <ul className="mt-2 space-y-2 text-sm">
+          <div
+            key={day}
+            className="rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]"
+          >
+            <h2 className="text-sm font-bold text-neutral-800">{DAY_NAMES[day]}</h2>
+            <ul className="mt-2 space-y-2 text-xs">
               {entries
                 .filter((entry) => entry.dayOfWeek === day)
                 .map((entry) => (
-                  <li key={entry.id} className="border-b border-gray-100 pb-2">
+                  <li key={entry.id} className="border-b border-neutral-50 pb-2">
                     {editingId === entry.id ? (
                       <div className="flex flex-col gap-1">
                         <input
@@ -172,13 +178,13 @@ export function TimetableView({
                           aria-label={`Edit subject for period ${entry.period}`}
                           value={editSubject}
                           onChange={(event) => setEditSubject(event.target.value)}
-                          className="rounded border border-gray-300 px-2 py-1"
+                          className={inputClass}
                         />
                         <select
                           aria-label={`Edit teacher for period ${entry.period}`}
                           value={editTeacher}
                           onChange={(event) => setEditTeacher(event.target.value)}
-                          className="rounded border border-gray-300 px-2 py-1"
+                          className={inputClass}
                         >
                           <option value="">No teacher</option>
                           {teachers.map((teacher) => (
@@ -190,30 +196,30 @@ export function TimetableView({
                         <button
                           type="button"
                           onClick={() => handleEditSave(entry.id)}
-                          className="rounded bg-blue-600 px-2 py-1 text-white"
+                          className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
                         >
                           Save
                         </button>
                       </div>
                     ) : (
                       <div>
-                        <div>
+                        <div className="font-medium text-neutral-700">
                           Period {entry.period}: {entry.subject}
                         </div>
-                        <div className="text-gray-500">{entry.teacherName ?? "—"}</div>
+                        <div className="text-neutral-400">{entry.teacherName ?? "—"}</div>
                         {role === "admin" && (
                           <div className="mt-1 flex gap-2">
                             <button
                               type="button"
                               onClick={() => startEdit(entry)}
-                              className="text-xs text-blue-600"
+                              className="text-[10px] font-semibold text-indigo-600 hover:underline"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(entry.id)}
-                              className="text-xs text-red-600"
+                              className="text-[10px] font-semibold text-red-500 hover:underline"
                             >
                               Delete
                             </button>
@@ -235,7 +241,7 @@ export function TimetableView({
                   onChange={(event) =>
                     setNewPeriod((prev) => ({ ...prev, [day]: event.target.value }))
                   }
-                  className="rounded border border-gray-300 px-2 py-1"
+                  className={inputClass}
                 />
                 <input
                   type="text"
@@ -245,7 +251,7 @@ export function TimetableView({
                   onChange={(event) =>
                     setNewSubject((prev) => ({ ...prev, [day]: event.target.value }))
                   }
-                  className="rounded border border-gray-300 px-2 py-1"
+                  className={inputClass}
                 />
                 <select
                   aria-label={`New teacher for ${DAY_NAMES[day]}`}
@@ -253,7 +259,7 @@ export function TimetableView({
                   onChange={(event) =>
                     setNewTeacher((prev) => ({ ...prev, [day]: event.target.value }))
                   }
-                  className="rounded border border-gray-300 px-2 py-1"
+                  className={inputClass}
                 >
                   <option value="">No teacher</option>
                   {teachers.map((teacher) => (
@@ -265,7 +271,7 @@ export function TimetableView({
                 <button
                   type="button"
                   onClick={() => handleAdd(day)}
-                  className="rounded bg-blue-600 px-2 py-1 text-white"
+                  className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
                 >
                   Add Period
                 </button>
