@@ -149,4 +149,81 @@ describe("getDashboardOverview", () => {
     expect(overview.activeFeeStructures).toBe(1);
     expect(overview.feeStructureCollection[0].collectionPercent).toBe(40);
   });
+
+  it("computes outstanding amount and collection percent against the true class-wide total due, not the per-student fee amount", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+
+    // fixtures.student is already enrolled in classA. Add two more students to
+    // classA so the fee structure's per-student amount must be multiplied by
+    // the class roster size to get the true amount due.
+    const studentB = await prisma.student.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Second Student",
+        dob: new Date("2015-05-01"),
+        classId: fixtures.classA.id,
+        section: "A",
+        admissionNo: "GH-2026-010",
+      },
+    });
+    const studentC = await prisma.student.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Third Student",
+        dob: new Date("2015-06-01"),
+        classId: fixtures.classA.id,
+        section: "A",
+        admissionNo: "GH-2026-011",
+      },
+    });
+
+    const feeStructure = await prisma.feeStructure.create({
+      data: {
+        schoolId: fixtures.school.id,
+        classId: fixtures.classA.id,
+        term: "Term 1",
+        amount: 1000, // per-student amount
+        dueDate: new Date("2026-09-01"),
+      },
+    });
+
+    // Student 1 pays in full, student 2 pays half, student 3 pays nothing.
+    await prisma.feePayment.create({
+      data: {
+        studentId: fixtures.student.id,
+        feeStructureId: feeStructure.id,
+        amountPaid: 1000,
+        paidDate: new Date(),
+        recordedById: fixtures.accountant.id,
+        status: "paid",
+      },
+    });
+    await prisma.feePayment.create({
+      data: {
+        studentId: studentB.id,
+        feeStructureId: feeStructure.id,
+        amountPaid: 500,
+        paidDate: new Date(),
+        recordedById: fixtures.accountant.id,
+        status: "partial",
+      },
+    });
+    void studentC;
+
+    const claims: SessionClaims = {
+      userId: fixtures.accountant.id,
+      role: "accountant",
+      schoolId: fixtures.school.id,
+    };
+    const overview = await getDashboardOverview(prisma, claims);
+
+    expect(overview.role).toBe("accountant");
+    if (overview.role !== "accountant") throw new Error("unexpected role");
+
+    // True total due = 1000/student * 3 students = 3000. Total paid = 1500.
+    expect(overview.feeStructureCollection[0].totalDue).toBe(3000);
+    expect(overview.feeStructureCollection[0].totalPaid).toBe(1500);
+    expect(overview.feeStructureCollection[0].collectionPercent).toBe(50);
+    expect(overview.outstandingAmount).toBe(1500);
+  });
 });

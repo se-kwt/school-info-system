@@ -305,20 +305,36 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
     0
   );
 
+  // FeeStructure.amount is a per-student amount, so the true amount due for a
+  // fee structure is that amount multiplied by the number of students in its
+  // class. Compare totals against totals, not a per-student amount against a
+  // class-wide sum of payments.
+  const classIds = [...new Set(feeStructures.map((fs) => fs.classId))];
+  const studentCounts = await prisma.student.groupBy({
+    by: ["classId"],
+    where: { classId: { in: classIds } },
+    _count: true,
+  });
+  const studentCountByClassId = new Map<number, number>(
+    studentCounts.map((row) => [row.classId, row._count])
+  );
+
   const outstandingAmount = feeStructures.reduce((sum, fs) => {
     const paid = fs.payments.reduce((s, p) => s + p.amountPaid, 0);
-    return sum + Math.max(0, fs.amount - paid);
+    const totalDue = fs.amount * (studentCountByClassId.get(fs.classId) ?? 0);
+    return sum + Math.max(0, totalDue - paid);
   }, 0);
 
   const feeStructureCollection: FeeStructureCollectionEntry[] = feeStructures.map((fs) => {
     const totalPaid = fs.payments.reduce((s, p) => s + p.amountPaid, 0);
+    const totalDue = fs.amount * (studentCountByClassId.get(fs.classId) ?? 0);
     return {
       id: fs.id,
       term: fs.term,
       className: `${fs.class.name} ${fs.class.section}`,
-      totalDue: fs.amount,
+      totalDue,
       totalPaid,
-      collectionPercent: fs.amount === 0 ? 0 : Math.round((totalPaid / fs.amount) * 100),
+      collectionPercent: totalDue === 0 ? 0 : Math.round((totalPaid / totalDue) * 100),
     };
   });
 
