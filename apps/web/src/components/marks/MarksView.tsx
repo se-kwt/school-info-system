@@ -32,6 +32,9 @@ interface StudentRow {
   marks: Record<string, MarkCell | null>;
 }
 
+const inputClass =
+  "rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:outline-none";
+
 export function MarksView({
   exams: initialExams,
   classes,
@@ -153,13 +156,13 @@ export function MarksView({
   }
 
   return (
-    <div className="mt-4">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <select
           aria-label="Exam"
           value={examId}
           onChange={(event) => setExamId(event.target.value)}
-          className="rounded border border-gray-300 px-3 py-2"
+          className={inputClass}
         >
           {exams.map((exam) => (
             <option key={exam.id} value={exam.id}>
@@ -171,7 +174,7 @@ export function MarksView({
           aria-label="Class"
           value={classId}
           onChange={(event) => setClassId(event.target.value)}
-          className="rounded border border-gray-300 px-3 py-2"
+          className={inputClass}
         >
           {classes.map((klass) => (
             <option key={klass.id} value={klass.id}>
@@ -181,14 +184,14 @@ export function MarksView({
         </select>
 
         {role === "admin" && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200/60 p-2">
             <input
               type="text"
               aria-label="New exam name"
               placeholder="Exam name"
               value={newExamName}
               onChange={(event) => setNewExamName(event.target.value)}
-              className="rounded border border-gray-300 px-2 py-1"
+              className={inputClass}
             />
             <input
               type="text"
@@ -196,19 +199,19 @@ export function MarksView({
               placeholder="Term"
               value={newExamTerm}
               onChange={(event) => setNewExamTerm(event.target.value)}
-              className="rounded border border-gray-300 px-2 py-1"
+              className={inputClass}
             />
             <input
               type="date"
               aria-label="New exam date"
               value={newExamDate}
               onChange={(event) => setNewExamDate(event.target.value)}
-              className="rounded border border-gray-300 px-2 py-1"
+              className={inputClass}
             />
             <button
               type="button"
               onClick={handleCreateExam}
-              className="rounded bg-blue-600 px-3 py-1 text-white"
+              className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
             >
               New Exam
             </button>
@@ -216,46 +219,50 @@ export function MarksView({
         )}
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {message && <p className="text-xs text-emerald-600">{message}</p>}
 
-      <table className="mt-4 w-full text-left text-sm">
-        <thead>
-          <tr>
-            <th className="border-b border-gray-200 pb-2">Name</th>
-            {subjects.map((subject) => (
-              <th key={subject} className="border-b border-gray-200 pb-2">
-                {subject}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((student) => (
-            <tr key={student.studentId}>
-              <td className="border-b border-gray-100 py-2">{student.name}</td>
-              {subjects.map((subject) => {
-                const cell = student.marks[subject];
-                return (
-                  <td key={subject} className="border-b border-gray-100 py-2">
-                    {cell ? `${cell.marksObtained}/${cell.maxMarks} (${cell.grade})` : "—"}
-                  </td>
-                );
-              })}
+      <div className="overflow-x-auto rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] lg:p-5">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+              <th className="border-b border-neutral-100 pb-2 pr-4">Name</th>
+              {subjects.map((subject) => (
+                <th key={subject} className="border-b border-neutral-100 pb-2 pr-4">
+                  {subject}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {students.map((student) => (
+              <tr key={student.studentId}>
+                <td className="border-b border-neutral-50 py-2 pr-4 font-medium text-neutral-700">
+                  {student.name}
+                </td>
+                {subjects.map((subject) => {
+                  const cell = student.marks[subject];
+                  return (
+                    <td key={subject} className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
+                      {cell ? `${cell.marksObtained}/${cell.maxMarks} (${cell.grade})` : "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {role === "teacher" && availableSubjects.length > 0 && (
-        <div className="mt-6 border-t border-gray-200 pt-4">
-          <h2 className="text-lg font-medium text-gray-800">Enter Marks</h2>
-          <div className="mt-2 flex gap-2">
+        <div className="rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] lg:p-5">
+          <h2 className="mb-3 text-sm font-bold text-neutral-800">Enter Marks</h2>
+          <div className="flex gap-2">
             <select
               aria-label="Entry subject"
               value={entrySubject}
               onChange={(event) => setEntrySubject(event.target.value)}
-              className="rounded border border-gray-300 px-2 py-1"
+              className={inputClass}
             >
               {availableSubjects.map((subject) => (
                 <option key={subject} value={subject}>
@@ -269,21 +276,23 @@ export function MarksView({
               placeholder="Max Marks"
               value={maxMarks}
               onChange={(event) => setMaxMarks(event.target.value)}
-              className="rounded border border-gray-300 px-2 py-1"
+              className={inputClass}
             />
           </div>
-          <table className="mt-4 w-full text-left text-sm">
+          <table className="mt-4 w-full text-left text-xs">
             <thead>
-              <tr>
-                <th className="border-b border-gray-200 pb-2">Name</th>
-                <th className="border-b border-gray-200 pb-2">Marks Obtained</th>
+              <tr className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+                <th className="border-b border-neutral-100 pb-2 pr-4">Name</th>
+                <th className="border-b border-neutral-100 pb-2 pr-4">Marks Obtained</th>
               </tr>
             </thead>
             <tbody>
               {students.map((student) => (
                 <tr key={student.studentId}>
-                  <td className="border-b border-gray-100 py-2">{student.name}</td>
-                  <td className="border-b border-gray-100 py-2">
+                  <td className="border-b border-neutral-50 py-2 pr-4 font-medium text-neutral-700">
+                    {student.name}
+                  </td>
+                  <td className="border-b border-neutral-50 py-2 pr-4">
                     <input
                       type="number"
                       aria-label={`Marks for ${student.name}`}
@@ -294,7 +303,7 @@ export function MarksView({
                           [student.studentId]: event.target.value,
                         }))
                       }
-                      className="rounded border border-gray-300 px-2 py-1"
+                      className={inputClass}
                     />
                   </td>
                 </tr>
@@ -304,7 +313,7 @@ export function MarksView({
           <button
             type="button"
             onClick={handleSave}
-            className="mt-4 rounded bg-blue-600 px-3 py-2 text-white"
+            className="mt-4 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
           >
             Save Marks
           </button>

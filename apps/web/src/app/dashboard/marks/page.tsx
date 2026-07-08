@@ -27,8 +27,11 @@ export default async function MarksPage() {
       : [];
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-gray-800">Exams &amp; Marks</h1>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-lg font-bold tracking-tight text-neutral-900">Exams &amp; Marks</h1>
+        <p className="text-xs text-neutral-400">Record and review marks by class and exam.</p>
+      </div>
       <MarksView
         exams={exams}
         classes={classes}
