@@ -16,8 +16,11 @@ export default async function AssignmentsPage() {
       : await listClasses(prisma, claims.schoolId);
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-gray-800">Assignments</h1>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-lg font-bold tracking-tight text-neutral-900">Assignments</h1>
+        <p className="text-xs text-neutral-400">Post assignments and track submission status.</p>
+      </div>
       <AssignmentsView
         classes={classes}
         role={claims.role === "teacher" ? "teacher" : "admin"}

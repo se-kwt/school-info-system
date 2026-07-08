@@ -17,6 +17,15 @@ interface StatusEntry {
   status: "pending" | "submitted" | "overdue";
 }
 
+const STATUS_BADGE: Record<StatusEntry["status"], string> = {
+  pending: "bg-amber-50 text-amber-600",
+  submitted: "bg-emerald-50 text-emerald-600",
+  overdue: "bg-red-50 text-red-500",
+};
+
+const inputClass =
+  "rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none";
+
 export function AssignmentRoster({
   assignment,
   role,
@@ -119,75 +128,77 @@ export function AssignmentRoster({
   const canEdit = role === "teacher" && assignment.createdById === currentUserId;
 
   return (
-    <div className="mt-6 border-t border-gray-200 pt-4">
+    <div className="rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] lg:p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-800">{assignment.title}</h2>
+        <h2 className="text-sm font-bold text-neutral-800">{assignment.title}</h2>
         {canEdit && !editing && (
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded border border-gray-300 px-3 py-1 text-sm"
+            className="rounded-lg border border-neutral-200 px-3 py-1 text-xs font-semibold text-neutral-700 transition-all hover:bg-neutral-50"
           >
             Edit
           </button>
         )}
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
+      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+      {message && <p className="mt-2 text-xs text-emerald-600">{message}</p>}
 
       {editing && (
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <input
             type="text"
             aria-label="Edit subject"
             value={editSubject}
             onChange={(event) => setEditSubject(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className={inputClass}
           />
           <input
             type="text"
             aria-label="Edit title"
             value={editTitle}
             onChange={(event) => setEditTitle(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className={inputClass}
           />
           <input
             type="text"
             aria-label="Edit description"
             value={editDescription}
             onChange={(event) => setEditDescription(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className={inputClass}
           />
           <input
             type="date"
             aria-label="Edit due date"
             value={editDueDate}
             onChange={(event) => setEditDueDate(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className={inputClass}
           />
           <button
             type="button"
             onClick={handleEditSave}
-            className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
+            className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
           >
             Save Changes
           </button>
         </div>
       )}
 
-      <table className="mt-4 w-full text-left text-sm">
+      <table className="mt-4 w-full text-left text-xs">
         <thead>
-          <tr>
-            <th className="border-b border-gray-200 pb-2">Name</th>
-            <th className="border-b border-gray-200 pb-2">Status</th>
+          <tr className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+            <th className="border-b border-neutral-100 pb-2 pr-4">Name</th>
+            <th className="border-b border-neutral-100 pb-2 pr-4">Status</th>
           </tr>
         </thead>
         <tbody>
           {statuses.map((entry) => (
             <tr key={entry.studentId}>
-              <td className="border-b border-gray-100 py-2">{entry.name}</td>
-              <td className="border-b border-gray-100 py-2">
+              <td className="border-b border-neutral-50 py-2 pr-4 font-medium text-neutral-700">
+                {entry.name}
+              </td>
+              <td className="border-b border-neutral-50 py-2 pr-4">
                 {role === "teacher" ? (
                   <select
                     aria-label={`Status for ${entry.name}`}
@@ -198,26 +209,15 @@ export function AssignmentRoster({
                         [entry.studentId]: event.target.value as "pending" | "submitted",
                       }))
                     }
-                    className="rounded border border-gray-300 px-2 py-1"
+                    className={inputClass}
                   >
                     <option value="pending">Pending</option>
                     <option value="submitted">Submitted</option>
                   </select>
                 ) : (
-                  <span
-                    className={
-                      entry.status === "overdue"
-                        ? "text-red-600"
-                        : entry.status === "submitted"
-                          ? "text-green-600"
-                          : "text-amber-600"
-                    }
-                  >
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_BADGE[entry.status]}`}>
                     {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                   </span>
-                )}
-                {role === "teacher" && entry.status === "overdue" && (
-                  <span className="ml-2 text-xs text-red-600">(overdue)</span>
                 )}
               </td>
             </tr>
@@ -229,7 +229,7 @@ export function AssignmentRoster({
         <button
           type="button"
           onClick={handleSave}
-          className="mt-4 rounded bg-blue-600 px-3 py-2 text-white"
+          className="mt-4 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
         >
           Save
         </button>

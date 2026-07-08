@@ -21,6 +21,9 @@ interface Assignment {
   hasOverdue: boolean;
 }
 
+const inputClass =
+  "rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:outline-none";
+
 export function AssignmentsView({
   classes,
   role,
@@ -92,12 +95,12 @@ export function AssignmentsView({
   const selected = assignments.find((a) => a.id === selectedId) ?? null;
 
   return (
-    <div className="mt-4">
+    <div className="flex flex-col gap-4">
       <select
         aria-label="Class"
         value={classId}
         onChange={(event) => setClassId(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className="w-fit rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none"
       >
         {classes.map((klass) => (
           <option key={klass.id} value={klass.id}>
@@ -106,18 +109,18 @@ export function AssignmentsView({
         ))}
       </select>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {message && <p className="text-xs text-emerald-600">{message}</p>}
 
       {role === "teacher" && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] lg:p-5">
           <input
             type="text"
             aria-label="Subject"
             placeholder="Subject"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className={inputClass}
           />
           <input
             type="text"
@@ -125,7 +128,7 @@ export function AssignmentsView({
             placeholder="Title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className={inputClass}
           />
           <input
             type="text"
@@ -133,59 +136,69 @@ export function AssignmentsView({
             placeholder="Description (optional)"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className={inputClass}
           />
           <input
             type="date"
             aria-label="Due date"
             value={dueDate}
             onChange={(event) => setDueDate(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className={inputClass}
           />
           <button
             type="button"
             onClick={handleCreate}
-            className="rounded bg-blue-600 px-3 py-2 text-white"
+            className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
           >
             New Assignment
           </button>
         </div>
       )}
 
-      <table className="mt-4 w-full text-left text-sm">
-        <thead>
-          <tr>
-            <th className="border-b border-gray-200 pb-2">Title</th>
-            <th className="border-b border-gray-200 pb-2">Subject</th>
-            <th className="border-b border-gray-200 pb-2">Due date</th>
-            <th className="border-b border-gray-200 pb-2">Submitted</th>
-          </tr>
-        </thead>
-        <tbody>
-          {assignments.map((assignment) => (
-            <tr
-              key={assignment.id}
-              onClick={() => setSelectedId(assignment.id)}
-              className="cursor-pointer hover:bg-gray-50"
-            >
-              <td className="border-b border-gray-100 py-2">{assignment.title}</td>
-              <td className="border-b border-gray-100 py-2">{assignment.subject}</td>
-              <td className="border-b border-gray-100 py-2">{assignment.dueDate}</td>
-              <td
-                className={`border-b border-gray-100 py-2 ${
-                  assignment.hasOverdue
-                    ? "text-red-600"
-                    : assignment.submittedCount === assignment.totalCount
-                      ? "text-green-600"
-                      : "text-amber-600"
-                }`}
-              >
-                {assignment.submittedCount}/{assignment.totalCount} submitted
-              </td>
+      <div className="overflow-x-auto rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] lg:p-5">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+              <th className="border-b border-neutral-100 pb-2 pr-4">Title</th>
+              <th className="border-b border-neutral-100 pb-2 pr-4">Subject</th>
+              <th className="border-b border-neutral-100 pb-2 pr-4">Due date</th>
+              <th className="border-b border-neutral-100 pb-2 pr-4">Submitted</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {assignments.map((assignment) => (
+              <tr
+                key={assignment.id}
+                onClick={() => setSelectedId(assignment.id)}
+                className="cursor-pointer hover:bg-neutral-50"
+              >
+                <td className="border-b border-neutral-50 py-2 pr-4 font-medium text-neutral-700">
+                  {assignment.title}
+                </td>
+                <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
+                  {assignment.subject}
+                </td>
+                <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
+                  {assignment.dueDate}
+                </td>
+                <td className="border-b border-neutral-50 py-2 pr-4">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      assignment.hasOverdue
+                        ? "bg-red-50 text-red-500"
+                        : assignment.submittedCount === assignment.totalCount
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-amber-50 text-amber-600"
+                    }`}
+                  >
+                    {assignment.submittedCount}/{assignment.totalCount} submitted
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {selected && (
         <AssignmentRoster
