@@ -8,8 +8,11 @@ export default async function FeesPage() {
   const classes = await listClasses(prisma, claims.schoolId);
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-gray-800">Fees</h1>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-lg font-bold tracking-tight text-neutral-900">Fees</h1>
+        <p className="text-xs text-neutral-400">Fee structures and payment roster by class.</p>
+      </div>
       <FeesView classes={classes} role={claims.role === "admin" ? "admin" : "accountant"} />
     </div>
   );
