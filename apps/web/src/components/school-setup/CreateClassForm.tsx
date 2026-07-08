@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
+const inputClass =
+  "rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:outline-none";
+
 export function CreateClassForm() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -34,13 +37,13 @@ export function CreateClassForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
+    <form onSubmit={handleSubmit} className="flex flex-wrap gap-2">
       <input
         type="text"
         aria-label="Class name"
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
         placeholder="e.g. Grade 6"
       />
       <input
@@ -48,13 +51,16 @@ export function CreateClassForm() {
         aria-label="Section"
         value={section}
         onChange={(event) => setSection(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
         placeholder="e.g. B"
       />
-      <button type="submit" className="rounded bg-blue-600 px-3 py-2 text-white">
+      <button
+        type="submit"
+        className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+      >
         Create Class
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="w-full text-xs text-red-500">{error}</p>}
     </form>
   );
 }
