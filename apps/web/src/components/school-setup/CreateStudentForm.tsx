@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
+const inputClass =
+  "rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:outline-none";
+
 export function CreateStudentForm({
   classes,
 }: {
@@ -52,13 +55,13 @@ export function CreateStudentForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <input
         type="text"
         aria-label="Student name"
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
         placeholder="Student name"
       />
       <input
@@ -66,13 +69,13 @@ export function CreateStudentForm({
         aria-label="Date of birth"
         value={dob}
         onChange={(event) => setDob(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
       />
       <select
         aria-label="Class"
         value={classId}
         onChange={(event) => setClassId(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
       >
         {classes.map((klass) => (
           <option key={klass.id} value={klass.id}>
@@ -85,7 +88,7 @@ export function CreateStudentForm({
         aria-label="Admission number"
         value={admissionNo}
         onChange={(event) => setAdmissionNo(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
         placeholder="Admission number"
       />
       <input
@@ -93,7 +96,7 @@ export function CreateStudentForm({
         aria-label="Parent phone"
         value={parentPhone}
         onChange={(event) => setParentPhone(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
         placeholder="Parent phone number"
       />
       <input
@@ -101,13 +104,16 @@ export function CreateStudentForm({
         aria-label="Parent name"
         value={parentName}
         onChange={(event) => setParentName(event.target.value)}
-        className="rounded border border-gray-300 px-3 py-2"
+        className={inputClass}
         placeholder="Parent name (only if this phone is new)"
       />
-      <button type="submit" className="rounded bg-blue-600 px-3 py-2 text-white">
+      <button
+        type="submit"
+        className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+      >
         Create Student
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="w-full text-xs text-red-500">{error}</p>}
     </form>
   );
 }
