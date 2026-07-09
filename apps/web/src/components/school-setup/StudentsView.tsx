@@ -6,9 +6,23 @@ interface StudentRow {
   id: number;
   name: string;
   admissionNo: string;
+  rollNumber: string | null;
+  photoUrl: string | null;
   status: "active" | "left" | "transferred" | "graduated" | "inactive";
   class: { name: string; section: string } | null;
   parents: { name: string; phone: string }[];
+}
+
+async function uploadPhoto(file: File): Promise<{ ok: true; photoUrl: string } | { ok: false; error: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/api/students/upload-photo", { method: "POST", body: formData });
+  if (!response.ok) {
+    const body = await response.json();
+    return { ok: false, error: body.error };
+  }
+  const body = await response.json();
+  return { ok: true, photoUrl: body.photoUrl };
 }
 
 export function StudentsView({
@@ -25,6 +39,8 @@ export function StudentsView({
   const [dob, setDob] = useState("");
   const [classId, setClassId] = useState(classes[0] ? String(classes[0].id) : "");
   const [admissionNo, setAdmissionNo] = useState("");
+  const [rollNumber, setRollNumber] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
   const [parentPhone, setParentPhone] = useState("");
   const [parentName, setParentName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +49,8 @@ export function StudentsView({
   const [editDob, setEditDob] = useState("");
   const [editAdmissionNo, setEditAdmissionNo] = useState("");
   const [editClassId, setEditClassId] = useState("");
+  const [editRollNumber, setEditRollNumber] = useState("");
+  const [editPhoto, setEditPhoto] = useState<File | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
 
   async function refresh() {
@@ -42,6 +60,17 @@ export function StudentsView({
 
   async function handleCreate() {
     setError(null);
+
+    let photoUrl: string | undefined;
+    if (photo) {
+      const uploadResult = await uploadPhoto(photo);
+      if (!uploadResult.ok) {
+        setError(uploadResult.error);
+        return;
+      }
+      photoUrl = uploadResult.photoUrl;
+    }
+
     const response = await fetch("/api/students", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -50,6 +79,8 @@ export function StudentsView({
         dob,
         classId: classId ? Number(classId) : undefined,
         admissionNo,
+        rollNumber: rollNumber || undefined,
+        photoUrl,
         parentPhone,
         parentName: parentName || undefined,
       }),
@@ -58,6 +89,8 @@ export function StudentsView({
       setName("");
       setDob("");
       setAdmissionNo("");
+      setRollNumber("");
+      setPhoto(null);
       setParentPhone("");
       setParentName("");
       await refresh();
@@ -70,6 +103,8 @@ export function StudentsView({
     setEditingId(student.id);
     setEditName(student.name);
     setEditAdmissionNo(student.admissionNo);
+    setEditRollNumber(student.rollNumber ?? "");
+    setEditPhoto(null);
     setEditDob("");
     setEditClassId("");
     setError(null);
@@ -78,12 +113,32 @@ export function StudentsView({
 
   async function handleSaveEdit(id: number) {
     setError(null);
-    const body: { name: string; admissionNo: string; dob?: string; classId?: number } = {
+
+    let photoUrl: string | undefined;
+    if (editPhoto) {
+      const uploadResult = await uploadPhoto(editPhoto);
+      if (!uploadResult.ok) {
+        setError(uploadResult.error);
+        return;
+      }
+      photoUrl = uploadResult.photoUrl;
+    }
+
+    const body: {
+      name: string;
+      admissionNo: string;
+      dob?: string;
+      classId?: number;
+      rollNumber?: string;
+      photoUrl?: string;
+    } = {
       name: editName,
       admissionNo: editAdmissionNo,
     };
     if (editDob) body.dob = editDob;
     if (editClassId) body.classId = Number(editClassId);
+    if (editRollNumber) body.rollNumber = editRollNumber;
+    if (photoUrl) body.photoUrl = photoUrl;
 
     const response = await fetch(`/api/students/${id}`, {
       method: "PATCH",
@@ -175,6 +230,21 @@ export function StudentsView({
             placeholder="Admission number"
           />
           <input
+            type="text"
+            aria-label="Roll number"
+            value={rollNumber}
+            onChange={(event) => setRollNumber(event.target.value)}
+            className="rounded border border-gray-300 px-3 py-2"
+            placeholder="Roll number (optional)"
+          />
+          <input
+            type="file"
+            aria-label="Student photo"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+            className="rounded border border-gray-300 px-3 py-2"
+          />
+          <input
             type="tel"
             aria-label="Parent phone"
             value={parentPhone}
@@ -203,6 +273,7 @@ export function StudentsView({
           <tr>
             <th className="border-b border-gray-200 pb-2">Name</th>
             <th className="border-b border-gray-200 pb-2">Admission No.</th>
+            <th className="border-b border-gray-200 pb-2">Roll No.</th>
             <th className="border-b border-gray-200 pb-2">Class</th>
             <th className="border-b border-gray-200 pb-2">Parent(s)</th>
             <th className="border-b border-gray-200 pb-2">Status</th>
@@ -215,6 +286,7 @@ export function StudentsView({
               <tr>
                 <td className="border-b border-gray-100 py-2">{student.name}</td>
                 <td className="border-b border-gray-100 py-2">{student.admissionNo}</td>
+                <td className="border-b border-gray-100 py-2">{student.rollNumber ?? "—"}</td>
                 <td className="border-b border-gray-100 py-2">
                   {student.class ? `${student.class.name} ${student.class.section}` : "Unassigned"}
                 </td>
@@ -248,7 +320,7 @@ export function StudentsView({
               </tr>
               {editingId === student.id && (
                 <tr>
-                  <td colSpan={6} className="border-b border-gray-100 bg-gray-50 py-2">
+                  <td colSpan={7} className="border-b border-gray-100 bg-gray-50 py-2">
                     <div className="flex flex-wrap items-center gap-2 px-2">
                       <input
                         type="text"
@@ -269,6 +341,21 @@ export function StudentsView({
                         aria-label={`Edit admission number for ${student.name}`}
                         value={editAdmissionNo}
                         onChange={(event) => setEditAdmissionNo(event.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1"
+                      />
+                      <input
+                        type="text"
+                        aria-label={`Edit roll number for ${student.name}`}
+                        value={editRollNumber}
+                        onChange={(event) => setEditRollNumber(event.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1"
+                        placeholder="Roll number"
+                      />
+                      <input
+                        type="file"
+                        aria-label={`Edit photo for ${student.name}`}
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(event) => setEditPhoto(event.target.files?.[0] ?? null)}
                         className="rounded border border-gray-300 px-2 py-1"
                       />
                       {student.class && (
@@ -306,7 +393,7 @@ export function StudentsView({
               )}
               {deleteBlockedId === student.id && (
                 <tr>
-                  <td colSpan={6} className="border-b border-gray-100 bg-amber-50 py-2">
+                  <td colSpan={7} className="border-b border-gray-100 bg-amber-50 py-2">
                     <div className="flex flex-wrap items-center gap-2 px-2 text-sm">
                       <span>{student.name} has recorded history and cannot be permanently deleted.</span>
                       <button
