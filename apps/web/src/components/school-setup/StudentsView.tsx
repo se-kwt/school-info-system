@@ -1,17 +1,10 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { useState } from "react";
+import { StudentCard, type StudentRow } from "./StudentCard";
+import { StudentDetailModal, type SaveStudentFields } from "./StudentDetailModal";
 
-interface StudentRow {
-  id: number;
-  name: string;
-  admissionNo: string;
-  rollNumber: string | null;
-  photoUrl: string | null;
-  status: "active" | "left" | "transferred" | "graduated" | "inactive";
-  class: { name: string; section: string } | null;
-  parents: { name: string; phone: string }[];
-}
+type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
 
 async function uploadPhoto(file: File): Promise<{ ok: true; photoUrl: string } | { ok: false; error: string }> {
   const formData = new FormData();
@@ -35,88 +28,49 @@ export function StudentsView({
   isAdmin: boolean;
 }) {
   const [students, setStudents] = useState(initialStudents);
-  const [name, setName] = useState("");
-  const [dob, setDob] = useState("");
-  const [classId, setClassId] = useState(classes[0] ? String(classes[0].id) : "");
-  const [admissionNo, setAdmissionNo] = useState("");
-  const [rollNumber, setRollNumber] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [parentPhone, setParentPhone] = useState("");
-  const [parentName, setParentName] = useState("");
+  const [classFilter, setClassFilter] = useState("all");
+  const [modalState, setModalState] = useState<ModalState>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editDob, setEditDob] = useState("");
-  const [editAdmissionNo, setEditAdmissionNo] = useState("");
-  const [editClassId, setEditClassId] = useState("");
-  const [editRollNumber, setEditRollNumber] = useState("");
-  const [editPhoto, setEditPhoto] = useState<File | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
+
+  const selectedClass = classFilter === "all" ? null : classes.find((klass) => String(klass.id) === classFilter);
+  const filteredStudents =
+    classFilter === "all"
+      ? students
+      : students.filter(
+          (student) =>
+            selectedClass && student.class?.name === selectedClass.name && student.class?.section === selectedClass.section
+        );
 
   async function refresh() {
     const response = await fetch("/api/students");
     setStudents(await response.json());
   }
 
-  async function handleCreate() {
-    setError(null);
-
-    let photoUrl: string | undefined;
-    if (photo) {
-      const uploadResult = await uploadPhoto(photo);
-      if (!uploadResult.ok) {
-        setError(uploadResult.error);
-        return;
-      }
-      photoUrl = uploadResult.photoUrl;
-    }
-
-    const response = await fetch("/api/students", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name,
-        dob,
-        classId: classId ? Number(classId) : undefined,
-        admissionNo,
-        rollNumber: rollNumber || undefined,
-        photoUrl,
-        parentPhone,
-        parentName: parentName || undefined,
-      }),
-    });
-    if (response.status === 201) {
-      setName("");
-      setDob("");
-      setAdmissionNo("");
-      setRollNumber("");
-      setPhoto(null);
-      setParentPhone("");
-      setParentName("");
-      await refresh();
-      return;
-    }
-    setError((await response.json()).error);
-  }
-
-  function startEdit(student: StudentRow) {
-    setEditingId(student.id);
-    setEditName(student.name);
-    setEditAdmissionNo(student.admissionNo);
-    setEditRollNumber(student.rollNumber ?? "");
-    setEditPhoto(null);
-    setEditDob("");
-    setEditClassId("");
+  function openCreate() {
+    setModalState({ mode: "create" });
     setError(null);
     setDeleteBlockedId(null);
   }
 
-  async function handleSaveEdit(id: number) {
+  function openEdit(id: number) {
+    setModalState({ mode: "edit", id });
+    setError(null);
+    setDeleteBlockedId(null);
+  }
+
+  function closeModal() {
+    setModalState(null);
+    setError(null);
+    setDeleteBlockedId(null);
+  }
+
+  async function handleSave(fields: SaveStudentFields) {
     setError(null);
 
     let photoUrl: string | undefined;
-    if (editPhoto) {
-      const uploadResult = await uploadPhoto(editPhoto);
+    if (fields.photoFile) {
+      const uploadResult = await uploadPhoto(fields.photoFile);
       if (!uploadResult.ok) {
         setError(uploadResult.error);
         return;
@@ -124,300 +78,154 @@ export function StudentsView({
       photoUrl = uploadResult.photoUrl;
     }
 
-    const body: {
-      name: string;
-      admissionNo: string;
-      dob?: string;
-      classId?: number;
-      rollNumber?: string;
-      photoUrl?: string;
-    } = {
-      name: editName,
-      admissionNo: editAdmissionNo,
-    };
-    if (editDob) body.dob = editDob;
-    if (editClassId) body.classId = Number(editClassId);
-    if (editRollNumber) body.rollNumber = editRollNumber;
-    if (photoUrl) body.photoUrl = photoUrl;
-
-    const response = await fetch(`/api/students/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
+    if (modalState?.mode === "create") {
+      const response = await fetch("/api/students", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: fields.name,
+          dob: fields.dob,
+          classId: fields.classId ?? undefined,
+          admissionNo: fields.admissionNo,
+          rollNumber: fields.rollNumber || undefined,
+          photoUrl,
+          parentPhone: fields.parentPhone,
+          parentName: fields.parentName || undefined,
+        }),
+      });
+      if (response.status === 201) {
+        await refresh();
+        closeModal();
+        return;
+      }
       setError((await response.json()).error);
       return;
     }
-    setEditingId(null);
-    await refresh();
+
+    if (modalState?.mode === "edit") {
+      const body: {
+        name: string;
+        admissionNo: string;
+        dob?: string;
+        classId?: number;
+        rollNumber?: string;
+        photoUrl?: string;
+      } = {
+        name: fields.name,
+        admissionNo: fields.admissionNo,
+      };
+      if (fields.dob) body.dob = fields.dob;
+      if (fields.classId) body.classId = fields.classId;
+      if (fields.rollNumber) body.rollNumber = fields.rollNumber;
+      if (photoUrl) body.photoUrl = photoUrl;
+
+      const response = await fetch(`/api/students/${modalState.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (response.ok) {
+        await refresh();
+        closeModal();
+        return;
+      }
+      setError((await response.json()).error);
+    }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete() {
+    if (modalState?.mode !== "edit") return;
     setError(null);
-    const response = await fetch(`/api/students/${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/students/${modalState.id}`, { method: "DELETE" });
     if (response.ok) {
-      setDeleteBlockedId(null);
       await refresh();
+      closeModal();
       return;
     }
     const body = await response.json();
     if (body.deletable === false) {
-      setDeleteBlockedId(id);
+      setDeleteBlockedId(modalState.id);
       return;
     }
     setError(body.error);
   }
 
-  async function handleDeactivate(id: number) {
+  async function handleDeactivate() {
+    if (modalState?.mode !== "edit") return;
     setError(null);
-    const response = await fetch(`/api/students/${id}/deactivate`, { method: "PATCH" });
+    const response = await fetch(`/api/students/${modalState.id}/deactivate`, { method: "PATCH" });
     if (!response.ok) {
       setError((await response.json()).error);
       return;
     }
-    setDeleteBlockedId(null);
+    await refresh();
+    closeModal();
+  }
+
+  async function handleActivate() {
+    if (modalState?.mode !== "edit") return;
+    setError(null);
+    const response = await fetch(`/api/students/${modalState.id}/activate`, { method: "PATCH" });
+    if (!response.ok) {
+      setError((await response.json()).error);
+      return;
+    }
     await refresh();
   }
 
-  async function handleActivate(id: number) {
-    setError(null);
-    const response = await fetch(`/api/students/${id}/activate`, { method: "PATCH" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh();
-  }
+  const editingStudent =
+    modalState?.mode === "edit" ? students.find((student) => student.id === modalState.id) : undefined;
 
   return (
     <div className="mt-4">
-      {isAdmin && (
-        <div className="flex flex-col gap-2">
-          <input
-            type="text"
-            aria-label="Student name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
-            placeholder="Student name"
-          />
-          <input
-            type="date"
-            aria-label="Date of birth"
-            value={dob}
-            onChange={(event) => setDob(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
-          />
-          <select
-            aria-label="Class"
-            value={classId}
-            onChange={(event) => setClassId(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
-          >
-            {classes.map((klass) => (
-              <option key={klass.id} value={klass.id}>
-                {klass.name} {klass.section}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            aria-label="Admission number"
-            value={admissionNo}
-            onChange={(event) => setAdmissionNo(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
-            placeholder="Admission number"
-          />
-          <input
-            type="text"
-            aria-label="Roll number"
-            value={rollNumber}
-            onChange={(event) => setRollNumber(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
-            placeholder="Roll number (optional)"
-          />
-          <input
-            type="file"
-            aria-label="Student photo"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
-            className="rounded border border-gray-300 px-3 py-2"
-          />
-          <input
-            type="tel"
-            aria-label="Parent phone"
-            value={parentPhone}
-            onChange={(event) => setParentPhone(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
-            placeholder="Parent phone number"
-          />
-          <input
-            type="text"
-            aria-label="Parent name"
-            value={parentName}
-            onChange={(event) => setParentName(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2"
-            placeholder="Parent name (only if this phone is new)"
-          />
-          <button type="button" onClick={handleCreate} className="rounded bg-blue-600 px-3 py-2 text-white">
-            Create Student
-          </button>
-        </div>
-      )}
-
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-
-      <table className="mt-6 w-full text-left text-sm">
-        <thead>
-          <tr>
-            <th className="border-b border-gray-200 pb-2">Name</th>
-            <th className="border-b border-gray-200 pb-2">Admission No.</th>
-            <th className="border-b border-gray-200 pb-2">Roll No.</th>
-            <th className="border-b border-gray-200 pb-2">Class</th>
-            <th className="border-b border-gray-200 pb-2">Parent(s)</th>
-            <th className="border-b border-gray-200 pb-2">Status</th>
-            {isAdmin && <th className="border-b border-gray-200 pb-2">Actions</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((student) => (
-            <Fragment key={student.id}>
-              <tr>
-                <td className="border-b border-gray-100 py-2">{student.name}</td>
-                <td className="border-b border-gray-100 py-2">{student.admissionNo}</td>
-                <td className="border-b border-gray-100 py-2">{student.rollNumber ?? "—"}</td>
-                <td className="border-b border-gray-100 py-2">
-                  {student.class ? `${student.class.name} ${student.class.section}` : "Unassigned"}
-                </td>
-                <td className="border-b border-gray-100 py-2">
-                  {student.parents.map((parent) => `${parent.name} (${parent.phone})`).join(", ") || "None"}
-                </td>
-                <td className="border-b border-gray-100 py-2">
-                  {student.status !== "active" && (
-                    <span className="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-600">{student.status}</span>
-                  )}
-                </td>
-                {isAdmin && (
-                  <td className="border-b border-gray-100 py-2">
-                    <button type="button" onClick={() => startEdit(student)} className="mr-3 text-blue-600 underline">
-                      Edit
-                    </button>
-                    <button type="button" onClick={() => handleDelete(student.id)} className="mr-3 text-red-600 underline">
-                      Delete
-                    </button>
-                    {student.status !== "active" && (
-                      <button
-                        type="button"
-                        onClick={() => handleActivate(student.id)}
-                        className="text-green-700 underline"
-                      >
-                        Activate
-                      </button>
-                    )}
-                  </td>
-                )}
-              </tr>
-              {editingId === student.id && (
-                <tr>
-                  <td colSpan={7} className="border-b border-gray-100 bg-gray-50 py-2">
-                    <div className="flex flex-wrap items-center gap-2 px-2">
-                      <input
-                        type="text"
-                        aria-label={`Edit name for ${student.name}`}
-                        value={editName}
-                        onChange={(event) => setEditName(event.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      />
-                      <input
-                        type="date"
-                        aria-label={`Edit date of birth for ${student.name}`}
-                        value={editDob}
-                        onChange={(event) => setEditDob(event.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      />
-                      <input
-                        type="text"
-                        aria-label={`Edit admission number for ${student.name}`}
-                        value={editAdmissionNo}
-                        onChange={(event) => setEditAdmissionNo(event.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      />
-                      <input
-                        type="text"
-                        aria-label={`Edit roll number for ${student.name}`}
-                        value={editRollNumber}
-                        onChange={(event) => setEditRollNumber(event.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                        placeholder="Roll number"
-                      />
-                      <input
-                        type="file"
-                        aria-label={`Edit photo for ${student.name}`}
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) => setEditPhoto(event.target.files?.[0] ?? null)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      />
-                      {student.class && (
-                        <select
-                          aria-label={`Edit class for ${student.name}`}
-                          value={editClassId}
-                          onChange={(event) => setEditClassId(event.target.value)}
-                          className="rounded border border-gray-300 px-2 py-1"
-                        >
-                          <option value="">Keep current class</option>
-                          {classes.map((klass) => (
-                            <option key={klass.id} value={klass.id}>
-                              {klass.name} {klass.section}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleSaveEdit(student.id)}
-                        className="rounded bg-blue-600 px-2 py-1 text-white"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(null)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {deleteBlockedId === student.id && (
-                <tr>
-                  <td colSpan={7} className="border-b border-gray-100 bg-amber-50 py-2">
-                    <div className="flex flex-wrap items-center gap-2 px-2 text-sm">
-                      <span>{student.name} has recorded history and cannot be permanently deleted.</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeactivate(student.id)}
-                        className="rounded bg-amber-600 px-2 py-1 text-white"
-                      >
-                        Deactivate instead
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteBlockedId(null)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </Fragment>
+      <div className="flex items-center justify-between gap-3">
+        <select
+          aria-label="Filter by class"
+          value={classFilter}
+          onChange={(event) => setClassFilter(event.target.value)}
+          className="rounded border border-gray-300 px-3 py-2 text-sm"
+        >
+          <option value="all">All classes</option>
+          {classes.map((klass) => (
+            <option key={klass.id} value={klass.id}>
+              {klass.name} {klass.section}
+            </option>
           ))}
-        </tbody>
-      </table>
+        </select>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={openCreate}
+            className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+          >
+            Add new student
+          </button>
+        )}
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        {filteredStudents.map((student) => (
+          <StudentCard key={student.id} student={student} onClick={() => openEdit(student.id)} />
+        ))}
+      </div>
+
+      {modalState && (
+        <StudentDetailModal
+          mode={modalState.mode}
+          student={editingStudent}
+          classes={classes}
+          isAdmin={isAdmin}
+          defaultClassId={selectedClass?.id}
+          serverError={error}
+          deleteBlocked={modalState.mode === "edit" && deleteBlockedId === modalState.id}
+          onClose={closeModal}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onDeactivate={handleDeactivate}
+          onCancelDelete={() => setDeleteBlockedId(null)}
+          onActivate={handleActivate}
+        />
+      )}
     </div>
   );
 }
