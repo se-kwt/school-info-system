@@ -37,6 +37,7 @@ describe("GET /api/fee-payments", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-900",
+        rollNumber: "SCH-900",
       },
     });
     const feeStructure = await prisma.feeStructure.create({
@@ -176,6 +177,7 @@ describe("POST /api/fee-payments", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-901",
+        rollNumber: "SCH-901",
       },
     });
     const feeStructure = await prisma.feeStructure.create({
@@ -299,6 +301,7 @@ describe("POST /api/fee-payments", () => {
         classId: otherClass.id,
         section: "B",
         admissionNo: "SCH-902",
+        rollNumber: "SCH-902",
       },
     });
     const admin = await prisma.user.create({

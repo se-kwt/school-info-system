@@ -28,6 +28,7 @@ describe("getDashboardOverview", () => {
         classId: otherClass.id,
         section: "B",
         admissionNo: "GH-2026-002",
+        rollNumber: "GH-2026-002",
       },
     });
 
@@ -60,6 +61,7 @@ describe("getDashboardOverview", () => {
         classId: otherClass.id,
         section: "B",
         admissionNo: "GH-2026-002",
+        rollNumber: "GH-2026-002",
       },
     });
 
@@ -164,6 +166,7 @@ describe("getDashboardOverview", () => {
         classId: fixtures.classA.id,
         section: "A",
         admissionNo: "GH-2026-010",
+        rollNumber: "GH-2026-010",
       },
     });
     const studentC = await prisma.student.create({
@@ -174,6 +177,7 @@ describe("getDashboardOverview", () => {
         classId: fixtures.classA.id,
         section: "A",
         admissionNo: "GH-2026-011",
+        rollNumber: "GH-2026-011",
       },
     });
 

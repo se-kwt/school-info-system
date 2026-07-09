@@ -69,12 +69,16 @@ model Student {
   classId     Int
   section     String
   admissionNo String   @unique
+  rollNumber  String
+  photoUrl    String?
 
   parentLinks        ParentStudent[]
   attendance         Attendance[]
   assignmentStatuses AssignmentStatus[]
   marks              Mark[]
   feePayments        FeePayment[]
+
+  @@unique([classId, rollNumber])
 }
 
 model ParentStudent {

@@ -43,6 +43,7 @@ describe("GET /api/marks", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-700",
+        rollNumber: "SCH-700",
       },
     });
     const exam = await prisma.exam.create({
@@ -199,6 +200,7 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-800",
+        rollNumber: "SCH-800",
       },
     });
     const exam = await prisma.exam.create({
@@ -362,6 +364,7 @@ describe("POST /api/marks", () => {
         classId: otherClass.id,
         section: "B",
         admissionNo: "SCH-801",
+        rollNumber: "SCH-801",
       },
     });
     loginAs(teacher.id, "teacher", school.id);
@@ -487,6 +490,7 @@ describe("POST /api/marks", () => {
           classId: klass.id,
           section: "A",
           admissionNo: `SCH-90${index}`,
+          rollNumber: `SCH-90${index}`,
         },
       });
 

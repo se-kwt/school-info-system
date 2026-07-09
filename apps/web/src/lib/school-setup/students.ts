@@ -1,10 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
-import { isUniqueConstraintViolation } from "./prisma-errors";
+import { isUniqueConstraintViolation, uniqueConstraintTarget } from "./prisma-errors";
 
 export interface StudentSummary {
   id: number;
   name: string;
   admissionNo: string;
+  rollNumber: string;
   class: { name: string; section: string };
   parents: { name: string; phone: string }[];
 }
@@ -23,6 +24,7 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
     id: student.id,
     name: student.name,
     admissionNo: student.admissionNo,
+    rollNumber: student.rollNumber,
     class: { name: student.class.name, section: student.class.section },
     parents: student.parentLinks.map((link) => ({
       name: link.parent.name,
@@ -34,6 +36,7 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
 export type CreateStudentResult =
   | { ok: true; student: { id: number; name: string; admissionNo: string } }
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
+  | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
   | { ok: false; error: "PHONE_WRONG_ROLE" }
   | { ok: false; error: "PARENT_NAME_REQUIRED" }
   | { ok: false; error: "INVALID_CLASS" };
@@ -46,6 +49,8 @@ export async function createStudent(
     dob: string;
     classId: number;
     admissionNo: string;
+    rollNumber: string;
+    photoUrl?: string;
     parentPhone: string;
     parentName?: string;
   }
@@ -55,6 +60,13 @@ export async function createStudent(
   });
   if (existingAdmission) {
     return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
+  }
+
+  const existingRollNumber = await prisma.student.findFirst({
+    where: { classId: input.classId, rollNumber: input.rollNumber },
+  });
+  if (existingRollNumber) {
+    return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
   }
 
   const existingParent = await prisma.user.findUnique({ where: { phone: input.parentPhone } });
@@ -86,6 +98,8 @@ export async function createStudent(
           classId: input.classId,
           section: targetClass.section,
           admissionNo: input.admissionNo,
+          rollNumber: input.rollNumber,
+          photoUrl: input.photoUrl ?? null,
         },
       });
 
@@ -101,6 +115,10 @@ export async function createStudent(
       student: { id: student.id, name: student.name, admissionNo: student.admissionNo },
     };
   } catch (err) {
+    const target = uniqueConstraintTarget(err);
+    if (target?.includes("rollNumber")) {
+      return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
+    }
     if (isUniqueConstraintViolation(err)) {
       return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
     }

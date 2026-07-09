@@ -16,6 +16,7 @@ export function CreateStudentForm({
   const [dob, setDob] = useState("");
   const [classId, setClassId] = useState(classes[0] ? String(classes[0].id) : "");
   const [admissionNo, setAdmissionNo] = useState("");
+  const [rollNumber, setRollNumber] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [parentName, setParentName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export function CreateStudentForm({
         dob,
         classId: classId ? Number(classId) : undefined,
         admissionNo,
+        rollNumber,
         parentPhone,
         parentName: parentName || undefined,
       }),
@@ -41,6 +43,7 @@ export function CreateStudentForm({
       setName("");
       setDob("");
       setAdmissionNo("");
+      setRollNumber("");
       setParentPhone("");
       setParentName("");
       router.refresh();
@@ -90,6 +93,14 @@ export function CreateStudentForm({
         onChange={(event) => setAdmissionNo(event.target.value)}
         className={inputClass}
         placeholder="Admission number"
+      />
+      <input
+        type="text"
+        aria-label="Roll number"
+        value={rollNumber}
+        onChange={(event) => setRollNumber(event.target.value)}
+        className={inputClass}
+        placeholder="Roll number"
       />
       <input
         type="tel"

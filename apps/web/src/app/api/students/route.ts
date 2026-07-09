@@ -25,17 +25,20 @@ export async function POST(request: Request) {
     let dob: string | undefined;
     let classId: number | undefined;
     let admissionNo: string | undefined;
+    let rollNumber: string | undefined;
+    let photoUrl: string | undefined;
     let parentPhone: string | undefined;
     let parentName: string | undefined;
     try {
-      ({ name, dob, classId, admissionNo, parentPhone, parentName } = await request.json());
+      ({ name, dob, classId, admissionNo, rollNumber, photoUrl, parentPhone, parentName } =
+        await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!name || !dob || !classId || !admissionNo || !parentPhone) {
+    if (!name || !dob || !classId || !admissionNo || !rollNumber || !parentPhone) {
       return NextResponse.json(
-        { error: "name, dob, classId, admissionNo, and parentPhone are required" },
+        { error: "name, dob, classId, admissionNo, rollNumber, and parentPhone are required" },
         { status: 400 }
       );
     }
@@ -45,6 +48,8 @@ export async function POST(request: Request) {
       dob,
       classId,
       admissionNo,
+      rollNumber,
+      photoUrl,
       parentPhone,
       parentName,
     });
@@ -53,6 +58,12 @@ export async function POST(request: Request) {
       if (result.error === "DUPLICATE_ADMISSION_NO") {
         return NextResponse.json(
           { error: "A student with this admission number already exists" },
+          { status: 409 }
+        );
+      }
+      if (result.error === "DUPLICATE_ROLL_NUMBER") {
+        return NextResponse.json(
+          { error: "A student with this roll number already exists in this class" },
           { status: 409 }
         );
       }

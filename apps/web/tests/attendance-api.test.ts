@@ -43,6 +43,7 @@ describe("/api/attendance", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-500",
+        rollNumber: "1",
       },
     });
     return { school, klass, teacher, student };
@@ -184,6 +185,7 @@ describe("/api/attendance", () => {
         classId: otherClass.id,
         section: "B",
         admissionNo: "SCH-501",
+        rollNumber: "1",
       },
     });
     loginAs(teacher.id, "teacher", school.id);

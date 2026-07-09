@@ -31,6 +31,7 @@ export async function createSeedFixtures(prisma: PrismaClient) {
       classId: classA.id,
       section: "A",
       admissionNo: "GH-2026-001",
+      rollNumber: "GH-2026-001",
     },
   });
 

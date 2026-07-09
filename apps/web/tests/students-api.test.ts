@@ -49,6 +49,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-001",
+        rollNumber: "1",
         parentPhone: parent.phone,
       }),
       headers: { "content-type": "application/json" },
@@ -74,6 +75,7 @@ describe("/api/students", () => {
         dob: "2015-06-15",
         classId: klass.id,
         admissionNo: "SCH-002",
+        rollNumber: "1",
         parentPhone: "+15558880002",
         parentName: "Brand New Parent",
       }),
@@ -105,6 +107,7 @@ describe("/api/students", () => {
         classId: klass.id,
         section: klass.section,
         admissionNo: "SCH-003",
+        rollNumber: "1",
       },
     });
 
@@ -115,6 +118,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-003",
+        rollNumber: "2",
         parentPhone: "+15558880003",
         parentName: "Some Parent",
       }),
@@ -141,6 +145,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-004",
+        rollNumber: "1",
         parentPhone: teacher.phone,
       }),
       headers: { "content-type": "application/json" },
@@ -163,6 +168,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-005",
+        rollNumber: "1",
         parentPhone: "+15558880005",
       }),
       headers: { "content-type": "application/json" },
@@ -186,6 +192,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: otherClass.id,
         admissionNo: "SCH-999",
+        rollNumber: "1",
         parentPhone: "+15558889999",
         parentName: "Some Parent",
       }),
@@ -193,5 +200,101 @@ describe("/api/students", () => {
     });
     const postResponse = await postStudents(postRequest);
     expect(postResponse.status).toBe(400);
+  });
+
+  it("rejects a missing rollNumber with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 8", section: "A" },
+    });
+
+    const postRequest = new Request("http://localhost/api/students", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "No Roll Number",
+        dob: "2016-01-01",
+        classId: klass.id,
+        admissionNo: "SCH-006",
+        parentPhone: "+15558880006",
+        parentName: "Some Parent",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const postResponse = await postStudents(postRequest);
+    expect(postResponse.status).toBe(400);
+  });
+
+  it("rejects a duplicate rollNumber within the same class with 409", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 9", section: "A" },
+    });
+    await prisma.student.create({
+      data: {
+        schoolId: school.id,
+        name: "First Student",
+        dob: new Date("2016-01-01"),
+        classId: klass.id,
+        section: "A",
+        admissionNo: "SCH-007",
+        rollNumber: "5",
+      },
+    });
+
+    const postRequest = new Request("http://localhost/api/students", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Second Student",
+        dob: "2016-01-01",
+        classId: klass.id,
+        admissionNo: "SCH-008",
+        rollNumber: "5",
+        parentPhone: "+15558880007",
+        parentName: "Some Parent",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const postResponse = await postStudents(postRequest);
+    expect(postResponse.status).toBe(409);
+  });
+
+  it("allows the same rollNumber in two different classes", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const classOne = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 10", section: "A" },
+    });
+    const classTwo = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 11", section: "A" },
+    });
+    await prisma.student.create({
+      data: {
+        schoolId: school.id,
+        name: "First Student",
+        dob: new Date("2016-01-01"),
+        classId: classOne.id,
+        section: "A",
+        admissionNo: "SCH-009",
+        rollNumber: "5",
+      },
+    });
+
+    const postRequest = new Request("http://localhost/api/students", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Second Student",
+        dob: "2016-01-01",
+        classId: classTwo.id,
+        admissionNo: "SCH-010",
+        rollNumber: "5",
+        parentPhone: "+15558880008",
+        parentName: "Some Parent",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const postResponse = await postStudents(postRequest);
+    expect(postResponse.status).toBe(201);
   });
 });

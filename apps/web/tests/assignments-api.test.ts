@@ -48,6 +48,7 @@ describe("/api/assignments", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-500",
+        rollNumber: "SCH-500",
       },
     });
     return { school, klass, teacher, student };
@@ -147,6 +148,7 @@ describe("/api/assignments", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-501",
+        rollNumber: "SCH-501",
       },
     });
     const assignment = await prisma.assignment.create({
@@ -412,6 +414,7 @@ describe("/api/assignments/[id]/statuses", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-600",
+        rollNumber: "SCH-600",
       },
     });
     const assignment = await prisma.assignment.create({
@@ -466,6 +469,7 @@ describe("/api/assignments/[id]/statuses", () => {
         classId: klass.id,
         section: "A",
         admissionNo: "SCH-601",
+        rollNumber: "SCH-601",
       },
     });
     const assignment = await prisma.assignment.create({
@@ -558,6 +562,7 @@ describe("/api/assignments/[id]/statuses", () => {
         classId: otherClass.id,
         section: "B",
         admissionNo: "SCH-602",
+        rollNumber: "SCH-602",
       },
     });
     loginAs(teacher.id, "teacher", school.id);
