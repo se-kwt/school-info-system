@@ -39,7 +39,6 @@ export async function createSeedFixtures(prisma: PrismaClient) {
       name: "Rohan Sharma",
       dob: new Date("2015-04-12"),
       admissionNo: "GH-2026-001",
-      rollNumber: "GH-2026-001",
     },
   });
 
@@ -49,6 +48,7 @@ export async function createSeedFixtures(prisma: PrismaClient) {
       classId: classA.id,
       academicYearId: academicYear.id,
       status: "active",
+      rollNumber: "GH-2026-001",
     },
   });
 

@@ -106,6 +106,7 @@ model Student {
   dob         DateTime
   admissionNo String        @unique
   status      StudentStatus @default(active)
+  photoUrl    String?
 
   parentLinks         ParentStudent[]
   attendance          Attendance[]
@@ -327,6 +328,7 @@ model Enrollment {
   createdAt      DateTime         @default(now())
 
   @@unique([studentId, academicYearId])
+  @@unique([classId, academicYearId, rollNumber])
 }
 
 model PromotionRun {
