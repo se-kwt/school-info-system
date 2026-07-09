@@ -5,6 +5,8 @@ import { getEnrolledStudents } from "./enrollment";
 export interface RosterEntry {
   studentId: number;
   name: string;
+  rollNumber: string | null;
+  photoUrl: string | null;
   status: AttendanceStatus | null;
   note: string | null;
   monthPercent: number;
@@ -74,6 +76,8 @@ export async function getAttendanceRoster(
       return {
         studentId: student.id,
         name: student.name,
+        rollNumber: student.rollNumber,
+        photoUrl: student.photoUrl,
         status: todayRecord ? todayRecord.status : null,
         note: todayRecord ? todayRecord.note : null,
         monthPercent,

@@ -64,7 +64,15 @@ describe("/api/attendance", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.students).toEqual([
-      { studentId: student.id, name: "Test Student", status: null, note: null, monthPercent: 0 },
+      {
+        studentId: student.id,
+        name: "Test Student",
+        rollNumber: null,
+        photoUrl: null,
+        status: null,
+        note: null,
+        monthPercent: 0,
+      },
     ]);
   });
 
