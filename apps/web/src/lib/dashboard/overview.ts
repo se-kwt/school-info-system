@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "@/lib/auth/jwt";
 import { getClassesForTeacher } from "@/lib/data/scoped-queries";
 import { listClasses } from "@/lib/school-setup/classes";
+import { getActiveAcademicYear } from "@/lib/academic-years";
 
 export interface ClassPerformanceEntry {
   classId: number;
@@ -114,15 +115,17 @@ async function getAcademicOverview(
   claims: SessionClaims
 ): Promise<AcademicOverview> {
   const role = claims.role === "teacher" ? "teacher" : "admin";
+  const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
+  const academicYearId = activeYear?.id ?? -1;
 
   const classes =
     role === "teacher"
-      ? await getClassesForTeacher(prisma, claims.userId)
+      ? await getClassesForTeacher(prisma, claims.userId, academicYearId)
       : await listClasses(prisma, claims.schoolId);
   const classIds = classes.map((klass) => klass.id);
 
-  const totalStudents = await prisma.student.count({
-    where: { classId: { in: classIds } },
+  const totalStudents = await prisma.enrollment.count({
+    where: { classId: { in: classIds }, academicYearId, status: "active" },
   });
 
   const todayStart = startOfToday();
@@ -131,7 +134,9 @@ async function getAcademicOverview(
   const todayAttendance = await prisma.attendance.findMany({
     where: {
       date: { gte: todayStart, lt: todayEnd },
-      student: { classId: { in: classIds } },
+      student: {
+        enrollments: { some: { classId: { in: classIds }, academicYearId, status: "active" } },
+      },
     },
     select: { status: true },
   });
@@ -171,7 +176,10 @@ async function getAcademicOverview(
   const classPerformance: ClassPerformanceEntry[] = [];
   for (const klass of classes) {
     const records = await prisma.attendance.findMany({
-      where: { date: { gte: thirtyDaysAgo, lt: todayEnd }, student: { classId: klass.id } },
+      where: {
+        date: { gte: thirtyDaysAgo, lt: todayEnd },
+        student: { enrollments: { some: { classId: klass.id, academicYearId, status: "active" } } },
+      },
       select: { status: true },
     });
     classPerformance.push({
@@ -191,7 +199,12 @@ async function getAcademicOverview(
     const dayEnd = addDays(day, 1);
     for (const klass of trendClasses) {
       const records = await prisma.attendance.findMany({
-        where: { date: { gte: day, lt: dayEnd }, student: { classId: klass.classId } },
+        where: {
+          date: { gte: day, lt: dayEnd },
+          student: {
+            enrollments: { some: { classId: klass.classId, academicYearId, status: "active" } },
+          },
+        },
         select: { status: true },
       });
       if (records.length === 0) continue;
@@ -226,10 +239,23 @@ async function getAcademicOverview(
   );
 
   const attendanceTodayRows = await prisma.attendance.findMany({
-    where: { date: { gte: todayStart, lt: todayEnd }, student: { classId: { in: classIds } } },
-    select: { student: { select: { classId: true } } },
+    where: {
+      date: { gte: todayStart, lt: todayEnd },
+      student: {
+        enrollments: { some: { classId: { in: classIds }, academicYearId, status: "active" } },
+      },
+    },
+    select: {
+      student: {
+        select: { enrollments: { where: { academicYearId }, select: { classId: true } } },
+      },
+    },
   });
-  const classesMarkedToday = new Set(attendanceTodayRows.map((row) => row.student.classId)).size;
+  const classesMarkedToday = new Set(
+    attendanceTodayRows
+      .map((row) => row.student.enrollments[0]?.classId)
+      .filter((classId): classId is number => classId !== undefined)
+  ).size;
   const staffCapacityPercent =
     classIds.length === 0 ? 0 : Math.round((classesMarkedToday / classIds.length) * 100);
 
@@ -310,9 +336,10 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
   // class. Compare totals against totals, not a per-student amount against a
   // class-wide sum of payments.
   const classIds = [...new Set(feeStructures.map((fs) => fs.classId))];
-  const studentCounts = await prisma.student.groupBy({
+  const activeYear = await getActiveAcademicYear(prisma, schoolId);
+  const studentCounts = await prisma.enrollment.groupBy({
     by: ["classId"],
-    where: { classId: { in: classIds } },
+    where: { classId: { in: classIds }, academicYearId: activeYear?.id ?? -1, status: "active" },
     _count: true,
   });
   const studentCountByClassId = new Map<number, number>(

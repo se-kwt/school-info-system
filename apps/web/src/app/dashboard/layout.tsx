@@ -4,6 +4,7 @@ import { requireDashboardRole } from "@/lib/auth/require-dashboard-role";
 import { getNavItemsForRole, WORKSPACE_NAV_ITEMS } from "@/lib/dashboard/nav-items";
 import { getClassesForTeacher } from "@/lib/data/scoped-queries";
 import { listClasses } from "@/lib/school-setup/classes";
+import { getActiveAcademicYear } from "@/lib/academic-years";
 
 export default async function DashboardLayout({
   children,
@@ -13,10 +14,11 @@ export default async function DashboardLayout({
   const claims = requireDashboardRole(["teacher", "admin", "accountant"]);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: claims.userId } });
   const navItems = getNavItemsForRole(claims.role);
+  const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
 
   const pinnedClasses =
     claims.role === "teacher"
-      ? (await getClassesForTeacher(prisma, claims.userId)).slice(0, 3)
+      ? (await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)).slice(0, 3)
       : claims.role === "admin"
         ? (await listClasses(prisma, claims.schoolId)).slice(0, 3)
         : [];

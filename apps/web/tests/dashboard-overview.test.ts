@@ -20,14 +20,20 @@ describe("getDashboardOverview", () => {
     const otherClass = await prisma.class.create({
       data: { schoolId: fixtures.school.id, name: "Grade 6", section: "B" },
     });
-    await prisma.student.create({
+    const otherStudent = await prisma.student.create({
       data: {
         schoolId: fixtures.school.id,
         name: "Other Student",
         dob: new Date("2014-01-01"),
-        classId: otherClass.id,
-        section: "B",
         admissionNo: "GH-2026-002",
+      },
+    });
+    await prisma.enrollment.create({
+      data: {
+        studentId: otherStudent.id,
+        classId: otherClass.id,
+        academicYearId: fixtures.academicYear.id,
+        status: "active",
         rollNumber: "GH-2026-002",
       },
     });
@@ -53,14 +59,20 @@ describe("getDashboardOverview", () => {
     const otherClass = await prisma.class.create({
       data: { schoolId: fixtures.school.id, name: "Grade 6", section: "B" },
     });
-    await prisma.student.create({
+    const otherStudent = await prisma.student.create({
       data: {
         schoolId: fixtures.school.id,
         name: "Other Student",
         dob: new Date("2014-01-01"),
-        classId: otherClass.id,
-        section: "B",
         admissionNo: "GH-2026-002",
+      },
+    });
+    await prisma.enrollment.create({
+      data: {
+        studentId: otherStudent.id,
+        classId: otherClass.id,
+        academicYearId: fixtures.academicYear.id,
+        status: "active",
         rollNumber: "GH-2026-002",
       },
     });
@@ -121,6 +133,7 @@ describe("getDashboardOverview", () => {
       data: {
         schoolId: fixtures.school.id,
         classId: fixtures.classA.id,
+        academicYearId: fixtures.academicYear.id,
         term: "Term 1",
         amount: 1000,
         dueDate: new Date("2026-09-01"),
@@ -163,9 +176,15 @@ describe("getDashboardOverview", () => {
         schoolId: fixtures.school.id,
         name: "Second Student",
         dob: new Date("2015-05-01"),
-        classId: fixtures.classA.id,
-        section: "A",
         admissionNo: "GH-2026-010",
+      },
+    });
+    await prisma.enrollment.create({
+      data: {
+        studentId: studentB.id,
+        classId: fixtures.classA.id,
+        academicYearId: fixtures.academicYear.id,
+        status: "active",
         rollNumber: "GH-2026-010",
       },
     });
@@ -174,9 +193,15 @@ describe("getDashboardOverview", () => {
         schoolId: fixtures.school.id,
         name: "Third Student",
         dob: new Date("2015-06-01"),
-        classId: fixtures.classA.id,
-        section: "A",
         admissionNo: "GH-2026-011",
+      },
+    });
+    await prisma.enrollment.create({
+      data: {
+        studentId: studentC.id,
+        classId: fixtures.classA.id,
+        academicYearId: fixtures.academicYear.id,
+        status: "active",
         rollNumber: "GH-2026-011",
       },
     });
@@ -185,6 +210,7 @@ describe("getDashboardOverview", () => {
       data: {
         schoolId: fixtures.school.id,
         classId: fixtures.classA.id,
+        academicYearId: fixtures.academicYear.id,
         term: "Term 1",
         amount: 1000, // per-student amount
         dueDate: new Date("2026-09-01"),
