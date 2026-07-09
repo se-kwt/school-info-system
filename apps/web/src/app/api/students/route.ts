@@ -37,9 +37,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!name || !dob || !classId || !admissionNo || !rollNumber || !parentPhone) {
+    if (!name || !dob || !classId || !admissionNo || !parentPhone) {
       return NextResponse.json(
-        { error: "name, dob, classId, admissionNo, rollNumber, and parentPhone are required" },
+        { error: "name, dob, classId, admissionNo, and parentPhone are required" },
         { status: 400 }
       );
     }

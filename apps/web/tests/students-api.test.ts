@@ -202,6 +202,74 @@ describe("/api/students", () => {
     const postResponse = await postStudents(postRequest);
     expect(postResponse.status).toBe(400);
   });
+
+  it("creates a student with a roll number and photo url", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
+    await loginAsAdmin(school.id);
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 8", section: "A" },
+    });
+
+    const postRequest = new Request("http://localhost/api/students", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Roll Number Student",
+        dob: "2016-01-01",
+        classId: klass.id,
+        admissionNo: "SCH-ROLL-1",
+        rollNumber: "5",
+        photoUrl: "/uploads/students/x.png",
+        parentPhone: "+15558880010",
+        parentName: "Some Parent",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const postResponse = await postStudents(postRequest);
+    expect(postResponse.status).toBe(201);
+
+    const getResponse = await getStudents();
+    const list = await getResponse.json();
+    const created = list.find((entry: { admissionNo: string }) => entry.admissionNo === "SCH-ROLL-1");
+    expect(created).toMatchObject({ rollNumber: "5", photoUrl: "/uploads/students/x.png" });
+  });
+
+  it("rejects a duplicate rollNumber within the same class and year with 409", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    await loginAsAdmin(school.id);
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 9", section: "A" },
+    });
+    await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "First Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-ROLL-2",
+    });
+    await prisma.enrollment.updateMany({
+      where: { classId: klass.id, academicYearId: year.id },
+      data: { rollNumber: "7" },
+    });
+
+    const postRequest = new Request("http://localhost/api/students", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Second Student",
+        dob: "2016-01-01",
+        classId: klass.id,
+        admissionNo: "SCH-ROLL-3",
+        rollNumber: "7",
+        parentPhone: "+15558880011",
+        parentName: "Some Parent",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const postResponse = await postStudents(postRequest);
+    expect(postResponse.status).toBe(409);
+  });
 });
 
 describe("/api/students/[id]", () => {
@@ -439,5 +507,70 @@ describe("/api/students/[id]", () => {
     });
     const response = await patchStudent(request, { params: { id: String(otherStudent.id) } });
     expect(response.status).toBe(404);
+  });
+
+  it("updates rollNumber and photoUrl", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    await loginAsAdmin(school.id);
+    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 5", section: "A" } });
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Test Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-EDIT-ROLL-1",
+    });
+
+    const request = new Request(`http://localhost/api/students/${student.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: student.name, admissionNo: student.admissionNo, rollNumber: "3", photoUrl: "/uploads/students/y.png" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchStudent(request, { params: { id: String(student.id) } });
+    expect(response.status).toBe(200);
+
+    const updatedStudent = await prisma.student.findUnique({ where: { id: student.id } });
+    expect(updatedStudent?.photoUrl).toBe("/uploads/students/y.png");
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { studentId_academicYearId: { studentId: student.id, academicYearId: year.id } },
+    });
+    expect(enrollment?.rollNumber).toBe("3");
+  });
+
+  it("rejects a duplicate rollNumber on edit within the same class and year with 409", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    await loginAsAdmin(school.id);
+    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 5", section: "A" } });
+    await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Taken",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-EDIT-ROLL-2",
+    });
+    await prisma.enrollment.updateMany({
+      where: { classId: klass.id, academicYearId: year.id },
+      data: { rollNumber: "9" },
+    });
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Other",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-EDIT-ROLL-3",
+    });
+
+    const request = new Request(`http://localhost/api/students/${student.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: student.name, admissionNo: student.admissionNo, rollNumber: "9" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchStudent(request, { params: { id: String(student.id) } });
+    expect(response.status).toBe(409);
   });
 });

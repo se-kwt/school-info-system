@@ -1,10 +1,12 @@
 import type { PrismaClient, StudentStatus } from "@prisma/client";
-import { isUniqueConstraintViolation } from "./prisma-errors";
+import { isUniqueConstraintViolation, uniqueConstraintTarget } from "./prisma-errors";
 
 export interface StudentSummary {
   id: number;
   name: string;
   admissionNo: string;
+  rollNumber: string | null;
+  photoUrl: string | null;
   status: StudentStatus;
   class: { name: string; section: string } | null;
   parents: { name: string; phone: string }[];
@@ -30,6 +32,8 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
       id: student.id,
       name: student.name,
       admissionNo: student.admissionNo,
+      rollNumber: enrollment?.rollNumber ?? null,
+      photoUrl: student.photoUrl,
       status: student.status,
       class: enrollment ? { name: enrollment.class.name, section: enrollment.class.section } : null,
       parents: student.parentLinks.map((link) => ({ name: link.parent.name, phone: link.parent.phone })),
@@ -40,6 +44,7 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
 export type CreateStudentResult =
   | { ok: true; student: { id: number; name: string; admissionNo: string } }
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
+  | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
   | { ok: false; error: "PHONE_WRONG_ROLE" }
   | { ok: false; error: "PARENT_NAME_REQUIRED" }
   | { ok: false; error: "INVALID_CLASS" };
@@ -53,12 +58,21 @@ export async function createStudent(
     dob: string;
     classId: number;
     admissionNo: string;
+    rollNumber?: string;
+    photoUrl?: string;
     parentPhone: string;
     parentName?: string;
   }
 ): Promise<CreateStudentResult> {
   const existingAdmission = await prisma.student.findUnique({ where: { admissionNo: input.admissionNo } });
   if (existingAdmission) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
+
+  if (input.rollNumber) {
+    const existingRollNumber = await prisma.enrollment.findFirst({
+      where: { classId: input.classId, academicYearId, rollNumber: input.rollNumber },
+    });
+    if (existingRollNumber) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
+  }
 
   const existingParent = await prisma.user.findUnique({ where: { phone: input.parentPhone } });
   if (existingParent && existingParent.role !== "parent") return { ok: false, error: "PHONE_WRONG_ROLE" };
@@ -76,11 +90,23 @@ export async function createStudent(
         }));
 
       const createdStudent = await tx.student.create({
-        data: { schoolId, name: input.name, dob: new Date(input.dob), admissionNo: input.admissionNo },
+        data: {
+          schoolId,
+          name: input.name,
+          dob: new Date(input.dob),
+          admissionNo: input.admissionNo,
+          photoUrl: input.photoUrl ?? null,
+        },
       });
 
       await tx.enrollment.create({
-        data: { studentId: createdStudent.id, classId: input.classId, academicYearId, status: "active" },
+        data: {
+          studentId: createdStudent.id,
+          classId: input.classId,
+          academicYearId,
+          status: "active",
+          rollNumber: input.rollNumber ?? null,
+        },
       });
 
       await tx.parentStudent.create({
@@ -95,6 +121,8 @@ export async function createStudent(
       student: { id: student.id, name: student.name, admissionNo: student.admissionNo },
     };
   } catch (err) {
+    const target = uniqueConstraintTarget(err);
+    if (target?.includes("rollNumber")) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
     if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
     throw err;
   }
@@ -104,6 +132,7 @@ export type EditStudentResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
+  | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "NO_ACTIVE_ENROLLMENT" };
 
@@ -113,7 +142,14 @@ export async function editStudent(
     studentId: number;
     schoolId: number;
     academicYearId: number | null;
-    fields: { name?: string; dob?: string; admissionNo?: string; classId?: number };
+    fields: {
+      name?: string;
+      dob?: string;
+      admissionNo?: string;
+      classId?: number;
+      rollNumber?: string;
+      photoUrl?: string;
+    };
   }
 ): Promise<EditStudentResult> {
   const student = await prisma.student.findFirst({ where: { id: params.studentId, schoolId: params.schoolId } });
@@ -124,35 +160,55 @@ export async function editStudent(
     if (existing) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
   }
 
-  if (params.fields.classId !== undefined) {
+  let enrollment: { classId: number } | null = null;
+  if (params.fields.classId !== undefined || params.fields.rollNumber !== undefined) {
     if (!params.academicYearId) return { ok: false, error: "NO_ACTIVE_ENROLLMENT" };
 
-    const enrollment = await prisma.enrollment.findUnique({
+    enrollment = await prisma.enrollment.findUnique({
       where: { studentId_academicYearId: { studentId: params.studentId, academicYearId: params.academicYearId } },
     });
     if (!enrollment) return { ok: false, error: "NO_ACTIVE_ENROLLMENT" };
 
-    const targetClass = await prisma.class.findFirst({
-      where: { id: params.fields.classId, schoolId: params.schoolId },
-    });
-    if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
+    if (params.fields.classId !== undefined) {
+      const targetClass = await prisma.class.findFirst({
+        where: { id: params.fields.classId, schoolId: params.schoolId },
+      });
+      if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
+    }
+
+    if (params.fields.rollNumber) {
+      const targetClassId = params.fields.classId ?? enrollment.classId;
+      const conflict = await prisma.enrollment.findFirst({
+        where: {
+          classId: targetClassId,
+          academicYearId: params.academicYearId,
+          rollNumber: params.fields.rollNumber,
+          studentId: { not: params.studentId },
+        },
+      });
+      if (conflict) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
+    }
   }
 
   await prisma.$transaction(async (tx) => {
-    const data: { name?: string; dob?: Date; admissionNo?: string } = {};
+    const data: { name?: string; dob?: Date; admissionNo?: string; photoUrl?: string } = {};
     if (params.fields.name !== undefined) data.name = params.fields.name;
     if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
     if (params.fields.admissionNo !== undefined) data.admissionNo = params.fields.admissionNo;
+    if (params.fields.photoUrl !== undefined) data.photoUrl = params.fields.photoUrl;
     if (Object.keys(data).length > 0) {
       await tx.student.update({ where: { id: params.studentId }, data });
     }
 
-    if (params.fields.classId !== undefined && params.academicYearId) {
+    if ((params.fields.classId !== undefined || params.fields.rollNumber !== undefined) && params.academicYearId) {
+      const enrollmentData: { classId?: number; rollNumber?: string } = {};
+      if (params.fields.classId !== undefined) enrollmentData.classId = params.fields.classId;
+      if (params.fields.rollNumber !== undefined) enrollmentData.rollNumber = params.fields.rollNumber;
       await tx.enrollment.update({
         where: {
           studentId_academicYearId: { studentId: params.studentId, academicYearId: params.academicYearId },
         },
-        data: { classId: params.fields.classId },
+        data: enrollmentData,
       });
     }
   });
