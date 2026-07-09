@@ -190,28 +190,34 @@ export async function editStudent(
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    const data: { name?: string; dob?: Date; admissionNo?: string; photoUrl?: string } = {};
-    if (params.fields.name !== undefined) data.name = params.fields.name;
-    if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
-    if (params.fields.admissionNo !== undefined) data.admissionNo = params.fields.admissionNo;
-    if (params.fields.photoUrl !== undefined) data.photoUrl = params.fields.photoUrl;
-    if (Object.keys(data).length > 0) {
-      await tx.student.update({ where: { id: params.studentId }, data });
-    }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const data: { name?: string; dob?: Date; admissionNo?: string; photoUrl?: string } = {};
+      if (params.fields.name !== undefined) data.name = params.fields.name;
+      if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
+      if (params.fields.admissionNo !== undefined) data.admissionNo = params.fields.admissionNo;
+      if (params.fields.photoUrl !== undefined) data.photoUrl = params.fields.photoUrl;
+      if (Object.keys(data).length > 0) {
+        await tx.student.update({ where: { id: params.studentId }, data });
+      }
 
-    if ((params.fields.classId !== undefined || params.fields.rollNumber !== undefined) && params.academicYearId) {
-      const enrollmentData: { classId?: number; rollNumber?: string } = {};
-      if (params.fields.classId !== undefined) enrollmentData.classId = params.fields.classId;
-      if (params.fields.rollNumber !== undefined) enrollmentData.rollNumber = params.fields.rollNumber;
-      await tx.enrollment.update({
-        where: {
-          studentId_academicYearId: { studentId: params.studentId, academicYearId: params.academicYearId },
-        },
-        data: enrollmentData,
-      });
-    }
-  });
+      if ((params.fields.classId !== undefined || params.fields.rollNumber !== undefined) && params.academicYearId) {
+        const enrollmentData: { classId?: number; rollNumber?: string } = {};
+        if (params.fields.classId !== undefined) enrollmentData.classId = params.fields.classId;
+        if (params.fields.rollNumber !== undefined) enrollmentData.rollNumber = params.fields.rollNumber;
+        await tx.enrollment.update({
+          where: {
+            studentId_academicYearId: { studentId: params.studentId, academicYearId: params.academicYearId },
+          },
+          data: enrollmentData,
+        });
+      }
+    });
+  } catch (err) {
+    const target = uniqueConstraintTarget(err);
+    if (target?.includes("rollNumber")) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
+    throw err;
+  }
 
   return { ok: true };
 }
