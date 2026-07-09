@@ -105,6 +105,8 @@ model Student {
   name        String
   dob         DateTime
   admissionNo String        @unique
+  rollNumber  String
+  photoUrl    String?
   status      StudentStatus @default(active)
 
   parentLinks         ParentStudent[]

@@ -64,7 +64,15 @@ describe("/api/attendance", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.students).toEqual([
-      { studentId: student.id, name: "Test Student", status: null, note: null, monthPercent: 0 },
+      {
+        studentId: student.id,
+        name: "Test Student",
+        rollNumber: "SCH-500",
+        photoUrl: null,
+        status: null,
+        note: null,
+        monthPercent: 0,
+      },
     ]);
   });
 
@@ -311,5 +319,108 @@ describe("/api/attendance", () => {
 
     // If June's 2 absent days leaked into July's window, this would be far below 100.
     expect(body.students[0].monthPercent).toBe(100);
+  });
+
+  it("deletes an existing attendance record when the entry status is null", async () => {
+    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    await prisma.attendance.create({
+      data: {
+        studentId: student.id,
+        date: new Date("2026-07-06"),
+        status: "present",
+        markedById: teacher.id,
+      },
+    });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const response = await postAttendance(
+      new Request("http://localhost/api/attendance", {
+        method: "POST",
+        body: JSON.stringify({
+          classId: klass.id,
+          date: "2026-07-06",
+          entries: [{ studentId: student.id, status: null }],
+        }),
+        headers: { "content-type": "application/json" },
+      })
+    );
+    expect(response.status).toBe(200);
+
+    const record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
+    expect(record).toBeNull();
+  });
+
+  it("is a no-op when a null-status entry has no existing record", async () => {
+    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const response = await postAttendance(
+      new Request("http://localhost/api/attendance", {
+        method: "POST",
+        body: JSON.stringify({
+          classId: klass.id,
+          date: "2026-07-06",
+          entries: [{ studentId: student.id, status: null }],
+        }),
+        headers: { "content-type": "application/json" },
+      })
+    );
+    expect(response.status).toBe(200);
+
+    const record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
+    expect(record).toBeNull();
+  });
+
+  it("applies a mix of present, absent, late, and null entries in a single submit", async () => {
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    const secondStudent = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Second Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-502",
+      rollNumber: "2",
+    });
+    const thirdStudent = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Third Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-503",
+      rollNumber: "3",
+    });
+    await prisma.attendance.create({
+      data: {
+        studentId: thirdStudent.id,
+        date: new Date("2026-07-06"),
+        status: "present",
+        markedById: teacher.id,
+      },
+    });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const response = await postAttendance(
+      new Request("http://localhost/api/attendance", {
+        method: "POST",
+        body: JSON.stringify({
+          classId: klass.id,
+          date: "2026-07-06",
+          entries: [
+            { studentId: student.id, status: "absent" },
+            { studentId: secondStudent.id, status: "late" },
+            { studentId: thirdStudent.id, status: null },
+          ],
+        }),
+        headers: { "content-type": "application/json" },
+      })
+    );
+    expect(response.status).toBe(200);
+
+    const records = await prisma.attendance.findMany({ where: { date: new Date("2026-07-06") } });
+    expect(records.find((record) => record.studentId === student.id)?.status).toBe("absent");
+    expect(records.find((record) => record.studentId === secondStudent.id)?.status).toBe("late");
+    expect(records.find((record) => record.studentId === thirdStudent.id)).toBeUndefined();
   });
 });

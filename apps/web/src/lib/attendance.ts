@@ -5,6 +5,8 @@ import { getEnrolledStudents } from "./enrollment";
 export interface RosterEntry {
   studentId: number;
   name: string;
+  rollNumber: string;
+  photoUrl: string | null;
   status: AttendanceStatus | null;
   note: string | null;
   monthPercent: number;
@@ -74,6 +76,8 @@ export async function getAttendanceRoster(
       return {
         studentId: student.id,
         name: student.name,
+        rollNumber: student.rollNumber,
+        photoUrl: student.photoUrl,
         status: todayRecord ? todayRecord.status : null,
         note: todayRecord ? todayRecord.note : null,
         monthPercent,
@@ -94,7 +98,7 @@ export async function markAttendance(
     date: string;
     academicYearId: number;
     teacherUserId: number;
-    entries: Array<{ studentId: number; status: "present" | "absent" | "late"; note?: string }>;
+    entries: Array<{ studentId: number; status: "present" | "absent" | "late" | null; note?: string }>;
   }
 ): Promise<MarkAttendanceResult> {
   const assignment = await prisma.classTeacher.findFirst({
@@ -119,21 +123,25 @@ export async function markAttendance(
   const targetDate = new Date(params.date);
   await prisma.$transaction(
     params.entries.map((entry) =>
-      prisma.attendance.upsert({
-        where: { studentId_date: { studentId: entry.studentId, date: targetDate } },
-        create: {
-          studentId: entry.studentId,
-          date: targetDate,
-          status: entry.status,
-          markedById: params.teacherUserId,
-          note: entry.note ?? null,
-        },
-        update: {
-          status: entry.status,
-          markedById: params.teacherUserId,
-          note: entry.note ?? null,
-        },
-      })
+      entry.status === null
+        ? prisma.attendance.deleteMany({
+            where: { studentId: entry.studentId, date: targetDate },
+          })
+        : prisma.attendance.upsert({
+            where: { studentId_date: { studentId: entry.studentId, date: targetDate } },
+            create: {
+              studentId: entry.studentId,
+              date: targetDate,
+              status: entry.status,
+              markedById: params.teacherUserId,
+              note: entry.note ?? null,
+            },
+            update: {
+              status: entry.status,
+              markedById: params.teacherUserId,
+              note: entry.note ?? null,
+            },
+          })
     )
   );
 

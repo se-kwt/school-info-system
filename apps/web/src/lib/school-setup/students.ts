@@ -5,6 +5,8 @@ export interface StudentSummary {
   id: number;
   name: string;
   admissionNo: string;
+  rollNumber: string;
+  photoUrl: string | null;
   status: StudentStatus;
   class: { name: string; section: string } | null;
   parents: { name: string; phone: string }[];
@@ -30,6 +32,8 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
       id: student.id,
       name: student.name,
       admissionNo: student.admissionNo,
+      rollNumber: student.rollNumber,
+      photoUrl: student.photoUrl,
       status: student.status,
       class: enrollment ? { name: enrollment.class.name, section: enrollment.class.section } : null,
       parents: student.parentLinks.map((link) => ({ name: link.parent.name, phone: link.parent.phone })),
@@ -40,6 +44,7 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
 export type CreateStudentResult =
   | { ok: true; student: { id: number; name: string; admissionNo: string } }
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
+  | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
   | { ok: false; error: "PHONE_WRONG_ROLE" }
   | { ok: false; error: "PARENT_NAME_REQUIRED" }
   | { ok: false; error: "INVALID_CLASS" };
@@ -53,6 +58,8 @@ export async function createStudent(
     dob: string;
     classId: number;
     admissionNo: string;
+    rollNumber: string;
+    photoUrl?: string;
     parentPhone: string;
     parentName?: string;
   }
@@ -67,6 +74,16 @@ export async function createStudent(
   const targetClass = await prisma.class.findFirst({ where: { id: input.classId, schoolId } });
   if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
 
+  const existingRollNumber = await prisma.enrollment.findFirst({
+    where: {
+      classId: input.classId,
+      academicYearId,
+      status: "active",
+      student: { rollNumber: input.rollNumber },
+    },
+  });
+  if (existingRollNumber) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
+
   try {
     const student = await prisma.$transaction(async (tx) => {
       const parent =
@@ -76,7 +93,14 @@ export async function createStudent(
         }));
 
       const createdStudent = await tx.student.create({
-        data: { schoolId, name: input.name, dob: new Date(input.dob), admissionNo: input.admissionNo },
+        data: {
+          schoolId,
+          name: input.name,
+          dob: new Date(input.dob),
+          admissionNo: input.admissionNo,
+          rollNumber: input.rollNumber,
+          photoUrl: input.photoUrl ?? null,
+        },
       });
 
       await tx.enrollment.create({
@@ -104,6 +128,7 @@ export type EditStudentResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
+  | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "NO_ACTIVE_ENROLLMENT" };
 
@@ -113,7 +138,14 @@ export async function editStudent(
     studentId: number;
     schoolId: number;
     academicYearId: number | null;
-    fields: { name?: string; dob?: string; admissionNo?: string; classId?: number };
+    fields: {
+      name?: string;
+      dob?: string;
+      admissionNo?: string;
+      classId?: number;
+      rollNumber?: string;
+      photoUrl?: string | null;
+    };
   }
 ): Promise<EditStudentResult> {
   const student = await prisma.student.findFirst({ where: { id: params.studentId, schoolId: params.schoolId } });
@@ -124,7 +156,7 @@ export async function editStudent(
     if (existing) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
   }
 
-  if (params.fields.classId !== undefined) {
+  if (params.fields.classId !== undefined || params.fields.rollNumber !== undefined) {
     if (!params.academicYearId) return { ok: false, error: "NO_ACTIVE_ENROLLMENT" };
 
     const enrollment = await prisma.enrollment.findUnique({
@@ -133,16 +165,30 @@ export async function editStudent(
     if (!enrollment) return { ok: false, error: "NO_ACTIVE_ENROLLMENT" };
 
     const targetClass = await prisma.class.findFirst({
-      where: { id: params.fields.classId, schoolId: params.schoolId },
+      where: { id: params.fields.classId ?? enrollment.classId, schoolId: params.schoolId },
     });
     if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
+
+    const rollNumber = params.fields.rollNumber ?? student.rollNumber;
+    const conflict = await prisma.enrollment.findFirst({
+      where: {
+        classId: targetClass.id,
+        academicYearId: params.academicYearId,
+        status: "active",
+        studentId: { not: params.studentId },
+        student: { rollNumber },
+      },
+    });
+    if (conflict) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
   }
 
   await prisma.$transaction(async (tx) => {
-    const data: { name?: string; dob?: Date; admissionNo?: string } = {};
+    const data: { name?: string; dob?: Date; admissionNo?: string; rollNumber?: string; photoUrl?: string | null } = {};
     if (params.fields.name !== undefined) data.name = params.fields.name;
     if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
     if (params.fields.admissionNo !== undefined) data.admissionNo = params.fields.admissionNo;
+    if (params.fields.rollNumber !== undefined) data.rollNumber = params.fields.rollNumber;
+    if (params.fields.photoUrl !== undefined) data.photoUrl = params.fields.photoUrl;
     if (Object.keys(data).length > 0) {
       await tx.student.update({ where: { id: params.studentId }, data });
     }
@@ -158,6 +204,39 @@ export async function editStudent(
   });
 
   return { ok: true };
+}
+
+export interface StudentEditDetail {
+  id: number;
+  name: string;
+  admissionNo: string;
+  rollNumber: string;
+  photoUrl: string | null;
+  classId: number | null;
+}
+
+export async function getStudentForEdit(
+  prisma: PrismaClient,
+  params: { schoolId: number; academicYearId: number | null; studentId: number }
+): Promise<StudentEditDetail | null> {
+  const student = await prisma.student.findFirst({
+    where: { id: params.studentId, schoolId: params.schoolId },
+    include: {
+      enrollments: {
+        where: params.academicYearId ? { academicYearId: params.academicYearId } : { id: -1 },
+      },
+    },
+  });
+  if (!student) return null;
+
+  return {
+    id: student.id,
+    name: student.name,
+    admissionNo: student.admissionNo,
+    rollNumber: student.rollNumber,
+    photoUrl: student.photoUrl,
+    classId: student.enrollments[0]?.classId ?? null,
+  };
 }
 
 export type DeleteStudentResult =
