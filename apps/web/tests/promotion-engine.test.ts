@@ -32,7 +32,7 @@ describe("startOrResumePromotionRun", () => {
       data: { schoolId: school.id, name: "Grade 2", section: "A" },
     });
     const student = await prisma.student.create({
-      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-1", rollNumber: "SCH-1" },
+      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-1" },
     });
     await prisma.enrollment.create({
       data: { studentId: student.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },
@@ -165,7 +165,7 @@ describe("updateMappings", () => {
       data: { schoolId: school.id, name: "Grade 2", section: "A" },
     });
     const student = await prisma.student.create({
-      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-2", rollNumber: "SCH-2" },
+      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-2" },
     });
     await prisma.enrollment.create({
       data: { studentId: student.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },
@@ -292,10 +292,10 @@ describe("getRosterForReview / setStudentDecisions / getRunSummary", () => {
       data: { schoolId: school.id, name: "Grade 2", section: "A" },
     });
     const studentA = await prisma.student.create({
-      data: { schoolId: school.id, name: "Student A", dob: new Date("2016-01-01"), admissionNo: "SCH-A", rollNumber: "SCH-A" },
+      data: { schoolId: school.id, name: "Student A", dob: new Date("2016-01-01"), admissionNo: "SCH-A" },
     });
     const studentB = await prisma.student.create({
-      data: { schoolId: school.id, name: "Student B", dob: new Date("2016-01-01"), admissionNo: "SCH-B", rollNumber: "SCH-B" },
+      data: { schoolId: school.id, name: "Student B", dob: new Date("2016-01-01"), admissionNo: "SCH-B" },
     });
     await prisma.enrollment.create({
       data: { studentId: studentA.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },
@@ -441,13 +441,13 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
       data: { schoolId: school.id, name: "Grade 2", section: "A" },
     });
     const promotedStudent = await prisma.student.create({
-      data: { schoolId: school.id, name: "Promoted Student", dob: new Date("2016-01-01"), admissionNo: "SCH-P", rollNumber: "SCH-P" },
+      data: { schoolId: school.id, name: "Promoted Student", dob: new Date("2016-01-01"), admissionNo: "SCH-P" },
     });
     const retainedStudent = await prisma.student.create({
-      data: { schoolId: school.id, name: "Retained Student", dob: new Date("2016-01-01"), admissionNo: "SCH-R", rollNumber: "SCH-R" },
+      data: { schoolId: school.id, name: "Retained Student", dob: new Date("2016-01-01"), admissionNo: "SCH-R" },
     });
     const graduatedStudent = await prisma.student.create({
-      data: { schoolId: school.id, name: "Graduated Student", dob: new Date("2010-01-01"), admissionNo: "SCH-G", rollNumber: "SCH-G" },
+      data: { schoolId: school.id, name: "Graduated Student", dob: new Date("2010-01-01"), admissionNo: "SCH-G" },
     });
     await prisma.enrollment.create({
       data: { studentId: promotedStudent.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },
@@ -570,7 +570,7 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
       data: { schoolId: school.id, name: "Grade 1", section: "A" },
     });
     const student = await prisma.student.create({
-      data: { schoolId: school.id, name: "Undecided Student", dob: new Date("2016-01-01"), admissionNo: "SCH-U", rollNumber: "SCH-U" },
+      data: { schoolId: school.id, name: "Undecided Student", dob: new Date("2016-01-01"), admissionNo: "SCH-U" },
     });
     await prisma.enrollment.create({
       data: { studentId: student.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },

@@ -13,14 +13,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
-    let body: {
-      name?: string;
-      dob?: string;
-      admissionNo?: string;
-      classId?: number;
-      rollNumber?: string;
-      photoUrl?: string | null;
-    };
+    let body: { name?: string; dob?: string; admissionNo?: string; classId?: number };
     try {
       body = await request.json();
     } catch {
@@ -42,12 +35,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (result.error === "DUPLICATE_ADMISSION_NO") {
         return NextResponse.json(
           { error: "A student with this admission number already exists" },
-          { status: 409 }
-        );
-      }
-      if (result.error === "DUPLICATE_ROLL_NUMBER") {
-        return NextResponse.json(
-          { error: "A student with this roll number already exists in this class" },
           { status: 409 }
         );
       }

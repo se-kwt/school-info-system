@@ -3,8 +3,6 @@ import type { PrismaClient } from "@prisma/client";
 export interface EnrolledStudent {
   id: number;
   name: string;
-  rollNumber: string;
-  photoUrl: string | null;
 }
 
 export async function getEnrolledStudents(
@@ -19,7 +17,5 @@ export async function getEnrolledStudents(
   return enrollments.map((enrollment) => ({
     id: enrollment.student.id,
     name: enrollment.student.name,
-    rollNumber: enrollment.student.rollNumber,
-    photoUrl: enrollment.student.photoUrl,
   }));
 }

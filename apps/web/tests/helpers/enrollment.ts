@@ -21,8 +21,6 @@ export async function createEnrolledStudent(
     name: string;
     dob: Date;
     admissionNo: string;
-    rollNumber?: string;
-    photoUrl?: string | null;
   }
 ) {
   const student = await prisma.student.create({
@@ -31,8 +29,6 @@ export async function createEnrolledStudent(
       name: params.name,
       dob: params.dob,
       admissionNo: params.admissionNo,
-      rollNumber: params.rollNumber ?? params.admissionNo,
-      photoUrl: params.photoUrl ?? null,
     },
   });
   await prisma.enrollment.create({

@@ -67,7 +67,7 @@ describe("/api/promotion-runs", () => {
       data: { schoolId: school.id, name: "Grade 2", section: "A" },
     });
     const student = await prisma.student.create({
-      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-API1", rollNumber: "SCH-API1" },
+      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-API1" },
     });
     await prisma.enrollment.create({
       data: { studentId: student.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },

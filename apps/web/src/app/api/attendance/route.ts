@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     let classId: number | undefined;
     let date: string | undefined;
-    let entries: Array<{ studentId: number; status: string | null; note?: string }> | undefined;
+    let entries: Array<{ studentId: number; status: string; note?: string }> | undefined;
     try {
       ({ classId, date, entries } = await request.json());
     } catch {
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       teacherUserId: claims.userId,
       entries: entries as Array<{
         studentId: number;
-        status: "present" | "absent" | "late" | null;
+        status: "present" | "absent" | "late";
         note?: string;
       }>,
     });
