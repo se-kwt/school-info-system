@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { listAssignments, createAssignment } from "@/lib/assignments";
+import { resolveAcademicYear } from "@/lib/academic-years";
 
 export async function GET(request: Request) {
   try {
@@ -18,11 +19,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "classId is required" }, { status: 400 });
     }
 
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+
     const result = await listAssignments(prisma, {
       classId,
       schoolId: claims.schoolId,
       role: claims.role,
       userId: claims.userId,
+      academicYearId: yearResult.academicYear.id,
     });
 
     if (!result.ok) {
@@ -63,6 +70,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+    if (yearResult.academicYear.status !== "active") {
+      return NextResponse.json(
+        { error: "This academic year is archived and no longer accepts changes" },
+        { status: 400 }
+      );
+    }
+
     const result = await createAssignment(prisma, {
       classId,
       teacherUserId: claims.userId,
@@ -70,6 +88,7 @@ export async function POST(request: Request) {
       title,
       description,
       dueDate,
+      academicYearId: yearResult.academicYear.id,
     });
 
     if (!result.ok) {

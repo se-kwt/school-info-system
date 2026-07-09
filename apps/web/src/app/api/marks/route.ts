@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { getMarksForClassExam, enterMarks } from "@/lib/marks";
+import { resolveAcademicYear } from "@/lib/academic-years";
 
 export async function GET(request: Request) {
   try {
@@ -20,10 +21,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "classId and examId are required" }, { status: 400 });
     }
 
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+
     const result = await getMarksForClassExam(prisma, {
       classId,
       examId,
       schoolId: claims.schoolId,
+      academicYearId: yearResult.academicYear.id,
       role: claims.role,
       userId: claims.userId,
     });
@@ -69,6 +76,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+    if (yearResult.academicYear.status !== "active") {
+      return NextResponse.json(
+        { error: "This academic year is archived and no longer accepts changes" },
+        { status: 400 }
+      );
+    }
+
     const result = await enterMarks(prisma, {
       classId,
       examId,
@@ -76,6 +94,7 @@ export async function POST(request: Request) {
       maxMarks,
       teacherUserId: claims.userId,
       schoolId: claims.schoolId,
+      academicYearId: yearResult.academicYear.id,
       entries,
     });
 

@@ -1,5 +1,6 @@
-import type { PrismaClient, AttendanceStatus } from "@prisma/client";
+import type { AttendanceStatus, PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "./auth/jwt";
+import { getEnrolledStudents } from "./enrollment";
 
 export interface RosterEntry {
   studentId: number;
@@ -20,62 +21,65 @@ export async function getAttendanceRoster(
     classId: number;
     date: string;
     schoolId: number;
+    academicYearId: number;
     role: SessionClaims["role"];
     userId: number;
   }
 ): Promise<GetRosterResult> {
   if (params.role === "teacher") {
     const assignment = await prisma.classTeacher.findFirst({
-      where: { classId: params.classId, teacherUserId: params.userId },
+      where: {
+        classId: params.classId,
+        teacherUserId: params.userId,
+        academicYearId: params.academicYearId,
+      },
     });
-    if (!assignment) {
-      return { ok: false, error: "NOT_ASSIGNED" };
-    }
+    if (!assignment) return { ok: false, error: "NOT_ASSIGNED" };
   } else {
     const klass = await prisma.class.findFirst({
       where: { id: params.classId, schoolId: params.schoolId },
     });
-    if (!klass) {
-      return { ok: false, error: "INVALID_CLASS" };
-    }
+    if (!klass) return { ok: false, error: "INVALID_CLASS" };
   }
 
   const [year, month] = params.date.split("-").map(Number);
   const monthStart = new Date(Date.UTC(year, month - 1, 1));
   const monthEnd = new Date(Date.UTC(year, month, 1));
 
-  const students = await prisma.student.findMany({
-    where: { classId: params.classId },
-    orderBy: { name: "asc" },
-    include: {
-      attendance: {
-        where: { date: { gte: monthStart, lt: monthEnd } },
-      },
+  const enrolled = await getEnrolledStudents(prisma, {
+    classId: params.classId,
+    academicYearId: params.academicYearId,
+  });
+
+  const attendanceRows = await prisma.attendance.findMany({
+    where: {
+      studentId: { in: enrolled.map((student) => student.id) },
+      date: { gte: monthStart, lt: monthEnd },
     },
   });
 
-  const result: RosterEntry[] = students.map((student) => {
-    const monthRecords = student.attendance;
-    const attendedCount = monthRecords.filter(
-      (record) => record.status === "present" || record.status === "late"
-    ).length;
-    const monthPercent =
-      monthRecords.length === 0 ? 0 : Math.round((attendedCount / monthRecords.length) * 100);
+  return {
+    ok: true,
+    students: enrolled.map((student) => {
+      const monthRecords = attendanceRows.filter((record) => record.studentId === student.id);
+      const attendedCount = monthRecords.filter(
+        (record) => record.status === "present" || record.status === "late"
+      ).length;
+      const monthPercent =
+        monthRecords.length === 0 ? 0 : Math.round((attendedCount / monthRecords.length) * 100);
+      const todayRecord = monthRecords.find(
+        (record) => record.date.toISOString().slice(0, 10) === params.date
+      );
 
-    const todayRecord = monthRecords.find(
-      (record) => record.date.toISOString().slice(0, 10) === params.date
-    );
-
-    return {
-      studentId: student.id,
-      name: student.name,
-      status: todayRecord ? todayRecord.status : null,
-      note: todayRecord ? todayRecord.note : null,
-      monthPercent,
-    };
-  });
-
-  return { ok: true, students: result };
+      return {
+        studentId: student.id,
+        name: student.name,
+        status: todayRecord ? todayRecord.status : null,
+        note: todayRecord ? todayRecord.note : null,
+        monthPercent,
+      };
+    }),
+  };
 }
 
 export type MarkAttendanceResult =
@@ -88,29 +92,31 @@ export async function markAttendance(
   params: {
     classId: number;
     date: string;
+    academicYearId: number;
     teacherUserId: number;
     entries: Array<{ studentId: number; status: "present" | "absent" | "late"; note?: string }>;
   }
 ): Promise<MarkAttendanceResult> {
   const assignment = await prisma.classTeacher.findFirst({
-    where: { classId: params.classId, teacherUserId: params.teacherUserId },
-  });
-  if (!assignment) {
-    return { ok: false, error: "NOT_ASSIGNED" };
-  }
-
-  const studentCount = await prisma.student.count({
     where: {
       classId: params.classId,
-      id: { in: params.entries.map((entry) => entry.studentId) },
+      teacherUserId: params.teacherUserId,
+      academicYearId: params.academicYearId,
     },
   });
-  if (studentCount !== params.entries.length) {
-    return { ok: false, error: "STUDENT_MISMATCH" };
-  }
+  if (!assignment) return { ok: false, error: "NOT_ASSIGNED" };
+
+  const enrolledCount = await prisma.enrollment.count({
+    where: {
+      classId: params.classId,
+      academicYearId: params.academicYearId,
+      status: "active",
+      studentId: { in: params.entries.map((entry) => entry.studentId) },
+    },
+  });
+  if (enrolledCount !== params.entries.length) return { ok: false, error: "STUDENT_MISMATCH" };
 
   const targetDate = new Date(params.date);
-
   await prisma.$transaction(
     params.entries.map((entry) =>
       prisma.attendance.upsert({

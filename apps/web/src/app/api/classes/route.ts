@@ -4,10 +4,12 @@ import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { listClasses, createClass } from "@/lib/school-setup/classes";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const claims = requireApiRole(["admin"]);
-    const classes = await listClasses(prisma, claims.schoolId);
+    const { searchParams } = new URL(request.url);
+    const includeArchived = searchParams.get("includeArchived") === "true";
+    const classes = await listClasses(prisma, claims.schoolId, { includeArchived });
     return NextResponse.json(classes);
   } catch (err) {
     if (err instanceof AuthError) {

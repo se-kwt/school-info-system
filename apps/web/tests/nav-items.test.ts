@@ -14,7 +14,7 @@ describe("getNavItemsForRole", () => {
     ]);
   });
 
-  it("returns all nine items for admin, including Classes and Staff", () => {
+  it("returns all ten items for admin, including Classes, Staff, and Academic Years", () => {
     const items = getNavItemsForRole("admin");
     expect(items.map((item) => item.href)).toEqual([
       "/dashboard",
@@ -26,6 +26,7 @@ describe("getNavItemsForRole", () => {
       "/dashboard/marks",
       "/dashboard/timetable",
       "/dashboard/fees",
+      "/dashboard/academic-years",
     ]);
   });
 

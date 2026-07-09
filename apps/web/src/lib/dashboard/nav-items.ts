@@ -1,44 +1,21 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  LayoutDashboard,
-  Users,
-  UserSquare2,
-  Folder,
-  CheckSquare,
-  ClipboardList,
-  Award,
-  CalendarClock,
-  Wallet,
-  Bell,
-  TrendingUp,
-  Link as LinkIcon,
-  Settings,
-} from "lucide-react";
 import type { SessionClaims } from "../auth/jwt";
 
 export interface NavItem {
   href: string;
   label: string;
-  icon: LucideIcon;
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/classes", label: "Classes", icon: Folder },
-  { href: "/dashboard/staff", label: "Staff", icon: UserSquare2 },
-  { href: "/dashboard/students", label: "Students", icon: Users },
-  { href: "/dashboard/attendance", label: "Attendance", icon: CheckSquare },
-  { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardList },
-  { href: "/dashboard/marks", label: "Exams & Marks", icon: Award },
-  { href: "/dashboard/timetable", label: "Timetable", icon: CalendarClock },
-  { href: "/dashboard/fees", label: "Fees", icon: Wallet },
-];
-
-export const WORKSPACE_NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-  { href: "/dashboard/reports", label: "Reports", icon: TrendingUp },
-  { href: "/dashboard/resources", label: "Resources", icon: LinkIcon },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/classes", label: "Classes" },
+  { href: "/dashboard/staff", label: "Staff" },
+  { href: "/dashboard/students", label: "Students" },
+  { href: "/dashboard/attendance", label: "Attendance" },
+  { href: "/dashboard/assignments", label: "Assignments" },
+  { href: "/dashboard/marks", label: "Exams & Marks" },
+  { href: "/dashboard/timetable", label: "Timetable" },
+  { href: "/dashboard/fees", label: "Fees" },
+  { href: "/dashboard/academic-years", label: "Academic Years" },
 ];
 
 const NAV_HREFS_BY_ROLE: Record<SessionClaims["role"], string[]> = {
@@ -60,6 +37,7 @@ const NAV_HREFS_BY_ROLE: Record<SessionClaims["role"], string[]> = {
     "/dashboard/marks",
     "/dashboard/timetable",
     "/dashboard/fees",
+    "/dashboard/academic-years",
   ],
   accountant: ["/dashboard", "/dashboard/fees"],
   parent: [],

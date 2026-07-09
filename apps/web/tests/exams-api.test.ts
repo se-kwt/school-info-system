@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createActiveYear } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getExams, POST as postExams } from "../src/app/api/exams/route";
 
@@ -31,6 +32,7 @@ describe("/api/exams", () => {
 
   it("creates an exam and lists it", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     const admin = await prisma.user.create({
       data: { phone: "+15550061111", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -57,6 +59,7 @@ describe("/api/exams", () => {
 
   it("rejects a missing field with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     const admin = await prisma.user.create({
       data: { phone: "+15550062222", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -89,11 +92,18 @@ describe("/api/exams", () => {
 
   it("allows a teacher to GET the exam list", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const teacher = await prisma.user.create({
       data: { phone: "+15550064444", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.exam.create({
-      data: { schoolId: school.id, name: "Final", term: "Term 2", examDate: new Date("2026-12-01") },
+      data: {
+        schoolId: school.id,
+        academicYearId: year.id,
+        name: "Final",
+        term: "Term 2",
+        examDate: new Date("2026-12-01"),
+      },
     });
     loginAs(teacher.id, "teacher", school.id);
 
@@ -107,9 +117,11 @@ describe("/api/exams", () => {
   it("only lists exams belonging to the caller's school", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherYear = await createActiveYear(prisma, otherSchool.id);
     await prisma.exam.create({
       data: {
         schoolId: otherSchool.id,
+        academicYearId: otherYear.id,
         name: "Other Exam",
         term: "Term 1",
         examDate: new Date("2026-09-01"),

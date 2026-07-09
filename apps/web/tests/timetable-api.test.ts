@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createActiveYear } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getTimetable, POST as postTimetable } from "../src/app/api/timetable/route";
 import {
@@ -30,6 +31,7 @@ describe("/api/timetable", () => {
 
   async function seedSchoolWithClassAndTeacher() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -37,9 +39,9 @@ describe("/api/timetable", () => {
       data: { phone: "+15550031111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math" },
+      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
     });
-    return { school, klass, teacher };
+    return { school, year, klass, teacher };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -227,15 +229,29 @@ describe("/api/timetable", () => {
   });
 
   it("lists entries sorted by day then period", async () => {
-    const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school, year, klass, teacher } = await seedSchoolWithClassAndTeacher();
     await prisma.timetableEntry.create({
-      data: { classId: klass.id, dayOfWeek: 2, period: 1, subject: "Science", teacherUserId: teacher.id },
+      data: {
+        classId: klass.id,
+        academicYearId: year.id,
+        dayOfWeek: 2,
+        period: 1,
+        subject: "Science",
+        teacherUserId: teacher.id,
+      },
     });
     await prisma.timetableEntry.create({
-      data: { classId: klass.id, dayOfWeek: 1, period: 3, subject: "English" },
+      data: { classId: klass.id, academicYearId: year.id, dayOfWeek: 1, period: 3, subject: "English" },
     });
     await prisma.timetableEntry.create({
-      data: { classId: klass.id, dayOfWeek: 1, period: 1, subject: "Math", teacherUserId: teacher.id },
+      data: {
+        classId: klass.id,
+        academicYearId: year.id,
+        dayOfWeek: 1,
+        period: 1,
+        subject: "Math",
+        teacherUserId: teacher.id,
+      },
     });
     loginAs(teacher.id, "teacher", school.id);
 
@@ -314,6 +330,7 @@ describe("/api/timetable/[id]", () => {
 
   async function seedEntry() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
     const klass = await prisma.class.create({
       data: { schoolId: school.id, name: "Grade 5", section: "A" },
     });
@@ -321,9 +338,16 @@ describe("/api/timetable/[id]", () => {
       data: { phone: "+15550051111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     const entry = await prisma.timetableEntry.create({
-      data: { classId: klass.id, dayOfWeek: 1, period: 1, subject: "Math", teacherUserId: teacher.id },
+      data: {
+        classId: klass.id,
+        academicYearId: year.id,
+        dayOfWeek: 1,
+        period: 1,
+        subject: "Math",
+        teacherUserId: teacher.id,
+      },
     });
-    return { school, klass, teacher, entry };
+    return { school, year, klass, teacher, entry };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { listExams, createExam } from "@/lib/exams";
+import { resolveAcademicYear } from "@/lib/academic-years";
 
 export async function GET(request: Request) {
   try {
@@ -37,7 +38,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await createExam(prisma, claims.schoolId, { name, term, examDate });
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+
+    const result = await createExam(prisma, claims.schoolId, yearResult.academicYear.id, {
+      name,
+      term,
+      examDate,
+    });
     return NextResponse.json({ id: result.id });
   } catch (err) {
     if (err instanceof AuthError) {

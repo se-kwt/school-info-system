@@ -98,6 +98,22 @@ describe("verifyOtp", () => {
     expect(secondAttempt).toEqual({ ok: false, error: "NOT_FOUND" });
   });
 
+  it("rejects verification for a user deactivated after their OTP was issued", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const user = await prisma.user.create({
+      data: { phone: "+15550006666", role: "teacher", name: "Soon Deactivated", schoolId: school.id },
+    });
+
+    const smsSender = new FakeSmsSender();
+    await sendOtp("+15550006666", { prisma, smsSender });
+    const code = extractCode(smsSender.lastMessage);
+
+    await prisma.user.update({ where: { id: user.id }, data: { status: "inactive" } });
+
+    const result = await verifyOtp("+15550006666", code, { prisma });
+    expect(result).toEqual({ ok: false, error: "NOT_FOUND" });
+  });
+
   it("returns a clean 400 JSON error for a malformed request body instead of throwing", async () => {
     const request = new Request("http://localhost/api/auth/verify-otp", {
       method: "POST",

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { listStudents, createStudent } from "@/lib/school-setup/students";
+import { resolveAcademicYear } from "@/lib/academic-years";
 
 export async function GET() {
   try {
@@ -43,7 +44,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await createStudent(prisma, claims.schoolId, {
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+
+    const result = await createStudent(prisma, claims.schoolId, yearResult.academicYear.id, {
       name,
       dob,
       classId,

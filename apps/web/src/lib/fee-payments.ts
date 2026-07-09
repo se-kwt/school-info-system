@@ -1,4 +1,5 @@
-import type { PrismaClient, FeeStatus } from "@prisma/client";
+import type { FeeStatus, PrismaClient } from "@prisma/client";
+import { getEnrolledStudents } from "./enrollment";
 
 export interface FeeRosterEntry {
   studentId: number;
@@ -19,34 +20,32 @@ export async function getFeeRoster(
   const feeStructure = await prisma.feeStructure.findFirst({
     where: { id: params.feeStructureId, schoolId: params.schoolId },
   });
-  if (!feeStructure) {
-    return { ok: false, error: "INVALID_FEE_STRUCTURE" };
-  }
+  if (!feeStructure) return { ok: false, error: "INVALID_FEE_STRUCTURE" };
 
-  const students = await prisma.student.findMany({
-    where: { classId: feeStructure.classId },
-    orderBy: { name: "asc" },
+  const enrolled = await getEnrolledStudents(prisma, {
+    classId: feeStructure.classId,
+    academicYearId: feeStructure.academicYearId,
   });
-
   const payments = await prisma.feePayment.findMany({
     where: {
       feeStructureId: params.feeStructureId,
-      studentId: { in: students.map((student) => student.id) },
+      studentId: { in: enrolled.map((student) => student.id) },
     },
   });
 
-  const result: FeeRosterEntry[] = students.map((student) => {
-    const payment = payments.find((p) => p.studentId === student.id);
-    return {
-      studentId: student.id,
-      name: student.name,
-      amountPaid: payment ? payment.amountPaid : 0,
-      amount: feeStructure.amount,
-      status: payment ? payment.status : "unpaid",
-    };
-  });
-
-  return { ok: true, students: result };
+  return {
+    ok: true,
+    students: enrolled.map((student) => {
+      const payment = payments.find((p) => p.studentId === student.id);
+      return {
+        studentId: student.id,
+        name: student.name,
+        amountPaid: payment ? payment.amountPaid : 0,
+        amount: feeStructure.amount,
+        status: payment ? payment.status : "unpaid",
+      };
+    }),
+  };
 }
 
 export function computeFeeStatus(amountPaid: number, amount: number): FeeStatus {
@@ -75,20 +74,18 @@ export async function recordPayment(
   const feeStructure = await prisma.feeStructure.findFirst({
     where: { id: params.feeStructureId, schoolId: params.schoolId },
   });
-  if (!feeStructure) {
-    return { ok: false, error: "INVALID_FEE_STRUCTURE" };
-  }
+  if (!feeStructure) return { ok: false, error: "INVALID_FEE_STRUCTURE" };
 
-  const student = await prisma.student.findFirst({
-    where: { id: params.studentId, classId: feeStructure.classId },
+  const enrollment = await prisma.enrollment.findFirst({
+    where: {
+      studentId: params.studentId,
+      classId: feeStructure.classId,
+      academicYearId: feeStructure.academicYearId,
+      status: "active",
+    },
   });
-  if (!student) {
-    return { ok: false, error: "STUDENT_MISMATCH" };
-  }
-
-  if (params.amount <= 0) {
-    return { ok: false, error: "INVALID_AMOUNT" };
-  }
+  if (!enrollment) return { ok: false, error: "STUDENT_MISMATCH" };
+  if (params.amount <= 0) return { ok: false, error: "INVALID_AMOUNT" };
 
   const existing = await prisma.feePayment.findUnique({
     where: {
@@ -101,12 +98,9 @@ export async function recordPayment(
   const existingAmountPaid = existing ? existing.amountPaid : 0;
   const newAmountPaid = existingAmountPaid + params.amount;
 
-  if (newAmountPaid > feeStructure.amount) {
-    return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
-  }
+  if (newAmountPaid > feeStructure.amount) return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
 
   const status = computeFeeStatus(newAmountPaid, feeStructure.amount);
-
   await prisma.feePayment.upsert({
     where: {
       studentId_feeStructureId: {

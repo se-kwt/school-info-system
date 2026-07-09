@@ -18,9 +18,7 @@ export async function listFeeStructures(
   const klass = await prisma.class.findFirst({
     where: { id: params.classId, schoolId: params.schoolId },
   });
-  if (!klass) {
-    return { ok: false, error: "INVALID_CLASS" };
-  }
+  if (!klass) return { ok: false, error: "INVALID_CLASS" };
 
   const feeStructures = await prisma.feeStructure.findMany({
     where: { classId: params.classId },
@@ -38,23 +36,23 @@ export async function listFeeStructures(
   };
 }
 
-export type CreateFeeStructureResult = { ok: true; id: number } | { ok: false; error: "INVALID_CLASS" };
+export type CreateFeeStructureResult =
+  | { ok: true; id: number }
+  | { ok: false; error: "INVALID_CLASS" };
 
 export async function createFeeStructure(
   prisma: PrismaClient,
   schoolId: number,
+  academicYearId: number,
   input: { classId: number; term: string; amount: number; dueDate: string }
 ): Promise<CreateFeeStructureResult> {
-  const klass = await prisma.class.findFirst({
-    where: { id: input.classId, schoolId },
-  });
-  if (!klass) {
-    return { ok: false, error: "INVALID_CLASS" };
-  }
+  const klass = await prisma.class.findFirst({ where: { id: input.classId, schoolId } });
+  if (!klass) return { ok: false, error: "INVALID_CLASS" };
 
   const created = await prisma.feeStructure.create({
     data: {
       schoolId,
+      academicYearId,
       classId: input.classId,
       term: input.term,
       amount: input.amount,

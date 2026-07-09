@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "./auth/jwt";
+import { getEnrolledStudents } from "./enrollment";
 
 export interface MarkCell {
   marksObtained: number;
@@ -25,45 +26,40 @@ export async function getMarksForClassExam(
     classId: number;
     examId: number;
     schoolId: number;
+    academicYearId: number;
     role: SessionClaims["role"];
     userId: number;
   }
 ): Promise<GetMarksResult> {
   if (params.role === "teacher") {
     const link = await prisma.classTeacher.findFirst({
-      where: { classId: params.classId, teacherUserId: params.userId },
+      where: {
+        classId: params.classId,
+        teacherUserId: params.userId,
+        academicYearId: params.academicYearId,
+      },
     });
-    if (!link) {
-      return { ok: false, error: "NOT_ASSIGNED" };
-    }
+    if (!link) return { ok: false, error: "NOT_ASSIGNED" };
   } else {
     const klass = await prisma.class.findFirst({
       where: { id: params.classId, schoolId: params.schoolId },
     });
-    if (!klass) {
-      return { ok: false, error: "INVALID_CLASS" };
-    }
+    if (!klass) return { ok: false, error: "INVALID_CLASS" };
   }
 
-  const exam = await prisma.exam.findFirst({
-    where: { id: params.examId, schoolId: params.schoolId },
-  });
-  if (!exam) {
-    return { ok: false, error: "INVALID_EXAM" };
-  }
+  const exam = await prisma.exam.findFirst({ where: { id: params.examId, schoolId: params.schoolId } });
+  if (!exam) return { ok: false, error: "INVALID_EXAM" };
 
-  const students = await prisma.student.findMany({
-    where: { classId: params.classId },
-    orderBy: { name: "asc" },
+  const enrolled = await getEnrolledStudents(prisma, {
+    classId: params.classId,
+    academicYearId: params.academicYearId,
   });
-
   const marks = await prisma.mark.findMany({
-    where: { examId: params.examId, studentId: { in: students.map((s) => s.id) } },
+    where: { examId: params.examId, studentId: { in: enrolled.map((s) => s.id) } },
   });
-
   const subjects = Array.from(new Set(marks.map((mark) => mark.subject))).sort();
 
-  const studentRows: MarksStudentRow[] = students.map((student) => {
+  const students = enrolled.map((student) => {
     const marksBySubject: Record<string, MarkCell | null> = {};
     for (const subject of subjects) {
       const mark = marks.find((m) => m.studentId === student.id && m.subject === subject);
@@ -74,7 +70,7 @@ export async function getMarksForClassExam(
     return { studentId: student.id, name: student.name, marks: marksBySubject };
   });
 
-  return { ok: true, subjects, students: studentRows };
+  return { ok: true, subjects, students };
 }
 
 export function computeGrade(marksObtained: number, maxMarks: number): string {
@@ -103,40 +99,34 @@ export async function enterMarks(
     maxMarks: number;
     teacherUserId: number;
     schoolId: number;
+    academicYearId: number;
     entries: Array<{ studentId: number; marksObtained: number }>;
   }
 ): Promise<EnterMarksResult> {
-  const exam = await prisma.exam.findFirst({
-    where: { id: params.examId, schoolId: params.schoolId },
-  });
-  if (!exam) {
-    return { ok: false, error: "INVALID_EXAM" };
-  }
+  const exam = await prisma.exam.findFirst({ where: { id: params.examId, schoolId: params.schoolId } });
+  if (!exam) return { ok: false, error: "INVALID_EXAM" };
 
   const link = await prisma.classTeacher.findFirst({
     where: {
       classId: params.classId,
       subject: params.subject,
       teacherUserId: params.teacherUserId,
+      academicYearId: params.academicYearId,
     },
   });
-  if (!link) {
-    return { ok: false, error: "NOT_ASSIGNED" };
-  }
+  if (!link) return { ok: false, error: "NOT_ASSIGNED" };
 
-  const studentCount = await prisma.student.count({
+  const enrolledCount = await prisma.enrollment.count({
     where: {
       classId: params.classId,
-      id: { in: params.entries.map((entry) => entry.studentId) },
+      academicYearId: params.academicYearId,
+      status: "active",
+      studentId: { in: params.entries.map((entry) => entry.studentId) },
     },
   });
-  if (studentCount !== params.entries.length) {
-    return { ok: false, error: "STUDENT_MISMATCH" };
-  }
+  if (enrolledCount !== params.entries.length) return { ok: false, error: "STUDENT_MISMATCH" };
 
-  if (params.maxMarks <= 0) {
-    return { ok: false, error: "INVALID_MAX_MARKS" };
-  }
+  if (params.maxMarks <= 0) return { ok: false, error: "INVALID_MAX_MARKS" };
 
   for (const entry of params.entries) {
     if (entry.marksObtained < 0 || entry.marksObtained > params.maxMarks) {

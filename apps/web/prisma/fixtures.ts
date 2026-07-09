@@ -3,6 +3,16 @@ import type { PrismaClient } from "@prisma/client";
 export async function createSeedFixtures(prisma: PrismaClient) {
   const school = await prisma.school.create({ data: { name: "Greenwood High" } });
 
+  const academicYear = await prisma.academicYear.create({
+    data: {
+      schoolId: school.id,
+      name: "2026-27",
+      startDate: new Date("2026-06-01"),
+      endDate: new Date("2027-04-30"),
+      status: "active",
+    },
+  });
+
   const classA = await prisma.class.create({
     data: { schoolId: school.id, name: "Grade 5", section: "A" },
   });
@@ -28,10 +38,17 @@ export async function createSeedFixtures(prisma: PrismaClient) {
       schoolId: school.id,
       name: "Rohan Sharma",
       dob: new Date("2015-04-12"),
-      classId: classA.id,
-      section: "A",
       admissionNo: "GH-2026-001",
       rollNumber: "GH-2026-001",
+    },
+  });
+
+  await prisma.enrollment.create({
+    data: {
+      studentId: student.id,
+      classId: classA.id,
+      academicYearId: academicYear.id,
+      status: "active",
     },
   });
 
@@ -40,8 +57,13 @@ export async function createSeedFixtures(prisma: PrismaClient) {
   });
 
   await prisma.classTeacher.create({
-    data: { classId: classA.id, teacherUserId: teacher.id, subject: "Mathematics" },
+    data: {
+      classId: classA.id,
+      teacherUserId: teacher.id,
+      subject: "Mathematics",
+      academicYearId: academicYear.id,
+    },
   });
 
-  return { school, classA, teacher, admin, accountant, parent, student };
+  return { school, academicYear, classA, teacher, admin, accountant, parent, student };
 }

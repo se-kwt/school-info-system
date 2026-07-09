@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { listStaff, createStaff } from "@/lib/school-setup/staff";
+import { resolveAcademicYear } from "@/lib/academic-years";
 
 const VALID_ROLES = ["teacher", "admin", "accountant"] as const;
 type StaffRole = (typeof VALID_ROLES)[number];
@@ -50,7 +51,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await createStaff(prisma, claims.schoolId, {
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+
+    const result = await createStaff(prisma, claims.schoolId, yearResult.academicYear.id, {
       name,
       phone,
       role,
