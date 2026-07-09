@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StudentAttendanceCard } from "./StudentAttendanceCard";
+import { AttendanceReviewPanel } from "./AttendanceReviewPanel";
+import { cycleAttendanceStatus, type AttendanceStatusValue } from "@/lib/attendance-status";
 
 interface ClassOption {
   id: number;
@@ -11,21 +14,15 @@ interface ClassOption {
 interface RosterEntry {
   studentId: number;
   name: string;
-  status: "present" | "absent" | "late" | null;
+  rollNumber: string | null;
+  photoUrl: string | null;
+  status: AttendanceStatusValue;
   note: string | null;
   monthPercent: number;
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  present: "bg-emerald-50 text-emerald-600",
-  late: "bg-amber-50 text-amber-600",
-  absent: "bg-red-50 text-red-500",
-};
-
 const inputClass =
   "rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none";
-const smallInputClass =
-  "rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none";
 
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
@@ -41,38 +38,54 @@ export function AttendanceView({
   const [classId, setClassId] = useState(classes[0] ? String(classes[0].id) : "");
   const [date, setDate] = useState(todayDateString());
   const [students, setStudents] = useState<RosterEntry[]>([]);
-  const [statusEdits, setStatusEdits] = useState<Record<number, "present" | "absent" | "late">>(
-    {}
-  );
-  const [noteEdits, setNoteEdits] = useState<Record<number, string>>({});
+  const [statusMap, setStatusMap] = useState<Record<number, AttendanceStatusValue>>({});
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  function applyRoster(roster: RosterEntry[]) {
+    setStudents(roster);
+    const nextStatusMap: Record<number, AttendanceStatusValue> = {};
+    for (const student of roster) {
+      nextStatusMap[student.studentId] = student.status;
+    }
+    setStatusMap(nextStatusMap);
+  }
 
   useEffect(() => {
     if (!classId) return;
     setError(null);
     setMessage(null);
+    setReviewOpen(false);
     fetch(`/api/attendance?classId=${classId}&date=${date}`).then(async (response) => {
       if (!response.ok) {
         const body = await response.json();
         setError(body.error);
         setStudents([]);
+        setStatusMap({});
         return;
       }
       const body = await response.json();
-      setStudents(body.students);
-      const statusMap: Record<number, "present" | "absent" | "late"> = {};
-      const noteMap: Record<number, string> = {};
-      for (const student of body.students as RosterEntry[]) {
-        statusMap[student.studentId] = student.status ?? "present";
-        noteMap[student.studentId] = student.note ?? "";
-      }
-      setStatusEdits(statusMap);
-      setNoteEdits(noteMap);
+      applyRoster(body.students as RosterEntry[]);
     });
   }, [classId, date]);
 
-  async function handleSave() {
+  function markAll(status: AttendanceStatusValue) {
+    const nextStatusMap: Record<number, AttendanceStatusValue> = {};
+    for (const student of students) {
+      nextStatusMap[student.studentId] = status;
+    }
+    setStatusMap(nextStatusMap);
+  }
+
+  function cycleStudent(studentId: number) {
+    setStatusMap((prev) => ({
+      ...prev,
+      [studentId]: cycleAttendanceStatus(prev[studentId] ?? null),
+    }));
+  }
+
+  async function handleConfirmSubmit() {
     setError(null);
     setMessage(null);
     const response = await fetch("/api/attendance", {
@@ -83,24 +96,34 @@ export function AttendanceView({
         date,
         entries: students.map((student) => ({
           studentId: student.studentId,
-          status: statusEdits[student.studentId] ?? "present",
-          note: noteEdits[student.studentId] || undefined,
+          status: statusMap[student.studentId] ?? null,
         })),
       }),
     });
 
     if (response.ok) {
-      setMessage("Attendance saved");
+      setMessage("Attendance submitted");
+      setReviewOpen(false);
       const refreshed = await fetch(`/api/attendance?classId=${classId}&date=${date}`);
       if (refreshed.ok) {
         const body = await refreshed.json();
-        setStudents(body.students);
+        applyRoster(body.students as RosterEntry[]);
       }
       return;
     }
     const body = await response.json();
     setError(body.error);
   }
+
+  const reviewEntries = students
+    .filter((student) => (statusMap[student.studentId] ?? null) !== "present")
+    .map((student) => ({
+      studentId: student.studentId,
+      name: student.name,
+      rollNumber: student.rollNumber,
+      photoUrl: student.photoUrl,
+      status: statusMap[student.studentId] ?? null,
+    }));
 
   return (
     <div className="flex flex-col gap-4">
@@ -125,88 +148,66 @@ export function AttendanceView({
           className={inputClass}
         />
       </div>
+
+      {role === "teacher" && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => markAll("present")}
+            className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700"
+          >
+            Mark All Present
+          </button>
+          <button
+            type="button"
+            onClick={() => markAll("absent")}
+            className="rounded-lg bg-red-500 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-red-600"
+          >
+            Mark All Absent
+          </button>
+          <button
+            type="button"
+            onClick={() => markAll(null)}
+            className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 transition-all hover:bg-neutral-50"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+
       {error && <p className="text-xs text-red-500">{error}</p>}
       {message && <p className="text-xs text-emerald-600">{message}</p>}
-      <div className="overflow-x-auto rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] lg:p-5">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
-              <th className="border-b border-neutral-100 pb-2 pr-4">Name</th>
-              <th className="border-b border-neutral-100 pb-2 pr-4">Status</th>
-              <th className="border-b border-neutral-100 pb-2 pr-4">Note</th>
-              <th className="border-b border-neutral-100 pb-2 pr-4">This Month&apos;s %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {students.map((student) => (
-              <tr key={student.studentId}>
-                <td className="border-b border-neutral-50 py-2 pr-4 font-medium text-neutral-700">
-                  {student.name}
-                </td>
-                <td className="border-b border-neutral-50 py-2 pr-4">
-                  {role === "teacher" ? (
-                    <select
-                      aria-label={`Status for ${student.name}`}
-                      value={statusEdits[student.studentId] ?? "present"}
-                      onChange={(event) =>
-                        setStatusEdits((prev) => ({
-                          ...prev,
-                          [student.studentId]: event.target.value as "present" | "absent" | "late",
-                        }))
-                      }
-                      className={smallInputClass}
-                    >
-                      <option value="present">Present</option>
-                      <option value="absent">Absent</option>
-                      <option value="late">Late</option>
-                    </select>
-                  ) : (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        student.status ? STATUS_BADGE[student.status] : "bg-neutral-100 text-neutral-500"
-                      }`}
-                    >
-                      {student.status
-                        ? student.status.charAt(0).toUpperCase() + student.status.slice(1)
-                        : "—"}
-                    </span>
-                  )}
-                </td>
-                <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
-                  {role === "teacher" ? (
-                    <input
-                      type="text"
-                      aria-label={`Note for ${student.name}`}
-                      value={noteEdits[student.studentId] ?? ""}
-                      onChange={(event) =>
-                        setNoteEdits((prev) => ({
-                          ...prev,
-                          [student.studentId]: event.target.value,
-                        }))
-                      }
-                      className={smallInputClass}
-                      placeholder="Optional note"
-                    />
-                  ) : (
-                    <span>{student.note ?? "—"}</span>
-                  )}
-                </td>
-                <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
-                  {student.monthPercent}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {students.map((student) => (
+          <StudentAttendanceCard
+            key={student.studentId}
+            name={student.name}
+            rollNumber={student.rollNumber}
+            photoUrl={student.photoUrl}
+            status={statusMap[student.studentId] ?? null}
+            onClick={role === "teacher" ? () => cycleStudent(student.studentId) : () => {}}
+          />
+        ))}
       </div>
+
       {role === "teacher" && (
         <button
           type="button"
-          onClick={handleSave}
-          className="w-fit rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+          onClick={() => setReviewOpen(true)}
+          className="w-fit self-end rounded-full bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
         >
-          Save Attendance
+          Submit All
         </button>
+      )}
+
+      {reviewOpen && (
+        <AttendanceReviewPanel
+          entries={reviewEntries}
+          onCycle={cycleStudent}
+          onBack={() => setReviewOpen(false)}
+          onConfirm={handleConfirmSubmit}
+        />
       )}
     </div>
   );
