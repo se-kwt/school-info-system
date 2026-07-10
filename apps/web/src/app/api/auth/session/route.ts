@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: 401 });
   }
 
-  const response = NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true, role: result.role });
   response.cookies.set(SESSION_COOKIE_NAME, result.token, {
     httpOnly: true,
     secure: true,

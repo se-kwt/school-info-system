@@ -50,6 +50,24 @@ describe("verifyOtp", () => {
     }
   });
 
+  it("returns the user's role alongside the session token", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: { phone: "+15550002223", role: "parent", name: "Test Parent", schoolId: school.id },
+    });
+
+    const smsSender = new FakeSmsSender();
+    await sendOtp("+15550002223", { prisma, smsSender });
+    const code = extractCode(smsSender.lastMessage);
+
+    const result = await verifyOtp("+15550002223", code, { prisma });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.role).toBe("parent");
+    }
+  });
+
   it("rejects an incorrect code", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await prisma.user.create({

@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
 import { verifyOtpCode } from "./otp";
-import { signSessionToken } from "./jwt";
+import { signSessionToken, type SessionClaims } from "./jwt";
 
 export type VerifyOtpResult =
-  | { ok: true; token: string }
+  | { ok: true; token: string; role: SessionClaims["role"] }
   | { ok: false; error: "INVALID_CODE" | "EXPIRED" | "NOT_FOUND" };
 
 export async function verifyOtp(
@@ -49,5 +49,5 @@ export async function verifyOtp(
     schoolId: user.schoolId,
   });
 
-  return { ok: true, token };
+  return { ok: true, token, role: user.role };
 }

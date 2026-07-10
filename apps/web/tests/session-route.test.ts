@@ -53,6 +53,28 @@ describe("POST /api/auth/session", () => {
     expect(setCookie.toLowerCase()).toContain("samesite=lax");
   });
 
+  it("includes the user's role in the response body", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: { phone: "+15550006667", role: "parent", name: "Test Parent", schoolId: school.id },
+    });
+
+    const smsSender = new FakeSmsSender();
+    await sendOtp("+15550006667", { prisma, smsSender });
+    const code = extractCode(smsSender.lastMessage);
+
+    const request = new Request("http://localhost/api/auth/session", {
+      method: "POST",
+      body: JSON.stringify({ phone: "+15550006667", code }),
+      headers: { "content-type": "application/json" },
+    });
+
+    const response = await sessionRoute(request);
+    const body = await response.json();
+
+    expect(body).toEqual({ success: true, role: "parent" });
+  });
+
   it("returns 401 with no cookie for an incorrect code", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await prisma.user.create({
