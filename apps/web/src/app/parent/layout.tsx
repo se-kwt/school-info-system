@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireParentRole } from "@/lib/auth/require-parent-role";
+import { NotificationBell } from "@/components/parent/NotificationBell";
 
 export default async function ParentLayout({ children }: { children: React.ReactNode }) {
   const claims = requireParentRole();
@@ -21,6 +22,7 @@ export default async function ParentLayout({ children }: { children: React.React
           <p className="text-[11px] font-medium text-neutral-400">Parent workspace</p>
         </div>
         <div className="flex items-center gap-3">
+          <NotificationBell />
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#14B8A6] text-xs font-bold text-white">
             {initials}
           </div>
