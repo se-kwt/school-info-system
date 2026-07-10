@@ -37,7 +37,7 @@ export default async function ParentPage({
         activeStudentId={activeChild.id}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <AttendanceCard percent={overview.attendanceMonthPercent} />
+        <AttendanceCard percent={overview.attendanceMonthPercent} days={overview.attendanceDays} />
         <AssignmentsCard assignments={overview.upcomingAssignments} />
         <MarksCard latestExam={overview.latestExam} />
         <FeesCard fees={overview.feesOutstanding} />
