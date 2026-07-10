@@ -28,8 +28,16 @@ export interface ParentExamSubject {
   grade: string;
 }
 
+export interface ParentAttendanceDay {
+  date: string;
+  dayOfMonth: number;
+  weekday: number;
+  status: "present" | "absent" | "late" | null;
+}
+
 export interface ParentOverview {
   attendanceMonthPercent: number;
+  attendanceDays: ParentAttendanceDay[];
   upcomingAssignments: ParentAssignmentEntry[];
   latestExam: { examName: string; term: string; subjects: ParentExamSubject[] } | null;
   feesOutstanding: { amount: number; nearestDueDate: string | null };
@@ -55,9 +63,25 @@ export async function getParentOverview(
   const { start, end } = monthRange();
   const attendanceRecords = await prisma.attendance.findMany({
     where: { studentId: params.studentId, date: { gte: start, lt: end } },
-    select: { status: true },
+    select: { date: true, status: true },
   });
   const attendanceMonthPercent = attendancePercent(attendanceRecords);
+
+  const year = start.getUTCFullYear();
+  const month = start.getUTCMonth();
+  const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const attendanceDays: ParentAttendanceDay[] = [];
+  for (let day = 1; day <= totalDays; day++) {
+    const cellDate = new Date(Date.UTC(year, month, day));
+    const dateStr = cellDate.toISOString().slice(0, 10);
+    const record = attendanceRecords.find((r) => r.date.toISOString().slice(0, 10) === dateStr);
+    attendanceDays.push({
+      date: dateStr,
+      dayOfMonth: day,
+      weekday: cellDate.getUTCDay(),
+      status: record ? record.status : null,
+    });
+  }
 
   const activeEnrollment = await prisma.enrollment.findFirst({
     where: { studentId: params.studentId, status: "active" },
@@ -129,5 +153,5 @@ export async function getParentOverview(
     };
   }
 
-  return { attendanceMonthPercent, upcomingAssignments, latestExam, feesOutstanding };
+  return { attendanceMonthPercent, attendanceDays, upcomingAssignments, latestExam, feesOutstanding };
 }

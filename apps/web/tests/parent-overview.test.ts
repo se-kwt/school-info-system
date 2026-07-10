@@ -48,7 +48,7 @@ describe("getParentOverview", () => {
     await prisma.$disconnect();
   });
 
-  it("computes this month's attendance percent from present/late records", async () => {
+  it("computes this month's attendance percent and per-day attendanceDays from present/late records", async () => {
     const fixtures = await createSeedFixtures(prisma);
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 2));
@@ -69,6 +69,30 @@ describe("getParentOverview", () => {
     });
 
     expect(overview.attendanceMonthPercent).toBe(67);
+
+    const day2 = overview.attendanceDays.find((d) => d.dayOfMonth === 2);
+    const day3 = overview.attendanceDays.find((d) => d.dayOfMonth === 3);
+    const day4 = overview.attendanceDays.find((d) => d.dayOfMonth === 4);
+    expect(day2?.status).toBe("present");
+    expect(day3?.status).toBe("absent");
+    expect(day4?.status).toBe("late");
+  });
+
+  it("returns a full month of attendanceDays with weekday numbers and null status for unmarked days", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const now = new Date();
+    const totalDays = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+    const firstDayWeekday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).getUTCDay();
+
+    const overview = await getParentOverview(prisma, {
+      studentId: fixtures.student.id,
+      schoolId: fixtures.school.id,
+    });
+
+    expect(overview.attendanceDays).toHaveLength(totalDays);
+    expect(overview.attendanceDays[0].dayOfMonth).toBe(1);
+    expect(overview.attendanceDays[0].status).toBeNull();
+    expect(overview.attendanceDays[0].weekday).toBe(firstDayWeekday);
   });
 
   it("returns up to 3 pending assignments ordered by due date, marking overdue ones", async () => {
