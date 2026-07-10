@@ -49,10 +49,12 @@ describe("LoginPage", () => {
     });
   });
 
-  it("navigates to /dashboard after a successful code verification", async () => {
+  it("navigates to /dashboard after a successful code verification for a staff role", async () => {
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, role: "teacher" }), { status: 200 })
+      );
 
     render(<LoginPage />);
     await userEvent.type(screen.getByLabelText("Phone number"), "+10000000001");
@@ -64,6 +66,26 @@ describe("LoginPage", () => {
 
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/dashboard");
+    });
+  });
+
+  it("navigates to /parent after a successful code verification for the parent role", async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, role: "parent" }), { status: 200 })
+      );
+
+    render(<LoginPage />);
+    await userEvent.type(screen.getByLabelText("Phone number"), "+10000000004");
+    await userEvent.click(screen.getByRole("button", { name: "Send code" }));
+    await waitFor(() => screen.getByLabelText("Verification code"));
+
+    await userEvent.type(screen.getByLabelText("Verification code"), "123456");
+    await userEvent.click(screen.getByRole("button", { name: "Verify" }));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/parent");
     });
   });
 

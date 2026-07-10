@@ -44,7 +44,8 @@ export default function LoginPage() {
     });
 
     if (response.status === 200) {
-      router.push("/dashboard");
+      const body = await response.json();
+      router.push(body.role === "parent" ? "/parent" : "/dashboard");
       return;
     }
     if (response.status === 401) {
@@ -63,7 +64,7 @@ export default function LoginPage() {
   if (step === "phone") {
     return (
       <main className="mx-auto mt-24 max-w-sm p-6">
-        <h1 className="mb-4 text-xl font-semibold text-gray-800">Staff Login</h1>
+        <h1 className="mb-4 text-xl font-semibold text-gray-800">Log in</h1>
         <form onSubmit={handleSendCode} className="flex flex-col gap-3">
           <input
             type="tel"
