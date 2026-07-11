@@ -77,10 +77,31 @@ function monthRange(): { start: Date; end: Date } {
   return { start, end };
 }
 
-function attendancePercent(records: { status: string }[]): number {
+export function attendancePercent(records: { status: string }[]): number {
   if (records.length === 0) return 0;
   const attended = records.filter((r) => r.status === "present" || r.status === "late").length;
   return Math.round((attended / records.length) * 100);
+}
+
+export function buildAttendanceMonthDays(
+  records: { date: Date; status: string }[],
+  year: number,
+  month: number
+): ParentAttendanceDay[] {
+  const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const days: ParentAttendanceDay[] = [];
+  for (let day = 1; day <= totalDays; day++) {
+    const cellDate = new Date(Date.UTC(year, month, day));
+    const dateStr = cellDate.toISOString().slice(0, 10);
+    const record = records.find((r) => r.date.toISOString().slice(0, 10) === dateStr);
+    days.push({
+      date: dateStr,
+      dayOfMonth: day,
+      weekday: cellDate.getUTCDay(),
+      status: (record?.status as ParentAttendanceDay["status"]) ?? null,
+    });
+  }
+  return days;
 }
 
 export async function getParentOverview(
@@ -96,19 +117,7 @@ export async function getParentOverview(
 
   const year = start.getUTCFullYear();
   const month = start.getUTCMonth();
-  const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const attendanceDays: ParentAttendanceDay[] = [];
-  for (let day = 1; day <= totalDays; day++) {
-    const cellDate = new Date(Date.UTC(year, month, day));
-    const dateStr = cellDate.toISOString().slice(0, 10);
-    const record = attendanceRecords.find((r) => r.date.toISOString().slice(0, 10) === dateStr);
-    attendanceDays.push({
-      date: dateStr,
-      dayOfMonth: day,
-      weekday: cellDate.getUTCDay(),
-      status: record ? record.status : null,
-    });
-  }
+  const attendanceDays = buildAttendanceMonthDays(attendanceRecords, year, month);
 
   const activeEnrollment = await prisma.enrollment.findFirst({
     where: { studentId: params.studentId, status: "active" },
