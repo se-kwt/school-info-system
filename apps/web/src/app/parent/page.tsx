@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireParentRole } from "@/lib/auth/require-parent-role";
 import { getParentChildren, getParentOverview } from "@/lib/parent/overview";
@@ -37,10 +38,30 @@ export default async function ParentPage({
         activeStudentId={activeChild.id}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <AttendanceCard percent={overview.attendanceMonthPercent} days={overview.attendanceDays} />
-        <AssignmentsCard assignments={overview.upcomingAssignments} />
-        <MarksCard latestExam={overview.latestExam} />
-        <FeesCard fees={overview.feesOutstanding} />
+        <Link
+          href={`/parent/attendance?studentId=${activeChild.id}`}
+          className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
+        >
+          <AttendanceCard percent={overview.attendanceMonthPercent} days={overview.attendanceDays} />
+        </Link>
+        <Link
+          href={`/parent/assignments?studentId=${activeChild.id}`}
+          className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
+        >
+          <AssignmentsCard assignments={overview.upcomingAssignments} />
+        </Link>
+        <Link
+          href={`/parent/marks?studentId=${activeChild.id}`}
+          className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
+        >
+          <MarksCard latestExam={overview.latestExam} />
+        </Link>
+        <Link
+          href={`/parent/fees?studentId=${activeChild.id}`}
+          className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
+        >
+          <FeesCard fees={overview.feesOutstanding} />
+        </Link>
       </div>
     </div>
   );
