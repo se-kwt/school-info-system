@@ -34,10 +34,10 @@ export function ProfileMenu({ initials }: { initials: string }) {
       </button>
       {open && (
         <div className="absolute right-0 top-10 z-10 w-40 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-md">
-          <Link href="/parent/profile" className={menuItemClass}>
+          <Link href="/parent/profile" className={menuItemClass} onClick={() => setOpen(false)}>
             Profile
           </Link>
-          <Link href="/parent/settings" className={menuItemClass}>
+          <Link href="/parent/settings" className={menuItemClass} onClick={() => setOpen(false)}>
             Settings
           </Link>
           <hr className="my-1 border-neutral-200" />

@@ -61,4 +61,22 @@ describe("ProfileMenu", () => {
     await userEvent.click(button);
     expect(screen.queryByText("Profile")).not.toBeInTheDocument();
   });
+
+  it("hides the menu after clicking the Profile link", async () => {
+    render(<ProfileMenu initials="PS" />);
+    await userEvent.click(screen.getByRole("button", { name: "Profile menu" }));
+    expect(screen.getByText("Profile")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByText("Profile"));
+    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+  });
+
+  it("hides the menu after clicking the Settings link", async () => {
+    render(<ProfileMenu initials="PS" />);
+    await userEvent.click(screen.getByRole("button", { name: "Profile menu" }));
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByText("Settings"));
+    expect(screen.queryByText("Profile")).not.toBeInTheDocument();
+  });
 });
