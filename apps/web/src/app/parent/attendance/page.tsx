@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireParentRole } from "@/lib/auth/require-parent-role";
 import { getParentChildren } from "@/lib/parent/overview";
 import { resolveActiveChild } from "@/lib/parent/resolve-child";
-import { getParentAttendanceMonth } from "@/lib/parent/attendance-history";
+import { getParentAttendanceMonth, getParentAttendanceYearSummary } from "@/lib/parent/attendance-history";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import { MonthCalendar } from "@/components/parent/MonthCalendar";
 
@@ -31,6 +31,7 @@ export default async function ParentAttendancePage({
     studentId: activeChild.id,
     month: searchParams.month,
   });
+  const yearSummary = await getParentAttendanceYearSummary(prisma, activeChild.id);
 
   const hasRecords = monthData.days.some((day) => day.status !== null);
 
@@ -46,6 +47,16 @@ export default async function ParentAttendancePage({
       >
         ← Overview
       </Link>
+      {yearSummary && (
+        <div className="rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]">
+          <p className="text-[11px] font-semibold text-neutral-400">
+            Overall attendance · {yearSummary.academicYearName}
+          </p>
+          <span className="block text-2xl font-bold leading-none tracking-tight text-neutral-800">
+            {yearSummary.percent}%
+          </span>
+        </div>
+      )}
       <div className="rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] lg:p-5">
         <div className="mb-4 flex items-center justify-between">
           <Link

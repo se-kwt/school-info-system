@@ -62,3 +62,33 @@ export async function getParentAttendanceMonth(
     nextMonth: formatMonthParam(next.year, next.month),
   };
 }
+
+export interface ParentAttendanceYearSummary {
+  academicYearName: string;
+  percent: number;
+}
+
+export async function getParentAttendanceYearSummary(
+  prisma: PrismaClient,
+  studentId: number
+): Promise<ParentAttendanceYearSummary | null> {
+  const enrollment = await prisma.enrollment.findFirst({
+    where: { studentId, status: "active" },
+    include: { academicYear: true },
+  });
+
+  if (!enrollment) return null;
+
+  const attendanceRecords = await prisma.attendance.findMany({
+    where: {
+      studentId,
+      date: { gte: enrollment.academicYear.startDate, lte: enrollment.academicYear.endDate },
+    },
+    select: { status: true },
+  });
+
+  return {
+    academicYearName: enrollment.academicYear.name,
+    percent: attendancePercent(attendanceRecords),
+  };
+}

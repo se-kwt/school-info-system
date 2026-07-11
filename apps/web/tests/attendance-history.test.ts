@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { createSeedFixtures } from "../prisma/fixtures";
-import { getParentAttendanceMonth } from "../src/lib/parent/attendance-history";
+import { getParentAttendanceMonth, getParentAttendanceYearSummary } from "../src/lib/parent/attendance-history";
 
 describe("getParentAttendanceMonth", () => {
   beforeEach(async () => {
@@ -71,5 +71,53 @@ describe("getParentAttendanceMonth", () => {
 
     expect(result.prevMonth).toBe("2025-12");
     expect(result.nextMonth).toBe("2026-02");
+  });
+});
+
+describe("getParentAttendanceYearSummary", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  it("computes the overall attendance percent across the whole active academic year", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    await prisma.attendance.createMany({
+      data: [
+        { studentId: fixtures.student.id, date: new Date("2026-06-02"), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, date: new Date("2026-09-10"), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, date: new Date("2026-12-15"), status: "absent", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, date: new Date("2027-02-01"), status: "late", markedById: fixtures.teacher.id },
+      ],
+    });
+
+    const result = await getParentAttendanceYearSummary(prisma, fixtures.student.id);
+
+    expect(result?.academicYearName).toBe(fixtures.academicYear.name);
+    expect(result?.percent).toBe(75);
+  });
+
+  it("returns null when the student has no active enrollment", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    await prisma.enrollment.updateMany({
+      where: { studentId: fixtures.student.id },
+      data: { status: "left" },
+    });
+
+    const result = await getParentAttendanceYearSummary(prisma, fixtures.student.id);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns 0 percent when there are no attendance records this year", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+
+    const result = await getParentAttendanceYearSummary(prisma, fixtures.student.id);
+
+    expect(result?.percent).toBe(0);
   });
 });
