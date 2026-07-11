@@ -2,14 +2,49 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  Building2,
+  Users,
+  GraduationCap,
+  ClipboardCheck,
+  BookOpen,
+  Award,
+  Calendar,
+  Wallet,
+  CalendarRange,
+  Bell,
+  FileBarChart,
+  FolderOpen,
+  Settings,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { IconName } from "@/lib/dashboard/nav-items";
 
 interface NavItem {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: IconName;
 }
+
+const ICON_MAP: Record<IconName, LucideIcon> = {
+  LayoutDashboard,
+  Building2,
+  Users,
+  GraduationCap,
+  ClipboardCheck,
+  BookOpen,
+  Award,
+  Calendar,
+  Wallet,
+  CalendarRange,
+  Bell,
+  FileBarChart,
+  FolderOpen,
+  Settings,
+};
 
 const STORAGE_KEY = "sidebar-collapsed";
 
@@ -82,7 +117,7 @@ export function Sidebar({
           )}
           <ul className="space-y-0.5">
             {navItems.map((item) => {
-              const Icon = item.icon;
+              const Icon = ICON_MAP[item.icon];
               return (
                 <li key={item.href}>
                   <Link href={item.href} className={navLinkClass} title={collapsed ? item.label : undefined}>
@@ -103,7 +138,7 @@ export function Sidebar({
           )}
           <ul className="space-y-0.5">
             {workspaceItems.map((item) => {
-              const Icon = item.icon;
+              const Icon = ICON_MAP[item.icon];
               return (
                 <li key={item.href}>
                   <Link href={item.href} className={navLinkClass} title={collapsed ? item.label : undefined}>

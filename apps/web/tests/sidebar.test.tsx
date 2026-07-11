@@ -3,11 +3,10 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { LayoutDashboard, Bell } from "lucide-react";
 import { Sidebar } from "../src/components/dashboard/Sidebar";
 
-const navItems = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }];
-const workspaceItems = [{ href: "/dashboard/notifications", label: "Notifications", icon: Bell }];
+const navItems = [{ href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" as const }];
+const workspaceItems = [{ href: "/dashboard/notifications", label: "Notifications", icon: "Bell" as const }];
 
 describe("Sidebar", () => {
   beforeEach(() => localStorage.clear());
