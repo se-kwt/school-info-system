@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { createSeedFixtures } from "../prisma/fixtures";
-import { getParentChildren, getParentOverview } from "../src/lib/parent/overview";
+import { getParentChildren, getParentChildrenWithClass, getParentOverview } from "../src/lib/parent/overview";
 
 describe("getParentChildren", () => {
   beforeEach(async () => {
@@ -35,6 +35,40 @@ describe("getParentChildren", () => {
 
     expect(children).toHaveLength(1);
     expect(children[0].id).toBe(fixtures.student.id);
+  });
+});
+
+describe("getParentChildrenWithClass", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  it("includes each child's current class and section", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+
+    const children = await getParentChildrenWithClass(prisma, fixtures.parent.id);
+
+    expect(children).toHaveLength(1);
+    expect(children[0].id).toBe(fixtures.student.id);
+    expect(children[0].name).toBe(fixtures.student.name);
+    expect(children[0].className).toBe("Grade 5 A");
+  });
+
+  it("returns null className for a child with no active enrollment", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    await prisma.enrollment.updateMany({
+      where: { studentId: fixtures.student.id },
+      data: { status: "left" },
+    });
+
+    const children = await getParentChildrenWithClass(prisma, fixtures.parent.id);
+
+    expect(children[0].className).toBeNull();
   });
 });
 

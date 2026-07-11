@@ -13,6 +13,33 @@ export async function getParentChildren(
   return links.map((link) => link.student);
 }
 
+export interface ParentChildWithClass {
+  id: number;
+  name: string;
+  className: string | null;
+}
+
+export async function getParentChildrenWithClass(
+  prisma: PrismaClient,
+  parentUserId: number
+): Promise<ParentChildWithClass[]> {
+  const children = await getParentChildren(prisma, parentUserId);
+
+  return Promise.all(
+    children.map(async (child) => {
+      const enrollment = await prisma.enrollment.findFirst({
+        where: { studentId: child.id, status: "active" },
+        include: { class: true },
+      });
+      return {
+        id: child.id,
+        name: child.name,
+        className: enrollment ? `${enrollment.class.name} ${enrollment.class.section}` : null,
+      };
+    })
+  );
+}
+
 export interface ParentAssignmentEntry {
   id: number;
   subject: string;
