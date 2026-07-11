@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireParentRole } from "@/lib/auth/require-parent-role";
 import { getParentChildren, getParentOverview } from "@/lib/parent/overview";
+import { resolveActiveChild } from "@/lib/parent/resolve-child";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import { AttendanceCard, AssignmentsCard, MarksCard, FeesCard } from "@/components/parent/SummaryCards";
 
@@ -22,8 +23,7 @@ export default async function ParentPage({
   }
 
   const requestedId = searchParams.studentId ? Number(searchParams.studentId) : undefined;
-  const activeChild =
-    children.find((child) => child.id === requestedId) ?? children[0];
+  const activeChild = resolveActiveChild(children, requestedId);
 
   const overview = await getParentOverview(prisma, {
     studentId: activeChild.id,
