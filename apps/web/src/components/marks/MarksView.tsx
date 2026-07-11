@@ -113,6 +113,7 @@ export function MarksView({
     });
 
     if (response.ok) {
+      const created = await response.json();
       setMessage("Exam created");
       setNewExamName("");
       setNewExamTerm("");
@@ -122,6 +123,7 @@ export function MarksView({
         const body = await listResponse.json();
         setExams(body.exams);
       }
+      setExamId(String(created.id));
       return;
     }
     const body = await response.json();
