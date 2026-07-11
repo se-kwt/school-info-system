@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireParentRole } from "@/lib/auth/require-parent-role";
 import { NotificationBell } from "@/components/parent/NotificationBell";
+import { ProfileMenu } from "@/components/parent/ProfileMenu";
 
 export default async function ParentLayout({ children }: { children: React.ReactNode }) {
   const claims = requireParentRole();
@@ -23,18 +24,7 @@ export default async function ParentLayout({ children }: { children: React.React
         </div>
         <div className="flex items-center gap-3">
           <NotificationBell />
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#14B8A6] text-xs font-bold text-white">
-            {initials}
-          </div>
-          <span className="text-xs font-semibold text-neutral-800">{user.name}</span>
-          <form action="/api/auth/logout" method="POST">
-            <button
-              type="submit"
-              className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-black"
-            >
-              Logout
-            </button>
-          </form>
+          <ProfileMenu initials={initials} />
         </div>
       </header>
       <main className="p-4 lg:p-6">{children}</main>
