@@ -1,30 +1,12 @@
 import type { ParentAssignmentEntry, ParentAttendanceDay, ParentOverview } from "@/lib/parent/overview";
+import { MonthCalendar } from "./MonthCalendar";
 
 const cardClass =
   "rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]";
 const labelClass = "text-[11px] font-semibold text-neutral-400";
 const titleClass = "mb-2 text-xs font-bold text-neutral-800";
 
-const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
-
-const ATTENDANCE_STATUS_CLASS: Record<"present" | "late" | "absent", string> = {
-  present: "bg-emerald-100 text-emerald-700",
-  late: "bg-amber-100 text-amber-700",
-  absent: "bg-red-100 text-red-700",
-};
-
-function LegendDot({ colorClassName, label }: { colorClassName: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1 text-[9px] text-neutral-400">
-      <span className={`h-2 w-2 rounded-full ${colorClassName}`} />
-      {label}
-    </span>
-  );
-}
-
 export function AttendanceCard({ percent, days }: { percent: number; days: ParentAttendanceDay[] }) {
-  const leadingBlanks = days.length > 0 ? days[0].weekday : 0;
-
   return (
     <div className={cardClass}>
       <p className={titleClass}>Attendance</p>
@@ -32,31 +14,8 @@ export function AttendanceCard({ percent, days }: { percent: number; days: Paren
         {percent}%
       </span>
       <span className={labelClass}>This month</span>
-      <div className="mt-3 grid grid-cols-7 gap-1">
-        {WEEKDAY_LABELS.map((label, index) => (
-          <span key={index} className="text-center text-[9px] font-semibold text-neutral-400">
-            {label}
-          </span>
-        ))}
-        {Array.from({ length: leadingBlanks }).map((_, index) => (
-          <span key={`blank-${index}`} data-testid="calendar-blank" />
-        ))}
-        {days.map((day) => (
-          <span
-            key={day.date}
-            className={`flex h-6 w-6 items-center justify-center rounded text-[10px] font-semibold ${
-              day.status ? ATTENDANCE_STATUS_CLASS[day.status] : "bg-neutral-100 text-neutral-400"
-            }`}
-          >
-            {day.dayOfMonth}
-          </span>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <LegendDot colorClassName="bg-emerald-400" label="Present" />
-        <LegendDot colorClassName="bg-amber-400" label="Late" />
-        <LegendDot colorClassName="bg-red-400" label="Absent" />
-        <LegendDot colorClassName="bg-neutral-300" label="No record" />
+      <div className="mt-3">
+        <MonthCalendar days={days} />
       </div>
     </div>
   );
