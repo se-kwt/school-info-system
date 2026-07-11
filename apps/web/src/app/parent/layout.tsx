@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireParentRole } from "@/lib/auth/require-parent-role";
 import { NotificationBell } from "@/components/parent/NotificationBell";
@@ -19,7 +20,9 @@ export default async function ParentLayout({ children }: { children: React.React
     <div className="min-h-screen bg-[#F8F9FA]">
       <header className="flex items-center justify-between border-b border-neutral-200/50 bg-white px-6 py-4">
         <div>
-          <p className="text-sm font-semibold tracking-tight text-neutral-900">{school.name}</p>
+          <Link href="/parent" className="text-sm font-semibold tracking-tight text-neutral-900">
+            {school.name}
+          </Link>
           <p className="text-[11px] font-medium text-neutral-400">Parent workspace</p>
         </div>
         <div className="flex items-center gap-3">
