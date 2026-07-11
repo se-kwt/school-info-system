@@ -1,5 +1,6 @@
 import type { ParentAssignmentEntry, ParentAttendanceDay, ParentOverview } from "@/lib/parent/overview";
 import { MonthCalendar } from "./MonthCalendar";
+import { ExamBreakdown } from "./ExamBreakdown";
 
 const cardClass =
   "rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]";
@@ -50,16 +51,7 @@ export function MarksCard({ latestExam }: { latestExam: ParentOverview["latestEx
       {latestExam === null ? (
         <p className={labelClass}>No exams recorded yet</p>
       ) : (
-        <div>
-          <p className="mb-1 text-xs font-semibold text-neutral-800">{latestExam.examName}</p>
-          <ul className="space-y-1">
-            {latestExam.subjects.map((subject) => (
-              <li key={subject.subject} className={labelClass}>
-                {subject.subject}: {subject.marksObtained}/{subject.maxMarks} ({subject.grade})
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ExamBreakdown examName={latestExam.examName} subjects={latestExam.subjects} />
       )}
     </div>
   );
