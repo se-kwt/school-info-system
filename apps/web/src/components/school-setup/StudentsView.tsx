@@ -89,8 +89,16 @@ export function StudentsView({
           admissionNo: fields.admissionNo,
           rollNumber: fields.rollNumber || undefined,
           photoUrl,
-          parentPhone: fields.parentPhone,
-          parentName: fields.parentName || undefined,
+          gender: fields.gender || undefined,
+          studentIdNumber: fields.studentIdNumber || undefined,
+          dateOfJoin: fields.dateOfJoin || undefined,
+          parents: fields.parents.map((p) => ({
+            relationship: p.relationship,
+            name: `${p.firstName} ${p.lastName}`.trim(),
+            phone: p.phone,
+            email: p.email || undefined,
+          })),
+          siblingStudentIds: fields.siblingStudentIds,
         }),
       });
       if (response.status === 201) {
@@ -110,6 +118,11 @@ export function StudentsView({
         classId?: number;
         rollNumber?: string;
         photoUrl?: string;
+        gender?: "male" | "female";
+        studentIdNumber?: string;
+        dateOfJoin?: string;
+        parents?: { relationship: string; name: string; phone: string; email?: string }[];
+        siblingStudentIds?: number[];
       } = {
         name: fields.name,
         admissionNo: fields.admissionNo,
@@ -118,6 +131,16 @@ export function StudentsView({
       if (fields.classId) body.classId = fields.classId;
       if (fields.rollNumber) body.rollNumber = fields.rollNumber;
       if (photoUrl) body.photoUrl = photoUrl;
+      if (fields.gender) body.gender = fields.gender;
+      if (fields.studentIdNumber) body.studentIdNumber = fields.studentIdNumber;
+      if (fields.dateOfJoin) body.dateOfJoin = fields.dateOfJoin;
+      body.parents = fields.parents.map((p) => ({
+        relationship: p.relationship,
+        name: `${p.firstName} ${p.lastName}`.trim(),
+        phone: p.phone,
+        email: p.email || undefined,
+      }));
+      body.siblingStudentIds = fields.siblingStudentIds;
 
       const response = await fetch(`/api/students/${modalState.id}`, {
         method: "PATCH",
@@ -214,6 +237,7 @@ export function StudentsView({
           mode={modalState.mode}
           student={editingStudent}
           classes={classes}
+          allStudents={students}
           isAdmin={isAdmin}
           defaultClassId={selectedClass?.id}
           serverError={error}

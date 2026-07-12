@@ -18,8 +18,12 @@ const students = [
     rollNumber: "5",
     photoUrl: null,
     status: "active" as const,
+    gender: null as null,
+    studentIdNumber: null as null,
+    dateOfJoin: null as null,
     class: { name: "Grade 5", section: "A" },
-    parents: [],
+    parents: [] as { relationship: string; name: string; phone: string; email: string | null }[],
+    siblings: [] as { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { name: string; section: string } | null }[],
   },
   {
     id: 2,
@@ -28,8 +32,12 @@ const students = [
     rollNumber: "1",
     photoUrl: null,
     status: "active" as const,
+    gender: null as null,
+    studentIdNumber: null as null,
+    dateOfJoin: null as null,
     class: { name: "Grade 6", section: "B" },
-    parents: [],
+    parents: [] as { relationship: string; name: string; phone: string; email: string | null }[],
+    siblings: [] as { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { name: string; section: string } | null }[],
   },
 ];
 
@@ -64,11 +72,14 @@ describe("StudentsView", () => {
     render(<StudentsView initialStudents={[]} classes={classes} isAdmin={true} />);
     await userEvent.click(screen.getByRole("button", { name: "Add new student" }));
 
-    await userEvent.type(screen.getByLabelText("Name"), "New Student");
+    await userEvent.type(screen.getByLabelText("First name"), "New");
+    await userEvent.type(screen.getByLabelText("Last name"), "Student");
     await userEvent.type(screen.getByLabelText("Admission number"), "SCH-3");
     await userEvent.type(screen.getByLabelText("Roll number"), "1");
-    await userEvent.type(screen.getByLabelText("Parent phone"), "+15550009999");
-    await userEvent.type(screen.getByLabelText("Parent name"), "A Parent");
+    await userEvent.click(screen.getByRole("button", { name: "Add parent" }));
+    await userEvent.type(screen.getByLabelText("Parent 1 first name"), "A");
+    await userEvent.type(screen.getByLabelText("Parent 1 last name"), "Parent");
+    await userEvent.type(screen.getByLabelText("Parent 1 mobile number"), "+15550009999");
 
     const file = new File(["binary"], "photo.png", { type: "image/png" });
     await userEvent.upload(screen.getByLabelText("Photo"), file);
