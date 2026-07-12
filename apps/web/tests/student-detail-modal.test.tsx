@@ -17,9 +17,18 @@ const existingStudent = {
   rollNumber: "5",
   photoUrl: null,
   status: "active" as const,
+  gender: "male" as const,
+  studentIdNumber: "STU-1",
+  dateOfJoin: "2026-06-01",
   class: { name: "Grade 5", section: "A" },
   parents: [],
+  siblings: [],
 };
+
+const allStudents = [
+  { id: 2, name: "Priya Sharma", admissionNo: "SCH-9", gender: "female" as const, class: { name: "Grade 5", section: "A" } },
+  { id: 3, name: "Amit Rao", admissionNo: "SCH-10", gender: "male" as const, class: { name: "Grade 6", section: "B" } },
+];
 
 function noop() {}
 
@@ -32,6 +41,7 @@ describe("StudentDetailModal", () => {
       <StudentDetailModal
         mode="create"
         classes={classes}
+        allStudents={allStudents}
         isAdmin={true}
         defaultClassId={2}
         serverError={null}
@@ -45,24 +55,31 @@ describe("StudentDetailModal", () => {
       />
     );
 
-    await userEvent.type(screen.getByLabelText("Name"), "New Student");
+    await userEvent.type(screen.getByLabelText("First name"), "New");
+    await userEvent.type(screen.getByLabelText("Last name"), "Student");
     await userEvent.type(screen.getByLabelText("Date of birth"), "2016-01-01");
     await userEvent.type(screen.getByLabelText("Admission number"), "SCH-2");
     await userEvent.type(screen.getByLabelText("Roll number"), "9");
-    await userEvent.type(screen.getByLabelText("Parent phone"), "+15550009999");
-    await userEvent.type(screen.getByLabelText("Parent name"), "A Parent");
+    await userEvent.click(screen.getByRole("button", { name: "Add parent" }));
+    await userEvent.selectOptions(screen.getByLabelText("Parent 1 relationship"), "Mother");
+    await userEvent.type(screen.getByLabelText("Parent 1 first name"), "A");
+    await userEvent.type(screen.getByLabelText("Parent 1 last name"), "Parent");
+    await userEvent.type(screen.getByLabelText("Parent 1 mobile number"), "+15550009999");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(onSave).toHaveBeenCalledWith({
-      name: "New Student",
-      dob: "2016-01-01",
-      admissionNo: "SCH-2",
-      rollNumber: "9",
-      classId: 2,
-      photoFile: null,
-      parentPhone: "+15550009999",
-      parentName: "A Parent",
-    });
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "New Student",
+        dob: "2016-01-01",
+        admissionNo: "SCH-2",
+        rollNumber: "9",
+        classId: 2,
+        photoFile: null,
+        parents: [
+          { relationship: "Mother", firstName: "A", lastName: "Parent", phone: "+15550009999", email: "" },
+        ],
+      })
+    );
   });
 
   it("create mode: uploading a photo includes it as photoFile on Save", async () => {
@@ -71,6 +88,7 @@ describe("StudentDetailModal", () => {
       <StudentDetailModal
         mode="create"
         classes={classes}
+        allStudents={allStudents}
         isAdmin={true}
         serverError={null}
         deleteBlocked={false}
@@ -85,21 +103,27 @@ describe("StudentDetailModal", () => {
 
     const file = new File(["binary"], "photo.png", { type: "image/png" });
     await userEvent.upload(screen.getByLabelText("Photo"), file);
-    await userEvent.type(screen.getByLabelText("Name"), "New Student");
+    await userEvent.type(screen.getByLabelText("First name"), "New");
     await userEvent.type(screen.getByLabelText("Admission number"), "SCH-2");
-    await userEvent.type(screen.getByLabelText("Parent phone"), "+15550009999");
-    await userEvent.type(screen.getByLabelText("Parent name"), "A Parent");
+    await userEvent.click(screen.getByRole("button", { name: "Add parent" }));
+    await userEvent.type(screen.getByLabelText("Parent 1 first name"), "A");
+    await userEvent.type(screen.getByLabelText("Parent 1 last name"), "Parent");
+    await userEvent.type(screen.getByLabelText("Parent 1 mobile number"), "+15550009999");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onSave.mock.calls[0][0].photoFile).toBe(file);
   });
 
-  it("edit mode: pre-fills fields and hides parent fields", () => {
+  it("edit mode: pre-fills fields and shows existing parent rows", () => {
     render(
       <StudentDetailModal
         mode="edit"
-        student={existingStudent}
+        student={{
+          ...existingStudent,
+          parents: [{ relationship: "Father", name: "Suresh Sharma", phone: "+15551234567", email: null }],
+        }}
         classes={classes}
+        allStudents={allStudents}
         isAdmin={true}
         serverError={null}
         deleteBlocked={false}
@@ -111,9 +135,36 @@ describe("StudentDetailModal", () => {
         onActivate={noop}
       />
     );
-    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Rohan Sharma");
-    expect((screen.getByLabelText("Admission number") as HTMLInputElement).value).toBe("SCH-1");
-    expect(screen.queryByLabelText("Parent phone")).not.toBeInTheDocument();
+    expect((screen.getByLabelText("First name") as HTMLInputElement).value).toBe("Rohan");
+    expect((screen.getByLabelText("Last name") as HTMLInputElement).value).toBe("Sharma");
+    expect((screen.getByLabelText("Parent 1 first name") as HTMLInputElement).value).toBe("Suresh");
+    expect((screen.getByLabelText("Parent 1 last name") as HTMLInputElement).value).toBe("Sharma");
+    expect((screen.getByLabelText("Parent 1 mobile number") as HTMLInputElement).value).toBe("+15551234567");
+  });
+
+  it("edit mode: pre-fills gender, studentIdNumber, and dateOfJoin, and shows status read-only", () => {
+    render(
+      <StudentDetailModal
+        mode="edit"
+        student={existingStudent}
+        classes={classes}
+        allStudents={allStudents}
+        isAdmin={true}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={noop}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+    expect((screen.getByLabelText("Gender") as HTMLSelectElement).value).toBe("male");
+    expect((screen.getByLabelText("ID") as HTMLInputElement).value).toBe("STU-1");
+    expect((screen.getByLabelText("Date of join") as HTMLInputElement).value).toBe("2026-06-01");
+    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Status")).not.toBeInTheDocument();
   });
 
   it("edit mode: hides the class dropdown when the student has no active enrollment", () => {
@@ -122,6 +173,7 @@ describe("StudentDetailModal", () => {
         mode="edit"
         student={{ ...existingStudent, class: null }}
         classes={classes}
+        allStudents={allStudents}
         isAdmin={true}
         serverError={null}
         deleteBlocked={false}
@@ -142,6 +194,7 @@ describe("StudentDetailModal", () => {
         mode="edit"
         student={existingStudent}
         classes={classes}
+        allStudents={allStudents}
         isAdmin={false}
         serverError={null}
         deleteBlocked={false}
@@ -165,6 +218,7 @@ describe("StudentDetailModal", () => {
         mode="edit"
         student={existingStudent}
         classes={classes}
+        allStudents={allStudents}
         isAdmin={true}
         serverError={null}
         deleteBlocked={true}
@@ -189,6 +243,7 @@ describe("StudentDetailModal", () => {
         mode="edit"
         student={{ ...existingStudent, status: "inactive" }}
         classes={classes}
+        allStudents={allStudents}
         isAdmin={true}
         serverError={null}
         deleteBlocked={false}
@@ -202,5 +257,69 @@ describe("StudentDetailModal", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Activate" }));
     expect(onActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it("sibling section: adds a sibling row, selecting a student auto-fills read-only fields", async () => {
+    const onSave = vi.fn();
+    render(
+      <StudentDetailModal
+        mode="create"
+        classes={classes}
+        allStudents={allStudents}
+        isAdmin={true}
+        defaultClassId={2}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={onSave}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Add sibling" }));
+    await userEvent.selectOptions(screen.getByLabelText("Sibling 1"), "2");
+
+    expect((screen.getByLabelText("Sibling first name") as HTMLInputElement).value).toBe("Priya");
+    expect((screen.getByLabelText("Sibling last name") as HTMLInputElement).value).toBe("Sharma");
+    expect((screen.getByLabelText("Sibling admission number") as HTMLInputElement).value).toBe("SCH-9");
+    expect((screen.getByLabelText("Sibling gender") as HTMLInputElement).value).toBe("female");
+    expect((screen.getByLabelText("Sibling class") as HTMLInputElement).value).toBe("Grade 5 A");
+  });
+
+  it("sibling section: removes a row and includes selected ids in onSave", async () => {
+    const onSave = vi.fn();
+    render(
+      <StudentDetailModal
+        mode="create"
+        classes={classes}
+        allStudents={allStudents}
+        isAdmin={true}
+        defaultClassId={2}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={onSave}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Add sibling" }));
+    await userEvent.selectOptions(screen.getByLabelText("Sibling 1"), "2");
+    await userEvent.click(screen.getByRole("button", { name: "Add sibling" }));
+    await userEvent.selectOptions(screen.getByLabelText("Sibling 2"), "3");
+    await userEvent.click(screen.getAllByRole("button", { name: "Remove sibling" })[0]);
+
+    await userEvent.type(screen.getByLabelText("First name"), "New");
+    await userEvent.type(screen.getByLabelText("Last name"), "Student");
+    await userEvent.type(screen.getByLabelText("Admission number"), "SCH-11");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave.mock.calls[0][0].siblingStudentIds).toEqual([3]);
   });
 });

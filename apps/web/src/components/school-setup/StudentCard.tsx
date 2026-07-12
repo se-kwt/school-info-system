@@ -7,8 +7,18 @@ export interface StudentRow {
   rollNumber: string | null;
   photoUrl: string | null;
   status: "active" | "left" | "transferred" | "graduated" | "inactive";
+  gender: "male" | "female" | null;
+  studentIdNumber: string | null;
+  dateOfJoin: string | null;
   class: { name: string; section: string } | null;
-  parents: { name: string; phone: string }[];
+  parents: { relationship: string; name: string; phone: string; email: string | null }[];
+  siblings: {
+    id: number;
+    name: string;
+    admissionNo: string;
+    gender: "male" | "female" | null;
+    class: { name: string; section: string } | null;
+  }[];
 }
 
 function initials(name: string): string {
