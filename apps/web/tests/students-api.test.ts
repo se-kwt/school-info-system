@@ -54,7 +54,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-001",
-        parentPhone: parent.phone,
+        parents: [{ relationship: "Guardian", name: "Existing Parent", phone: parent.phone }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -80,8 +80,7 @@ describe("/api/students", () => {
         dob: "2015-06-15",
         classId: klass.id,
         admissionNo: "SCH-002",
-        parentPhone: "+15558880002",
-        parentName: "Brand New Parent",
+        parents: [{ relationship: "Guardian", name: "Brand New Parent", phone: "+15558880002" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -94,7 +93,9 @@ describe("/api/students", () => {
     const getResponse = await getStudents();
     const list = await getResponse.json();
     const created = list.find((entry: { admissionNo: string }) => entry.admissionNo === "SCH-002");
-    expect(created.parents).toEqual([{ name: "Brand New Parent", phone: "+15558880002" }]);
+    expect(created.parents).toEqual([
+      { relationship: "Guardian", name: "Brand New Parent", phone: "+15558880002", email: null },
+    ]);
   });
 
   it("rejects a duplicate admission number with 409", async () => {
@@ -120,8 +121,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-003",
-        parentPhone: "+15558880003",
-        parentName: "Some Parent",
+        parents: [{ relationship: "Guardian", name: "Some Parent", phone: "+15558880003" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -147,7 +147,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-004",
-        parentPhone: teacher.phone,
+        parents: [{ relationship: "Guardian", name: "A Teacher", phone: teacher.phone }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -155,7 +155,7 @@ describe("/api/students", () => {
     expect(postResponse.status).toBe(409);
   });
 
-  it("rejects a new parentPhone with no parentName with 400", async () => {
+  it("rejects create with an empty parents array with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
@@ -166,11 +166,11 @@ describe("/api/students", () => {
     const postRequest = new Request("http://localhost/api/students", {
       method: "POST",
       body: JSON.stringify({
-        name: "No Parent Name",
+        name: "No Parent",
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-005",
-        parentPhone: "+15558880005",
+        parents: [],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -194,8 +194,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: otherClass.id,
         admissionNo: "SCH-999",
-        parentPhone: "+15558889999",
-        parentName: "Some Parent",
+        parents: [{ relationship: "Guardian", name: "Some Parent", phone: "+15558889999" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -220,8 +219,7 @@ describe("/api/students", () => {
         admissionNo: "SCH-ROLL-1",
         rollNumber: "5",
         photoUrl: "/uploads/students/x.png",
-        parentPhone: "+15558880010",
-        parentName: "Some Parent",
+        parents: [{ relationship: "Guardian", name: "Some Parent", phone: "+15558880010" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -262,8 +260,7 @@ describe("/api/students", () => {
         classId: klass.id,
         admissionNo: "SCH-ROLL-3",
         rollNumber: "7",
-        parentPhone: "+15558880011",
-        parentName: "Some Parent",
+        parents: [{ relationship: "Guardian", name: "Some Parent", phone: "+15558880011" }],
       }),
       headers: { "content-type": "application/json" },
     });

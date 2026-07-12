@@ -20,6 +20,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       classId?: number;
       rollNumber?: string;
       photoUrl?: string;
+      gender?: "male" | "female";
+      studentIdNumber?: string;
+      dateOfJoin?: string;
+      parents?: { relationship: string; name: string; phone: string; email?: string }[];
+      siblingStudentIds?: number[];
     };
     try {
       body = await request.json();
@@ -51,8 +56,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           { status: 409 }
         );
       }
+      if (result.error === "DUPLICATE_STUDENT_ID") {
+        return NextResponse.json({ error: "A student with this ID number already exists" }, { status: 409 });
+      }
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
+      }
+      if (result.error === "INVALID_SIBLING") {
+        return NextResponse.json({ error: "One of the selected siblings is invalid" }, { status: 400 });
       }
       return NextResponse.json(
         { error: "This student has no active enrollment to reassign" },

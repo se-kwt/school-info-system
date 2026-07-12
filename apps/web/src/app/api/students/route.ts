@@ -28,18 +28,32 @@ export async function POST(request: Request) {
     let admissionNo: string | undefined;
     let rollNumber: string | undefined;
     let photoUrl: string | undefined;
-    let parentPhone: string | undefined;
-    let parentName: string | undefined;
+    let gender: "male" | "female" | undefined;
+    let studentIdNumber: string | undefined;
+    let dateOfJoin: string | undefined;
+    let parents: { relationship: string; name: string; phone: string; email?: string }[] | undefined;
+    let siblingStudentIds: number[] | undefined;
     try {
-      ({ name, dob, classId, admissionNo, rollNumber, photoUrl, parentPhone, parentName } =
-        await request.json());
+      ({
+        name,
+        dob,
+        classId,
+        admissionNo,
+        rollNumber,
+        photoUrl,
+        gender,
+        studentIdNumber,
+        dateOfJoin,
+        parents,
+        siblingStudentIds,
+      } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!name || !dob || !classId || !admissionNo || !parentPhone) {
+    if (!name || !dob || !classId || !admissionNo || !parents) {
       return NextResponse.json(
-        { error: "name, dob, classId, admissionNo, and parentPhone are required" },
+        { error: "name, dob, classId, admissionNo, and parents are required" },
         { status: 400 }
       );
     }
@@ -56,8 +70,11 @@ export async function POST(request: Request) {
       admissionNo,
       rollNumber,
       photoUrl,
-      parentPhone,
-      parentName,
+      gender,
+      studentIdNumber,
+      dateOfJoin,
+      parents,
+      siblingStudentIds,
     });
 
     if (!result.ok) {
@@ -73,6 +90,9 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+      if (result.error === "DUPLICATE_STUDENT_ID") {
+        return NextResponse.json({ error: "A student with this ID number already exists" }, { status: 409 });
+      }
       if (result.error === "PHONE_WRONG_ROLE") {
         return NextResponse.json(
           { error: "This phone number is already registered as a different role" },
@@ -82,10 +102,10 @@ export async function POST(request: Request) {
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
       }
-      return NextResponse.json(
-        { error: "parentName is required to create a new parent account" },
-        { status: 400 }
-      );
+      if (result.error === "INVALID_SIBLING") {
+        return NextResponse.json({ error: "One of the selected siblings is invalid" }, { status: 400 });
+      }
+      return NextResponse.json({ error: "At least one parent is required" }, { status: 400 });
     }
 
     return NextResponse.json(result.student, { status: 201 });
