@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { sendOtp } from "../src/lib/auth/send-otp";
 import { POST as sendOtpRoute } from "../src/app/api/auth/send-otp/route";
@@ -37,6 +37,20 @@ describe("sendOtp", () => {
     const stored = await prisma.otpCode.findFirst({ where: { phone: "+15550001111" } });
     expect(stored).not.toBeNull();
     expect(stored?.codeHash).not.toBe("");
+    expect(result.code).toBeUndefined();
+  });
+
+  it("only returns the plaintext code when exposeCodeForTesting is explicitly passed", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: { phone: "+15550003333", role: "parent", name: "Test Parent", schoolId: school.id },
+    });
+
+    const smsSender = new FakeSmsSender();
+    const result = await sendOtp("+15550003333", { prisma, smsSender, exposeCodeForTesting: true });
+
+    expect(result.code).toMatch(/^\d{6}$/);
+    expect(smsSender.sentMessages[0].message).toContain(result.code!);
   });
 
   it("rejects an unregistered phone number", async () => {
@@ -77,5 +91,56 @@ describe("sendOtp", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body).toEqual({ error: "Invalid request body" });
+  });
+
+  describe("EXPOSE_OTP_FOR_TESTING gating", () => {
+    const originalValue = process.env.EXPOSE_OTP_FOR_TESTING;
+
+    afterEach(() => {
+      if (originalValue === undefined) {
+        delete process.env.EXPOSE_OTP_FOR_TESTING;
+      } else {
+        process.env.EXPOSE_OTP_FOR_TESTING = originalValue;
+      }
+    });
+
+    it("omits the code from the response when EXPOSE_OTP_FOR_TESTING is unset", async () => {
+      delete process.env.EXPOSE_OTP_FOR_TESTING;
+      const school = await prisma.school.create({ data: { name: "Test School" } });
+      await prisma.user.create({
+        data: { phone: "+15550004444", role: "parent", name: "Test Parent", schoolId: school.id },
+      });
+
+      const request = new Request("http://localhost/api/auth/send-otp", {
+        method: "POST",
+        body: JSON.stringify({ phone: "+15550004444" }),
+        headers: { "content-type": "application/json" },
+      });
+
+      const response = await sendOtpRoute(request);
+      const body = await response.json();
+
+      expect(body.success).toBe(true);
+      expect(body.code).toBeUndefined();
+    });
+
+    it("includes the code in the response when EXPOSE_OTP_FOR_TESTING is 'true'", async () => {
+      process.env.EXPOSE_OTP_FOR_TESTING = "true";
+      const school = await prisma.school.create({ data: { name: "Test School" } });
+      await prisma.user.create({
+        data: { phone: "+15550005555", role: "parent", name: "Test Parent", schoolId: school.id },
+      });
+
+      const request = new Request("http://localhost/api/auth/send-otp", {
+        method: "POST",
+        body: JSON.stringify({ phone: "+15550005555" }),
+        headers: { "content-type": "application/json" },
+      });
+
+      const response = await sendOtpRoute(request);
+      const body = await response.json();
+
+      expect(body.code).toMatch(/^\d{6}$/);
+    });
   });
 });

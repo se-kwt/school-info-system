@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 type Step = "phone" | "otp";
@@ -11,6 +11,13 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [testOtp, setTestOtp] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!testOtp) return;
+    const timeout = setTimeout(() => setTestOtp(null), 15000);
+    return () => clearTimeout(timeout);
+  }, [testOtp]);
 
   async function handleSendCode(event: FormEvent) {
     event.preventDefault();
@@ -23,6 +30,8 @@ export default function LoginPage() {
     });
 
     if (response.status === 200) {
+      const body = await response.json();
+      setTestOtp(typeof body.code === "string" ? body.code : null);
       setStep("otp");
       return;
     }
@@ -61,6 +70,15 @@ export default function LoginPage() {
     setError(null);
   }
 
+  const testOtpToast = testOtp && (
+    <div
+      role="status"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg"
+    >
+      Test OTP: <span className="font-bold tracking-wide">{testOtp}</span>
+    </div>
+  );
+
   if (step === "phone") {
     return (
       <main className="mx-auto mt-24 max-w-sm p-6">
@@ -79,6 +97,7 @@ export default function LoginPage() {
           </button>
           {error && <p className="text-sm text-red-600">{error}</p>}
         </form>
+        {testOtpToast}
       </main>
     );
   }
@@ -107,6 +126,7 @@ export default function LoginPage() {
         </button>
         {error && <p className="text-sm text-red-600">{error}</p>}
       </form>
+      {testOtpToast}
     </main>
   );
 }

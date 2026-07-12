@@ -35,6 +35,33 @@ describe("LoginPage", () => {
     });
   });
 
+  it("shows the test OTP as a toast when the send-otp response includes a code", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, code: "654321" }), { status: 200 })
+    );
+
+    render(<LoginPage />);
+    await userEvent.type(screen.getByLabelText("Phone number"), "+10000000001");
+    await userEvent.click(screen.getByRole("button", { name: "Send code" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("654321")).toBeInTheDocument();
+    });
+  });
+
+  it("does not show a toast when the send-otp response has no code", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    render(<LoginPage />);
+    await userEvent.type(screen.getByLabelText("Phone number"), "+10000000001");
+    await userEvent.click(screen.getByRole("button", { name: "Send code" }));
+    await waitFor(() => screen.getByLabelText("Verification code"));
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it("shows an inline error for an unregistered phone number", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "Phone number is not registered" }), { status: 404 })
