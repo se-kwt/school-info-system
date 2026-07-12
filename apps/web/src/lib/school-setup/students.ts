@@ -8,8 +8,12 @@ export interface StudentSummary {
   rollNumber: string | null;
   photoUrl: string | null;
   status: StudentStatus;
+  gender: "male" | "female" | null;
+  studentIdNumber: string | null;
+  dateOfJoin: string | null;
   class: { name: string; section: string } | null;
-  parents: { name: string; phone: string }[];
+  parents: { relationship: string; name: string; phone: string; email: string | null }[];
+  siblings: { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { name: string; section: string } | null }[];
 }
 
 export async function listStudents(prisma: PrismaClient, schoolId: number): Promise<StudentSummary[]> {
@@ -26,6 +30,39 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
     orderBy: { name: "asc" },
   });
 
+  const studentIds = students.map((s) => s.id);
+  const byId = new Map(students.map((s) => [s.id, s]));
+  const siblingLinks = await prisma.studentSibling.findMany({
+    where: { OR: [{ studentId: { in: studentIds } }, { siblingId: { in: studentIds } }] },
+  });
+
+  function siblingSummary(id: number) {
+    const s = byId.get(id);
+    if (!s) return null;
+    const enrollment = s.enrollments[0];
+    return {
+      id: s.id,
+      name: s.name,
+      admissionNo: s.admissionNo,
+      gender: s.gender,
+      class: enrollment ? { name: enrollment.class.name, section: enrollment.class.section } : null,
+    };
+  }
+
+  const siblingsByStudent = new Map<number, ReturnType<typeof siblingSummary>[]>();
+  function addSibling(ownerId: number, otherId: number) {
+    if (!byId.has(ownerId)) return;
+    const summary = siblingSummary(otherId);
+    if (!summary) return;
+    const list = siblingsByStudent.get(ownerId) ?? [];
+    list.push(summary);
+    siblingsByStudent.set(ownerId, list);
+  }
+  for (const link of siblingLinks) {
+    addSibling(link.studentId, link.siblingId);
+    addSibling(link.siblingId, link.studentId);
+  }
+
   return students.map((student) => {
     const enrollment = student.enrollments[0];
     return {
@@ -35,8 +72,17 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
       rollNumber: enrollment?.rollNumber ?? null,
       photoUrl: student.photoUrl,
       status: student.status,
+      gender: student.gender,
+      studentIdNumber: student.studentIdNumber,
+      dateOfJoin: student.dateOfJoin ? student.dateOfJoin.toISOString().slice(0, 10) : null,
       class: enrollment ? { name: enrollment.class.name, section: enrollment.class.section } : null,
-      parents: student.parentLinks.map((link) => ({ name: link.parent.name, phone: link.parent.phone })),
+      parents: student.parentLinks.map((link) => ({
+        relationship: link.relationship,
+        name: link.parent.name,
+        phone: link.parent.phone,
+        email: link.parent.email,
+      })),
+      siblings: (siblingsByStudent.get(student.id) ?? []).filter((s): s is NonNullable<typeof s> => s !== null),
     };
   });
 }
@@ -45,9 +91,11 @@ export type CreateStudentResult =
   | { ok: true; student: { id: number; name: string; admissionNo: string } }
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
   | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
+  | { ok: false; error: "DUPLICATE_STUDENT_ID" }
   | { ok: false; error: "PHONE_WRONG_ROLE" }
-  | { ok: false; error: "PARENT_NAME_REQUIRED" }
-  | { ok: false; error: "INVALID_CLASS" };
+  | { ok: false; error: "PARENT_REQUIRED" }
+  | { ok: false; error: "INVALID_CLASS" }
+  | { ok: false; error: "INVALID_SIBLING" };
 
 export async function createStudent(
   prisma: PrismaClient,
@@ -60,12 +108,20 @@ export async function createStudent(
     admissionNo: string;
     rollNumber?: string;
     photoUrl?: string;
-    parentPhone: string;
-    parentName?: string;
+    gender?: "male" | "female";
+    studentIdNumber?: string;
+    dateOfJoin?: string;
+    parents: { relationship: string; name: string; phone: string; email?: string }[];
+    siblingStudentIds?: number[];
   }
 ): Promise<CreateStudentResult> {
   const existingAdmission = await prisma.student.findUnique({ where: { admissionNo: input.admissionNo } });
   if (existingAdmission) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
+
+  if (input.studentIdNumber) {
+    const existingStudentId = await prisma.student.findUnique({ where: { studentIdNumber: input.studentIdNumber } });
+    if (existingStudentId) return { ok: false, error: "DUPLICATE_STUDENT_ID" };
+  }
 
   if (input.rollNumber) {
     const existingRollNumber = await prisma.enrollment.findFirst({
@@ -74,21 +130,25 @@ export async function createStudent(
     if (existingRollNumber) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
   }
 
-  const existingParent = await prisma.user.findUnique({ where: { phone: input.parentPhone } });
-  if (existingParent && existingParent.role !== "parent") return { ok: false, error: "PHONE_WRONG_ROLE" };
-  if (!existingParent && !input.parentName) return { ok: false, error: "PARENT_NAME_REQUIRED" };
+  if (input.parents.length === 0) return { ok: false, error: "PARENT_REQUIRED" };
+
+  for (const parentInput of input.parents) {
+    const existingParent = await prisma.user.findUnique({ where: { phone: parentInput.phone } });
+    if (existingParent && existingParent.role !== "parent") return { ok: false, error: "PHONE_WRONG_ROLE" };
+  }
+
+  if (input.siblingStudentIds && input.siblingStudentIds.length > 0) {
+    const siblingCount = await prisma.student.count({
+      where: { id: { in: input.siblingStudentIds }, schoolId },
+    });
+    if (siblingCount !== input.siblingStudentIds.length) return { ok: false, error: "INVALID_SIBLING" };
+  }
 
   const targetClass = await prisma.class.findFirst({ where: { id: input.classId, schoolId } });
   if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
 
   try {
     const student = await prisma.$transaction(async (tx) => {
-      const parent =
-        existingParent ??
-        (await tx.user.create({
-          data: { schoolId, phone: input.parentPhone, name: input.parentName as string, role: "parent" },
-        }));
-
       const createdStudent = await tx.student.create({
         data: {
           schoolId,
@@ -96,6 +156,9 @@ export async function createStudent(
           dob: new Date(input.dob),
           admissionNo: input.admissionNo,
           photoUrl: input.photoUrl ?? null,
+          gender: input.gender ?? null,
+          studentIdNumber: input.studentIdNumber ?? null,
+          dateOfJoin: input.dateOfJoin ? new Date(input.dateOfJoin) : null,
         },
       });
 
@@ -109,9 +172,30 @@ export async function createStudent(
         },
       });
 
-      await tx.parentStudent.create({
-        data: { parentUserId: parent.id, studentId: createdStudent.id },
-      });
+      for (const parentInput of input.parents) {
+        const existingParent = await tx.user.findUnique({ where: { phone: parentInput.phone } });
+        const parent =
+          existingParent ??
+          (await tx.user.create({
+            data: {
+              schoolId,
+              phone: parentInput.phone,
+              name: parentInput.name,
+              email: parentInput.email ?? null,
+              role: "parent",
+            },
+          }));
+
+        await tx.parentStudent.create({
+          data: { parentUserId: parent.id, studentId: createdStudent.id, relationship: parentInput.relationship },
+        });
+      }
+
+      if (input.siblingStudentIds) {
+        for (const siblingId of input.siblingStudentIds) {
+          await tx.studentSibling.create({ data: { studentId: createdStudent.id, siblingId } });
+        }
+      }
 
       return createdStudent;
     });
@@ -123,6 +207,7 @@ export async function createStudent(
   } catch (err) {
     const target = uniqueConstraintTarget(err);
     if (target?.includes("rollNumber")) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
+    if (target?.includes("studentIdNumber")) return { ok: false, error: "DUPLICATE_STUDENT_ID" };
     if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
     throw err;
   }
@@ -133,7 +218,9 @@ export type EditStudentResult =
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
   | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
+  | { ok: false; error: "DUPLICATE_STUDENT_ID" }
   | { ok: false; error: "INVALID_CLASS" }
+  | { ok: false; error: "INVALID_SIBLING" }
   | { ok: false; error: "NO_ACTIVE_ENROLLMENT" };
 
 export async function editStudent(
@@ -149,6 +236,11 @@ export async function editStudent(
       classId?: number;
       rollNumber?: string;
       photoUrl?: string;
+      gender?: "male" | "female";
+      studentIdNumber?: string;
+      dateOfJoin?: string;
+      parents?: { relationship: string; name: string; phone: string; email?: string }[];
+      siblingStudentIds?: number[];
     };
   }
 ): Promise<EditStudentResult> {
@@ -158,6 +250,19 @@ export async function editStudent(
   if (params.fields.admissionNo && params.fields.admissionNo !== student.admissionNo) {
     const existing = await prisma.student.findUnique({ where: { admissionNo: params.fields.admissionNo } });
     if (existing) return { ok: false, error: "DUPLICATE_ADMISSION_NO" };
+  }
+
+  if (params.fields.studentIdNumber && params.fields.studentIdNumber !== student.studentIdNumber) {
+    const existing = await prisma.student.findUnique({ where: { studentIdNumber: params.fields.studentIdNumber } });
+    if (existing) return { ok: false, error: "DUPLICATE_STUDENT_ID" };
+  }
+
+  if (params.fields.siblingStudentIds) {
+    if (params.fields.siblingStudentIds.includes(params.studentId)) return { ok: false, error: "INVALID_SIBLING" };
+    const siblingCount = await prisma.student.count({
+      where: { id: { in: params.fields.siblingStudentIds }, schoolId: params.schoolId },
+    });
+    if (siblingCount !== params.fields.siblingStudentIds.length) return { ok: false, error: "INVALID_SIBLING" };
   }
 
   let enrollment: { classId: number } | null = null;
@@ -192,11 +297,22 @@ export async function editStudent(
 
   try {
     await prisma.$transaction(async (tx) => {
-      const data: { name?: string; dob?: Date; admissionNo?: string; photoUrl?: string } = {};
+      const data: {
+        name?: string;
+        dob?: Date;
+        admissionNo?: string;
+        photoUrl?: string;
+        gender?: "male" | "female";
+        studentIdNumber?: string;
+        dateOfJoin?: Date;
+      } = {};
       if (params.fields.name !== undefined) data.name = params.fields.name;
       if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
       if (params.fields.admissionNo !== undefined) data.admissionNo = params.fields.admissionNo;
       if (params.fields.photoUrl !== undefined) data.photoUrl = params.fields.photoUrl;
+      if (params.fields.gender !== undefined) data.gender = params.fields.gender;
+      if (params.fields.studentIdNumber !== undefined) data.studentIdNumber = params.fields.studentIdNumber;
+      if (params.fields.dateOfJoin !== undefined) data.dateOfJoin = new Date(params.fields.dateOfJoin);
       if (Object.keys(data).length > 0) {
         await tx.student.update({ where: { id: params.studentId }, data });
       }
@@ -212,10 +328,60 @@ export async function editStudent(
           data: enrollmentData,
         });
       }
+
+      if (params.fields.parents !== undefined) {
+        const existingLinks = await tx.parentStudent.findMany({
+          where: { studentId: params.studentId },
+          include: { parent: true },
+        });
+        const newPhones = new Set(params.fields.parents.map((p) => p.phone));
+
+        for (const link of existingLinks) {
+          if (!newPhones.has(link.parent.phone)) {
+            await tx.parentStudent.delete({ where: { id: link.id } });
+          }
+        }
+
+        for (const parentInput of params.fields.parents) {
+          let parent = await tx.user.findUnique({ where: { phone: parentInput.phone } });
+          if (!parent) {
+            parent = await tx.user.create({
+              data: {
+                schoolId: params.schoolId,
+                phone: parentInput.phone,
+                name: parentInput.name,
+                email: parentInput.email ?? null,
+                role: "parent",
+              },
+            });
+          } else {
+            await tx.user.update({
+              where: { id: parent.id },
+              data: { name: parentInput.name, email: parentInput.email ?? null },
+            });
+          }
+
+          await tx.parentStudent.upsert({
+            where: { parentUserId_studentId: { parentUserId: parent.id, studentId: params.studentId } },
+            update: { relationship: parentInput.relationship },
+            create: { parentUserId: parent.id, studentId: params.studentId, relationship: parentInput.relationship },
+          });
+        }
+      }
+
+      if (params.fields.siblingStudentIds !== undefined) {
+        await tx.studentSibling.deleteMany({
+          where: { OR: [{ studentId: params.studentId }, { siblingId: params.studentId }] },
+        });
+        for (const siblingId of params.fields.siblingStudentIds) {
+          await tx.studentSibling.create({ data: { studentId: params.studentId, siblingId } });
+        }
+      }
     });
   } catch (err) {
     const target = uniqueConstraintTarget(err);
     if (target?.includes("rollNumber")) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
+    if (target?.includes("studentIdNumber")) return { ok: false, error: "DUPLICATE_STUDENT_ID" };
     throw err;
   }
 
