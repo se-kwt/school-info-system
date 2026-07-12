@@ -67,6 +67,11 @@ enum StudentStatus {
   inactive
 }
 
+enum Gender {
+  male
+  female
+}
+
 model School {
   id            Int            @id @default(autoincrement())
   name          String
@@ -84,6 +89,7 @@ model User {
   phone    String     @unique
   role     Role
   name     String
+  email    String?
   status   UserStatus @default(active)
   school   School     @relation(fields: [schoolId], references: [id])
   schoolId Int
@@ -99,14 +105,17 @@ model User {
 }
 
 model Student {
-  id          Int           @id @default(autoincrement())
-  school      School        @relation(fields: [schoolId], references: [id])
-  schoolId    Int
-  name        String
-  dob         DateTime
-  admissionNo String        @unique
-  status      StudentStatus @default(active)
-  photoUrl    String?
+  id              Int           @id @default(autoincrement())
+  school          School        @relation(fields: [schoolId], references: [id])
+  schoolId        Int
+  name            String
+  dob             DateTime
+  admissionNo     String        @unique
+  status          StudentStatus @default(active)
+  photoUrl        String?
+  gender          Gender?
+  studentIdNumber String?       @unique
+  dateOfJoin      DateTime?
 
   parentLinks         ParentStudent[]
   attendance          Attendance[]
@@ -115,6 +124,18 @@ model Student {
   feePayments         FeePayment[]
   enrollments         Enrollment[]
   promotionLogEntries PromotionLogEntry[]
+  siblingLinks        StudentSibling[]    @relation("StudentSiblingA")
+  siblingOfLinks      StudentSibling[]    @relation("StudentSiblingB")
+}
+
+model StudentSibling {
+  id        Int     @id @default(autoincrement())
+  student   Student @relation("StudentSiblingA", fields: [studentId], references: [id])
+  studentId Int
+  sibling   Student @relation("StudentSiblingB", fields: [siblingId], references: [id])
+  siblingId Int
+
+  @@unique([studentId, siblingId])
 }
 
 model ParentStudent {
@@ -123,6 +144,7 @@ model ParentStudent {
   parentUserId Int
   student      Student @relation(fields: [studentId], references: [id])
   studentId    Int
+  relationship String  @default("Guardian")
 
   @@unique([parentUserId, studentId])
 }
