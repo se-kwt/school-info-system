@@ -49,4 +49,24 @@ describe("Modal", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("defaults to max-w-lg when no maxWidthClassName is given", () => {
+    render(
+      <Modal onClose={() => {}}>
+        <p>Modal content</p>
+      </Modal>
+    );
+    expect(screen.getByTestId("modal-backdrop").firstElementChild).toHaveClass("max-w-lg");
+  });
+
+  it("uses a custom maxWidthClassName when given", () => {
+    render(
+      <Modal onClose={() => {}} maxWidthClassName="max-w-2xl">
+        <p>Modal content</p>
+      </Modal>
+    );
+    const panel = screen.getByTestId("modal-backdrop").firstElementChild;
+    expect(panel).toHaveClass("max-w-2xl");
+    expect(panel).not.toHaveClass("max-w-lg");
+  });
 });

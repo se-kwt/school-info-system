@@ -2,7 +2,15 @@
 
 import { useEffect } from "react";
 
-export function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+export function Modal({
+  children,
+  onClose,
+  maxWidthClassName = "max-w-lg",
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  maxWidthClassName?: string;
+}) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -20,7 +28,7 @@ export function Modal({ children, onClose }: { children: React.ReactNode; onClos
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+        className={`flex max-h-[85vh] w-full ${maxWidthClassName} flex-col gap-4 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}
