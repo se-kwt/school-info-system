@@ -135,8 +135,8 @@ describe("StudentDetailModal", () => {
         onActivate={noop}
       />
     );
-    expect((screen.getByLabelText("First name") as HTMLInputElement).value).toBe("Rohan");
-    expect((screen.getByLabelText("Last name") as HTMLInputElement).value).toBe("Sharma");
+    expect((screen.getByRole("textbox", { name: "First name" }) as HTMLInputElement).value).toBe("Rohan");
+    expect((screen.getByRole("textbox", { name: "Last name" }) as HTMLInputElement).value).toBe("Sharma");
     expect((screen.getByLabelText("Parent 1 first name") as HTMLInputElement).value).toBe("Suresh");
     expect((screen.getByLabelText("Parent 1 last name") as HTMLInputElement).value).toBe("Sharma");
     expect((screen.getByLabelText("Parent 1 mobile number") as HTMLInputElement).value).toBe("+15551234567");
@@ -165,6 +165,95 @@ describe("StudentDetailModal", () => {
     expect((screen.getByLabelText("Date of join") as HTMLInputElement).value).toBe("2026-06-01");
     expect(screen.getByText("active")).toBeInTheDocument();
     expect(screen.queryByLabelText("Status")).not.toBeInTheDocument();
+  });
+
+  it("create mode: Division shows the selected class's section, read-only", async () => {
+    render(
+      <StudentDetailModal
+        mode="create"
+        classes={classes}
+        allStudents={allStudents}
+        isAdmin={true}
+        defaultClassId={2}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={noop}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+    const division = screen.getByLabelText("Division") as HTMLInputElement;
+    expect(division.value).toBe("B");
+    expect(division).toBeDisabled();
+
+    await userEvent.selectOptions(screen.getByLabelText("Class"), "1");
+    expect((screen.getByLabelText("Division") as HTMLInputElement).value).toBe("A");
+  });
+
+  it("create mode: every Student Details field has a visible label", () => {
+    render(
+      <StudentDetailModal
+        mode="create"
+        classes={classes}
+        allStudents={allStudents}
+        isAdmin={true}
+        defaultClassId={2}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={noop}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+    for (const text of [
+      "First name",
+      "Last name",
+      "Admission number",
+      "Date of birth",
+      "Roll number",
+      "Class",
+      "Division",
+      "Date of join",
+      "ID",
+      "Gender",
+    ]) {
+      const label = screen.getByText(text, { selector: "label" });
+      expect(label).toBeInTheDocument();
+    }
+  });
+
+  it("sibling and parent rows also render visible labels", async () => {
+    render(
+      <StudentDetailModal
+        mode="create"
+        classes={classes}
+        allStudents={allStudents}
+        isAdmin={true}
+        defaultClassId={2}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={noop}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Add sibling" }));
+    expect(screen.getByText("Select student", { selector: "label" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Add parent" }));
+    expect(screen.getByText("Relationship", { selector: "label" })).toBeInTheDocument();
+    // "First name" appears three times: Student Details + Sibling 1 display + Parent 1
+    const firstNameLabels = screen.getAllByText("First name", { selector: "label" });
+    expect(firstNameLabels).toHaveLength(3);
   });
 
   it("edit mode: hides the class dropdown when the student has no active enrollment", () => {
@@ -315,9 +404,9 @@ describe("StudentDetailModal", () => {
     await userEvent.selectOptions(screen.getByLabelText("Sibling 2"), "3");
     await userEvent.click(screen.getAllByRole("button", { name: "Remove sibling" })[0]);
 
-    await userEvent.type(screen.getByLabelText("First name"), "New");
-    await userEvent.type(screen.getByLabelText("Last name"), "Student");
-    await userEvent.type(screen.getByLabelText("Admission number"), "SCH-11");
+    await userEvent.type(screen.getByRole("textbox", { name: "First name" }), "New");
+    await userEvent.type(screen.getByRole("textbox", { name: "Last name" }), "Student");
+    await userEvent.type(screen.getByRole("textbox", { name: "Admission number" }), "SCH-11");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onSave.mock.calls[0][0].siblingStudentIds).toEqual([3]);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Modal } from "./Modal";
 import type { StudentRow } from "./StudentCard";
 import { FormSection } from "./FormSection";
+import { Field } from "./Field";
 
 export interface SaveStudentFields {
   name: string;
@@ -132,267 +133,365 @@ export function StudentDetailModal({
   }
 
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={onClose} maxWidthClassName="max-w-2xl">
       <h2 className="text-sm font-bold text-neutral-800">
         {mode === "create" ? "Add new student" : student?.name}
       </h2>
 
       <div className="flex flex-col gap-4">
-        <FormSection title="Student Details">
-          <input
-            type="text"
-            aria-label="First name"
-            value={firstName}
-            onChange={(event) => setFirstName(event.target.value)}
-            disabled={!isAdmin}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-            placeholder="First name"
-          />
-          <input
-            type="text"
-            aria-label="Last name"
-            value={lastName}
-            onChange={(event) => setLastName(event.target.value)}
-            disabled={!isAdmin}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Last name"
-          />
-          <input
-            type="text"
-            aria-label="Admission number"
-            value={admissionNo}
-            onChange={(event) => setAdmissionNo(event.target.value)}
-            disabled={!isAdmin}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Admission number"
-          />
-          <input
-            type="date"
-            aria-label="Date of birth"
-            value={dob}
-            onChange={(event) => setDob(event.target.value)}
-            disabled={!isAdmin}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-          <input
-            type="text"
-            aria-label="Roll number"
-            value={rollNumber}
-            onChange={(event) => setRollNumber(event.target.value)}
-            disabled={!isAdmin}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Roll number (optional)"
-          />
-          {showClassField && (
-            <select
-              aria-label="Class"
-              value={classId}
-              onChange={(event) => setClassId(event.target.value)}
-              disabled={!isAdmin}
-              className="rounded border border-gray-300 px-3 py-2 text-sm"
-            >
-              {mode === "edit" && <option value="">Keep current class</option>}
-              {classes.map((klass) => (
-                <option key={klass.id} value={klass.id}>
-                  {klass.name} {klass.section}
-                </option>
-              ))}
-            </select>
-          )}
-          <input
-            type="date"
-            aria-label="Date of join"
-            value={dateOfJoin}
-            onChange={(event) => setDateOfJoin(event.target.value)}
-            disabled={!isAdmin}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-          <input
-            type="text"
-            aria-label="ID"
-            value={studentIdNumber}
-            onChange={(event) => setStudentIdNumber(event.target.value)}
-            disabled={!isAdmin}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Student ID number"
-          />
-          <select
-            aria-label="Gender"
-            value={gender}
-            onChange={(event) => setGender(event.target.value as "male" | "female" | "")}
-            disabled={!isAdmin}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value="">Select gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
-          {mode === "edit" && (
-            <p className="text-sm text-neutral-500">
-              Status: <span className="font-semibold text-neutral-800">{student?.status}</span>
-            </p>
-          )}
-          {isAdmin && (
+        <FormSection number={1} title="Student Details">
+          <Field label="First name" htmlFor="firstName">
             <input
-              type="file"
-              aria-label="Photo"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm"
+              id="firstName"
+              type="text"
+              aria-label="First name"
+              value={firstName}
+              onChange={(event) => setFirstName(event.target.value)}
+              disabled={!isAdmin}
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+              placeholder="First name"
             />
-          )}
-        </FormSection>
-
-        <FormSection title="Sibling Details">
-          {siblingIds.map((siblingId, index) => {
-            const selected = allStudents.find((s) => s.id === siblingId);
-            return (
-              <div key={index} className="flex flex-col gap-2 rounded border border-neutral-100 p-2">
-                <select
-                  aria-label={`Sibling ${index + 1}`}
-                  value={siblingId ?? ""}
-                  onChange={(event) => updateSiblingRow(index, event.target.value)}
-                  disabled={!isAdmin}
-                  className="rounded border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Select a student</option>
-                  {allStudents
-                    .filter((s) => s.id !== student?.id)
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.admissionNo})
-                      </option>
-                    ))}
-                </select>
-                <input
-                  type="text"
-                  aria-label="Sibling first name"
-                  value={selected?.name.split(" ")[0] ?? ""}
-                  disabled
-                  className="rounded border border-gray-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500"
-                />
-                <input
-                  type="text"
-                  aria-label="Sibling last name"
-                  value={selected ? selected.name.split(" ").slice(1).join(" ") : ""}
-                  disabled
-                  className="rounded border border-gray-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500"
-                />
-                <input
-                  type="text"
-                  aria-label="Sibling admission number"
-                  value={selected?.admissionNo ?? ""}
-                  disabled
-                  className="rounded border border-gray-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500"
-                />
-                <input
-                  type="text"
-                  aria-label="Sibling gender"
-                  value={selected?.gender ?? ""}
-                  disabled
-                  className="rounded border border-gray-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500"
-                />
-                <input
-                  type="text"
-                  aria-label="Sibling class"
-                  value={selected?.class ? `${selected.class.name} ${selected.class.section}` : ""}
-                  disabled
-                  className="rounded border border-gray-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500"
-                />
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => removeSiblingRow(index)}
-                    className="self-start text-xs font-semibold text-red-600"
-                  >
-                    Remove sibling
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={addSiblingRow}
-              className="self-start text-xs font-semibold text-neutral-700"
-            >
-              Add sibling
-            </button>
-          )}
-        </FormSection>
-
-        <FormSection title="Parent Details">
-          {parentRows.map((row, index) => (
-            <div key={index} className="flex flex-col gap-2 rounded border border-neutral-100 p-2">
+          </Field>
+          <Field label="Last name" htmlFor="lastName">
+            <input
+              id="lastName"
+              type="text"
+              aria-label="Last name"
+              value={lastName}
+              onChange={(event) => setLastName(event.target.value)}
+              disabled={!isAdmin}
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+              placeholder="Last name"
+            />
+          </Field>
+          <Field label="Admission number" htmlFor="admissionNo">
+            <input
+              id="admissionNo"
+              type="text"
+              aria-label="Admission number"
+              value={admissionNo}
+              onChange={(event) => setAdmissionNo(event.target.value)}
+              disabled={!isAdmin}
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+              placeholder="Admission number"
+            />
+          </Field>
+          <Field label="Date of birth" htmlFor="dob">
+            <input
+              id="dob"
+              type="date"
+              aria-label="Date of birth"
+              value={dob}
+              onChange={(event) => setDob(event.target.value)}
+              disabled={!isAdmin}
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+            />
+          </Field>
+          <Field label="Roll number" htmlFor="rollNumber">
+            <input
+              id="rollNumber"
+              type="text"
+              aria-label="Roll number"
+              value={rollNumber}
+              onChange={(event) => setRollNumber(event.target.value)}
+              disabled={!isAdmin}
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+              placeholder="Roll number (optional)"
+            />
+          </Field>
+          {showClassField && (
+            <Field label="Class" htmlFor="classId">
               <select
-                aria-label={`Parent ${index + 1} relationship`}
-                value={row.relationship}
-                onChange={(event) => updateParentRow(index, "relationship", event.target.value)}
+                id="classId"
+                aria-label="Class"
+                value={classId}
+                onChange={(event) => setClassId(event.target.value)}
                 disabled={!isAdmin}
-                className="rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
               >
-                <option value="Father">Father</option>
-                <option value="Mother">Mother</option>
-                <option value="Guardian">Guardian</option>
-                <option value="Other">Other</option>
+                {mode === "edit" && <option value="">Keep current class</option>}
+                {classes.map((klass) => (
+                  <option key={klass.id} value={klass.id}>
+                    {klass.name} {klass.section}
+                  </option>
+                ))}
               </select>
-              <input
-                type="text"
-                aria-label={`Parent ${index + 1} first name`}
-                value={row.firstName}
-                onChange={(event) => updateParentRow(index, "firstName", event.target.value)}
-                disabled={!isAdmin}
-                className="rounded border border-gray-300 px-3 py-2 text-sm"
-                placeholder="First name"
-              />
-              <input
-                type="text"
-                aria-label={`Parent ${index + 1} last name`}
-                value={row.lastName}
-                onChange={(event) => updateParentRow(index, "lastName", event.target.value)}
-                disabled={!isAdmin}
-                className="rounded border border-gray-300 px-3 py-2 text-sm"
-                placeholder="Last name"
-              />
-              <input
-                type="email"
-                aria-label={`Parent ${index + 1} email`}
-                value={row.email}
-                onChange={(event) => updateParentRow(index, "email", event.target.value)}
-                disabled={!isAdmin}
-                className="rounded border border-gray-300 px-3 py-2 text-sm"
-                placeholder="Email"
-              />
-              <input
-                type="tel"
-                aria-label={`Parent ${index + 1} mobile number`}
-                value={row.phone}
-                onChange={(event) => updateParentRow(index, "phone", event.target.value)}
-                disabled={!isAdmin}
-                className="rounded border border-gray-300 px-3 py-2 text-sm"
-                placeholder="Mobile number"
-              />
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => removeParentRow(index)}
-                  className="self-start text-xs font-semibold text-red-600"
-                >
-                  Remove parent
-                </button>
-              )}
-            </div>
-          ))}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={addParentRow}
-              className="self-start text-xs font-semibold text-neutral-700"
-            >
-              Add parent
-            </button>
+            </Field>
           )}
+          <Field label="Division" htmlFor="division">
+            <input
+              id="division"
+              type="text"
+              aria-label="Division"
+              value={classes.find((klass) => String(klass.id) === classId)?.section ?? ""}
+              disabled
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500"
+              placeholder="Division"
+            />
+          </Field>
+          <Field label="Date of join" htmlFor="dateOfJoin">
+            <input
+              id="dateOfJoin"
+              type="date"
+              aria-label="Date of join"
+              value={dateOfJoin}
+              onChange={(event) => setDateOfJoin(event.target.value)}
+              disabled={!isAdmin}
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+            />
+          </Field>
+          <Field label="ID" htmlFor="studentIdNumber">
+            <input
+              id="studentIdNumber"
+              type="text"
+              aria-label="ID"
+              value={studentIdNumber}
+              onChange={(event) => setStudentIdNumber(event.target.value)}
+              disabled={!isAdmin}
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+              placeholder="Student ID number"
+            />
+          </Field>
+          <Field label="Gender" htmlFor="gender">
+            <select
+              id="gender"
+              aria-label="Gender"
+              value={gender}
+              onChange={(event) => setGender(event.target.value as "male" | "female" | "")}
+              disabled={!isAdmin}
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+            >
+              <option value="">Select gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </Field>
+          {mode === "edit" && (
+            <div className="col-span-2 flex flex-col gap-1">
+              <span className="text-xs font-medium text-neutral-600">Status</span>
+              <div className="w-full rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-800">
+                {student?.status}
+              </div>
+            </div>
+          )}
+          {isAdmin && (
+            <Field label="Photo" htmlFor="photo" className="col-span-2">
+              <input
+                id="photo"
+                type="file"
+                aria-label="Photo"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+              />
+            </Field>
+          )}
+        </FormSection>
+
+        <FormSection number={2} title="Sibling Details">
+          <div className="col-span-2 flex flex-col gap-3">
+            {siblingIds.map((siblingId, index) => {
+              const selected = allStudents.find((s) => s.id === siblingId);
+              return (
+                <div key={index} className="rounded-xl border border-neutral-100 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-neutral-400">
+                      Sibling {index + 1}
+                    </span>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => removeSiblingRow(index)}
+                        className="text-xs font-semibold text-red-600"
+                      >
+                        Remove sibling
+                      </button>
+                    )}
+                  </div>
+                  <div className="mb-3">
+                    <Field label="Select student" htmlFor={`sibling-${index}-select`}>
+                      <select
+                        id={`sibling-${index}-select`}
+                        aria-label={`Sibling ${index + 1}`}
+                        value={siblingId ?? ""}
+                        onChange={(event) => updateSiblingRow(index, event.target.value)}
+                        disabled={!isAdmin}
+                        className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                      >
+                        <option value="">Select a student</option>
+                        {allStudents
+                          .filter((s) => s.id !== student?.id)
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.admissionNo})
+                            </option>
+                          ))}
+                      </select>
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="First name" htmlFor={`sibling-${index}-first`}>
+                      <input
+                        id={`sibling-${index}-first`}
+                        type="text"
+                        aria-label="Sibling first name"
+                        value={selected?.name.split(" ")[0] ?? ""}
+                        disabled
+                        className="w-full rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500"
+                      />
+                    </Field>
+                    <Field label="Last name" htmlFor={`sibling-${index}-last`}>
+                      <input
+                        id={`sibling-${index}-last`}
+                        type="text"
+                        aria-label="Sibling last name"
+                        value={selected ? selected.name.split(" ").slice(1).join(" ") : ""}
+                        disabled
+                        className="w-full rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500"
+                      />
+                    </Field>
+                    <Field label="Admission number" htmlFor={`sibling-${index}-admission`}>
+                      <input
+                        id={`sibling-${index}-admission`}
+                        type="text"
+                        aria-label="Sibling admission number"
+                        value={selected?.admissionNo ?? ""}
+                        disabled
+                        className="w-full rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500"
+                      />
+                    </Field>
+                    <Field label="Gender" htmlFor={`sibling-${index}-gender`}>
+                      <input
+                        id={`sibling-${index}-gender`}
+                        type="text"
+                        aria-label="Sibling gender"
+                        value={selected?.gender ?? ""}
+                        disabled
+                        className="w-full rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500"
+                      />
+                    </Field>
+                    <Field label="Class" htmlFor={`sibling-${index}-class`} className="col-span-2">
+                      <input
+                        id={`sibling-${index}-class`}
+                        type="text"
+                        aria-label="Sibling class"
+                        value={selected?.class ? `${selected.class.name} ${selected.class.section}` : ""}
+                        disabled
+                        className="w-full rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500"
+                      />
+                    </Field>
+                  </div>
+                </div>
+              );
+            })}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={addSiblingRow}
+                className="self-start text-xs font-semibold text-indigo-600"
+              >
+                Add sibling
+              </button>
+            )}
+          </div>
+        </FormSection>
+
+        <FormSection number={3} title="Parent Details">
+          <div className="col-span-2 flex flex-col gap-3">
+            {parentRows.map((row, index) => (
+              <div key={index} className="rounded-xl border border-neutral-100 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase text-neutral-400">
+                    Parent {index + 1}
+                  </span>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => removeParentRow(index)}
+                      className="text-xs font-semibold text-red-600"
+                    >
+                      Remove parent
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Relationship" htmlFor={`parent-${index}-relationship`}>
+                    <select
+                      id={`parent-${index}-relationship`}
+                      aria-label={`Parent ${index + 1} relationship`}
+                      value={row.relationship}
+                      onChange={(event) => updateParentRow(index, "relationship", event.target.value)}
+                      disabled={!isAdmin}
+                      className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                    >
+                      <option value="Father">Father</option>
+                      <option value="Mother">Mother</option>
+                      <option value="Guardian">Guardian</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </Field>
+                  <div />
+                  <Field label="First name" htmlFor={`parent-${index}-first`}>
+                    <input
+                      id={`parent-${index}-first`}
+                      type="text"
+                      aria-label={`Parent ${index + 1} first name`}
+                      value={row.firstName}
+                      onChange={(event) => updateParentRow(index, "firstName", event.target.value)}
+                      disabled={!isAdmin}
+                      className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                      placeholder="First name"
+                    />
+                  </Field>
+                  <Field label="Last name" htmlFor={`parent-${index}-last`}>
+                    <input
+                      id={`parent-${index}-last`}
+                      type="text"
+                      aria-label={`Parent ${index + 1} last name`}
+                      value={row.lastName}
+                      onChange={(event) => updateParentRow(index, "lastName", event.target.value)}
+                      disabled={!isAdmin}
+                      className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                      placeholder="Last name"
+                    />
+                  </Field>
+                  <Field label="Email" htmlFor={`parent-${index}-email`}>
+                    <input
+                      id={`parent-${index}-email`}
+                      type="email"
+                      aria-label={`Parent ${index + 1} email`}
+                      value={row.email}
+                      onChange={(event) => updateParentRow(index, "email", event.target.value)}
+                      disabled={!isAdmin}
+                      className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                      placeholder="Email"
+                    />
+                  </Field>
+                  <Field label="Mobile number" htmlFor={`parent-${index}-phone`}>
+                    <input
+                      id={`parent-${index}-phone`}
+                      type="tel"
+                      aria-label={`Parent ${index + 1} mobile number`}
+                      value={row.phone}
+                      onChange={(event) => updateParentRow(index, "phone", event.target.value)}
+                      disabled={!isAdmin}
+                      className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                      placeholder="Mobile number"
+                    />
+                  </Field>
+                </div>
+              </div>
+            ))}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={addParentRow}
+                className="self-start text-xs font-semibold text-indigo-600"
+              >
+                Add parent
+              </button>
+            )}
+          </div>
         </FormSection>
       </div>
 
