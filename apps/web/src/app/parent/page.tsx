@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireParentRole } from "@/lib/auth/require-parent-role";
-import { getParentChildren, getParentOverview } from "@/lib/parent/overview";
+import { getParentChildrenWithClass, getParentOverview } from "@/lib/parent/overview";
 import { resolveActiveChild } from "@/lib/parent/resolve-child";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
+import { StudentInfoBanner } from "@/components/parent/StudentInfoBanner";
 import { AttendanceCard, AssignmentsCard, MarksCard, FeesCard } from "@/components/parent/SummaryCards";
 
 export default async function ParentPage({
@@ -12,7 +13,7 @@ export default async function ParentPage({
   searchParams: { studentId?: string };
 }) {
   const claims = requireParentRole();
-  const children = await getParentChildren(prisma, claims.userId);
+  const children = await getParentChildrenWithClass(prisma, claims.userId);
 
   if (children.length === 0) {
     return (
@@ -33,6 +34,7 @@ export default async function ParentPage({
 
   return (
     <div className="space-y-4">
+      <StudentInfoBanner name={activeChild.name} className={activeChild.className} />
       <ChildSwitcher
         students={children.map((child) => ({ id: child.id, name: child.name }))}
         activeStudentId={activeChild.id}
