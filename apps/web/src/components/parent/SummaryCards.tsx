@@ -10,7 +10,7 @@ const titleClass = "mb-2 text-xs font-bold text-neutral-800";
 export function AttendanceCard({ percent, days }: { percent: number; days: ParentAttendanceDay[] }) {
   return (
     <div className={cardClass}>
-      <p className={titleClass}>Attendance</p>
+      <p className={titleClass}>Attendance Summary</p>
       <span className="block text-2xl font-bold leading-none tracking-tight text-neutral-800">
         {percent}%
       </span>
@@ -25,7 +25,7 @@ export function AttendanceCard({ percent, days }: { percent: number; days: Paren
 export function AssignmentsCard({ assignments }: { assignments: ParentAssignmentEntry[] }) {
   return (
     <div className={cardClass}>
-      <p className={titleClass}>Assignments</p>
+      <p className={titleClass}>Pending Assignments</p>
       {assignments.length === 0 ? (
         <p className={labelClass}>No pending assignments</p>
       ) : (
@@ -47,7 +47,7 @@ export function AssignmentsCard({ assignments }: { assignments: ParentAssignment
 export function MarksCard({ latestExam }: { latestExam: ParentOverview["latestExam"] }) {
   return (
     <div className={cardClass}>
-      <p className={titleClass}>Marks</p>
+      <p className={titleClass}>Marks / Exam Results</p>
       {latestExam === null ? (
         <p className={labelClass}>No exams recorded yet</p>
       ) : (
@@ -60,7 +60,7 @@ export function MarksCard({ latestExam }: { latestExam: ParentOverview["latestEx
 export function FeesCard({ fees }: { fees: ParentOverview["feesOutstanding"] }) {
   return (
     <div className={cardClass}>
-      <p className={titleClass}>Fees</p>
+      <p className={titleClass}>Fee Due Status</p>
       {fees.amount === 0 ? (
         <p className="text-sm font-bold text-emerald-600">No dues</p>
       ) : (

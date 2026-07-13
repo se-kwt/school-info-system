@@ -22,6 +22,7 @@ describe("AttendanceCard", () => {
 
   it("shows the attendance percent", () => {
     render(<AttendanceCard percent={82} days={days} />);
+    expect(screen.getByText("Attendance Summary")).toBeInTheDocument();
     expect(screen.getByText("82%")).toBeInTheDocument();
   });
 
@@ -44,6 +45,7 @@ describe("AssignmentsCard", () => {
 
   it("shows a message when there are no pending assignments", () => {
     render(<AssignmentsCard assignments={[]} />);
+    expect(screen.getByText("Pending Assignments")).toBeInTheDocument();
     expect(screen.getByText("No pending assignments")).toBeInTheDocument();
   });
 
@@ -67,6 +69,7 @@ describe("MarksCard", () => {
 
   it("shows a message when there is no exam yet", () => {
     render(<MarksCard latestExam={null} />);
+    expect(screen.getByText("Marks / Exam Results")).toBeInTheDocument();
     expect(screen.getByText("No exams recorded yet")).toBeInTheDocument();
   });
 
@@ -90,6 +93,7 @@ describe("FeesCard", () => {
 
   it("shows 'No dues' when the outstanding amount is zero", () => {
     render(<FeesCard fees={{ amount: 0, nearestDueDate: null }} />);
+    expect(screen.getByText("Fee Due Status")).toBeInTheDocument();
     expect(screen.getByText("No dues")).toBeInTheDocument();
   });
 

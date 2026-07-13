@@ -41,28 +41,28 @@ export default async function ParentPage({
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link
-          href={`/parent/attendance?studentId=${activeChild.id}`}
-          className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
-        >
-          <AttendanceCard percent={overview.attendanceMonthPercent} days={overview.attendanceDays} />
-        </Link>
-        <Link
           href={`/parent/assignments?studentId=${activeChild.id}`}
           className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
         >
           <AssignmentsCard assignments={overview.upcomingAssignments} />
         </Link>
         <Link
-          href={`/parent/marks?studentId=${activeChild.id}`}
+          href={`/parent/attendance?studentId=${activeChild.id}`}
           className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
         >
-          <MarksCard latestExam={overview.latestExam} />
+          <AttendanceCard percent={overview.attendanceMonthPercent} days={overview.attendanceDays} />
         </Link>
         <Link
           href={`/parent/fees?studentId=${activeChild.id}`}
           className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
         >
           <FeesCard fees={overview.feesOutstanding} />
+        </Link>
+        <Link
+          href={`/parent/marks?studentId=${activeChild.id}`}
+          className="block rounded-2xl transition-all hover:shadow-md hover:border-neutral-300"
+        >
+          <MarksCard latestExam={overview.latestExam} />
         </Link>
       </div>
     </div>
