@@ -1,8 +1,17 @@
 import { requireDashboardRole } from "@/lib/auth/require-dashboard-role";
 import { ComingSoon } from "@/components/ComingSoon";
+import { SchoolProfileSettings } from "@/components/settings/SchoolProfileSettings";
+import { prisma } from "@/lib/prisma";
 import { Settings } from "lucide-react";
 
-export default function SettingsPage() {
-  requireDashboardRole(["teacher", "admin", "accountant"]);
-  return <ComingSoon feature="Settings" icon={Settings} />;
+export default async function SettingsPage() {
+  const claims = requireDashboardRole(["teacher", "admin", "accountant"]);
+
+  if (claims.role !== "admin") {
+    return <ComingSoon feature="Settings" icon={Settings} />;
+  }
+
+  const school = await prisma.school.findUniqueOrThrow({ where: { id: claims.schoolId } });
+
+  return <SchoolProfileSettings initialLogoUrl={school.logoUrl} schoolName={school.name} />;
 }
