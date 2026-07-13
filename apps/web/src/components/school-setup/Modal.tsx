@@ -28,10 +28,10 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className={`flex max-h-[85vh] w-full ${maxWidthClassName} flex-col gap-4 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl`}
+        className={`flex max-h-[85vh] w-full ${maxWidthClassName} flex-col overflow-hidden rounded-2xl bg-white shadow-xl`}
         onClick={(event) => event.stopPropagation()}
       >
-        {children}
+        <div className="modal-scroll flex flex-col gap-4 overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );
