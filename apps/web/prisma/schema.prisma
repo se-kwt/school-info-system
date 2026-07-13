@@ -75,6 +75,7 @@ enum Gender {
 model School {
   id            Int            @id @default(autoincrement())
   name          String
+  logoUrl       String?
   users         User[]
   students      Student[]
   classes       Class[]
