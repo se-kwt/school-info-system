@@ -13,7 +13,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
     }
 
-    let body: { subject?: string; title?: string; description?: string; dueDate?: string };
+    let body: {
+      subject?: string;
+      title?: string;
+      description?: string;
+      dueDate?: string;
+      attachmentUrl?: string;
+      attachmentName?: string;
+    };
     try {
       body = await request.json();
     } catch {
@@ -24,7 +31,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       body.subject === undefined &&
       body.title === undefined &&
       body.description === undefined &&
-      body.dueDate === undefined
+      body.dueDate === undefined &&
+      body.attachmentUrl === undefined &&
+      body.attachmentName === undefined
     ) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
