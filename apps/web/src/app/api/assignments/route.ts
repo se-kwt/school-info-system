@@ -57,8 +57,11 @@ export async function POST(request: Request) {
     let title: string | undefined;
     let description: string | undefined;
     let dueDate: string | undefined;
+    let attachmentUrl: string | undefined;
+    let attachmentName: string | undefined;
     try {
-      ({ classId, subject, title, description, dueDate } = await request.json());
+      ({ classId, subject, title, description, dueDate, attachmentUrl, attachmentName } =
+        await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -89,6 +92,8 @@ export async function POST(request: Request) {
       description,
       dueDate,
       academicYearId: yearResult.academicYear.id,
+      attachmentUrl,
+      attachmentName,
     });
 
     if (!result.ok) {

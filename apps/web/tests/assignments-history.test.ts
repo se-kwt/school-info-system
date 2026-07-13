@@ -60,4 +60,60 @@ describe("getParentAssignmentHistory", () => {
 
     expect(history).toEqual([]);
   });
+
+  it("filters to pending (including overdue) when status: 'pending' is passed", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+
+    const pendingAssignment = await prisma.assignment.create({
+      data: {
+        classId: fixtures.classA.id,
+        subject: "Mathematics",
+        title: "Pending HW",
+        dueDate: new Date("2026-08-01"),
+        createdById: fixtures.teacher.id,
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+    const overdueAssignment = await prisma.assignment.create({
+      data: {
+        classId: fixtures.classA.id,
+        subject: "Science",
+        title: "Overdue HW",
+        dueDate: new Date("2020-01-01"),
+        createdById: fixtures.teacher.id,
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+    const submittedAssignment = await prisma.assignment.create({
+      data: {
+        classId: fixtures.classA.id,
+        subject: "English",
+        title: "Submitted HW",
+        dueDate: new Date("2026-07-01"),
+        createdById: fixtures.teacher.id,
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+    await prisma.assignmentStatus.create({
+      data: { assignmentId: pendingAssignment.id, studentId: fixtures.student.id, status: "pending" },
+    });
+    await prisma.assignmentStatus.create({
+      data: { assignmentId: overdueAssignment.id, studentId: fixtures.student.id, status: "pending" },
+    });
+    await prisma.assignmentStatus.create({
+      data: {
+        assignmentId: submittedAssignment.id,
+        studentId: fixtures.student.id,
+        status: "submitted",
+      },
+    });
+
+    const pending = await getParentAssignmentHistory(prisma, fixtures.student.id, { status: "pending" });
+    expect(pending.map((entry) => entry.title).sort()).toEqual(["Overdue HW", "Pending HW"]);
+
+    const submitted = await getParentAssignmentHistory(prisma, fixtures.student.id, {
+      status: "submitted",
+    });
+    expect(submitted.map((entry) => entry.title)).toEqual(["Submitted HW"]);
+  });
 });

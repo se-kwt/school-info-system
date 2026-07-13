@@ -24,6 +24,19 @@ interface Assignment {
 const inputClass =
   "rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:outline-none";
 
+async function uploadAttachment(
+  file: File
+): Promise<{ ok: true; attachmentUrl: string; attachmentName: string } | { ok: false; error: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/api/assignments/upload", { method: "POST", body: formData });
+  const body = await response.json();
+  if (!response.ok) {
+    return { ok: false, error: body.error };
+  }
+  return { ok: true, attachmentUrl: body.attachmentUrl, attachmentName: body.attachmentName };
+}
+
 export function AssignmentsView({
   classes,
   role,
@@ -40,6 +53,7 @@ export function AssignmentsView({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -67,6 +81,19 @@ export function AssignmentsView({
   async function handleCreate() {
     setError(null);
     setMessage(null);
+
+    let attachmentUrl: string | undefined;
+    let attachmentName: string | undefined;
+    if (attachmentFile) {
+      const uploadResult = await uploadAttachment(attachmentFile);
+      if (!uploadResult.ok) {
+        setError(uploadResult.error);
+        return;
+      }
+      attachmentUrl = uploadResult.attachmentUrl;
+      attachmentName = uploadResult.attachmentName;
+    }
+
     const response = await fetch("/api/assignments", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -76,6 +103,8 @@ export function AssignmentsView({
         title,
         description: description || undefined,
         dueDate,
+        attachmentUrl,
+        attachmentName,
       }),
     });
 
@@ -85,6 +114,7 @@ export function AssignmentsView({
       setTitle("");
       setDescription("");
       setDueDate("");
+      setAttachmentFile(null);
       await refresh();
       return;
     }
@@ -143,6 +173,13 @@ export function AssignmentsView({
             aria-label="Due date"
             value={dueDate}
             onChange={(event) => setDueDate(event.target.value)}
+            className={inputClass}
+          />
+          <input
+            type="file"
+            aria-label="Attachment"
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
             className={inputClass}
           />
           <button

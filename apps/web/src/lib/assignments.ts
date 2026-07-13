@@ -94,6 +94,8 @@ export async function createAssignment(
     description?: string;
     dueDate: string;
     academicYearId: number;
+    attachmentUrl?: string;
+    attachmentName?: string;
   }
 ): Promise<CreateAssignmentResult> {
   const link = await prisma.classTeacher.findFirst({
@@ -113,6 +115,8 @@ export async function createAssignment(
         title: params.title,
         description: params.description ?? null,
         dueDate: new Date(params.dueDate),
+        attachmentUrl: params.attachmentUrl ?? null,
+        attachmentName: params.attachmentName ?? null,
         createdById: params.teacherUserId,
         academicYearId: params.academicYearId,
       },
@@ -130,6 +134,22 @@ export async function createAssignment(
           status: "pending" as const,
         })),
       });
+
+      const parentLinks = await tx.parentStudent.findMany({
+        where: { studentId: { in: enrolled.map((student) => student.id) } },
+      });
+      const distinctParentIds = [...new Set(parentLinks.map((link) => link.parentUserId))];
+      if (distinctParentIds.length > 0) {
+        await tx.notification.createMany({
+          data: distinctParentIds.map((parentUserId) => ({
+            userId: parentUserId,
+            type: "assignment_published",
+            title: created.title,
+            body: `${created.subject} · Due ${params.dueDate}`,
+            relatedId: created.id,
+          })),
+        });
+      }
     }
     return created;
   });
@@ -148,7 +168,14 @@ export async function editAssignment(
     assignmentId: number;
     teacherUserId: number;
     schoolId: number;
-    fields: { subject?: string; title?: string; description?: string; dueDate?: string };
+    fields: {
+      subject?: string;
+      title?: string;
+      description?: string;
+      dueDate?: string;
+      attachmentUrl?: string;
+      attachmentName?: string;
+    };
   }
 ): Promise<EditAssignmentResult> {
   const assignment = await prisma.assignment.findUnique({
@@ -158,11 +185,20 @@ export async function editAssignment(
   if (!assignment || assignment.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
   if (assignment.createdById !== params.teacherUserId) return { ok: false, error: "FORBIDDEN" };
 
-  const data: { subject?: string; title?: string; description?: string; dueDate?: Date } = {};
+  const data: {
+    subject?: string;
+    title?: string;
+    description?: string;
+    dueDate?: Date;
+    attachmentUrl?: string;
+    attachmentName?: string;
+  } = {};
   if (params.fields.subject !== undefined) data.subject = params.fields.subject;
   if (params.fields.title !== undefined) data.title = params.fields.title;
   if (params.fields.description !== undefined) data.description = params.fields.description;
   if (params.fields.dueDate !== undefined) data.dueDate = new Date(params.fields.dueDate);
+  if (params.fields.attachmentUrl !== undefined) data.attachmentUrl = params.fields.attachmentUrl;
+  if (params.fields.attachmentName !== undefined) data.attachmentName = params.fields.attachmentName;
 
   await prisma.assignment.update({ where: { id: params.assignmentId }, data });
   return { ok: true };

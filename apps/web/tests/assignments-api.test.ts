@@ -82,6 +82,96 @@ describe("/api/assignments", () => {
     expect(statuses[0]).toMatchObject({ studentId: student.id, status: "pending" });
   });
 
+  it("persists attachment fields when provided", async () => {
+    const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request("http://localhost/api/assignments", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        subject: "Math",
+        title: "Chapter 3 worksheet",
+        dueDate: "2026-07-10",
+        attachmentUrl: "/uploads/assignments/abc.pdf",
+        attachmentName: "Worksheet.pdf",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postAssignments(request);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+
+    const created = await prisma.assignment.findUniqueOrThrow({ where: { id: body.id } });
+    expect(created.attachmentUrl).toBe("/uploads/assignments/abc.pdf");
+    expect(created.attachmentName).toBe("Worksheet.pdf");
+  });
+
+  it("creates one notification per distinct parent linked to an enrolled student", async () => {
+    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    const parent = await prisma.user.create({
+      data: { phone: "+15550009001", role: "parent", name: "Test Parent", schoolId: school.id },
+    });
+    await prisma.parentStudent.create({ data: { parentUserId: parent.id, studentId: student.id } });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request("http://localhost/api/assignments", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        subject: "Math",
+        title: "Chapter 3 worksheet",
+        dueDate: "2026-07-10",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postAssignments(request);
+    const body = await response.json();
+
+    const notifications = await prisma.notification.findMany({ where: { userId: parent.id } });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      type: "assignment_published",
+      title: "Chapter 3 worksheet",
+      relatedId: body.id,
+    });
+  });
+
+  it("creates exactly one notification for a parent with two children in the same class", async () => {
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    const secondStudent = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Sibling Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-502",
+    });
+    const parent = await prisma.user.create({
+      data: { phone: "+15550009002", role: "parent", name: "Test Parent", schoolId: school.id },
+    });
+    await prisma.parentStudent.create({ data: { parentUserId: parent.id, studentId: student.id } });
+    await prisma.parentStudent.create({
+      data: { parentUserId: parent.id, studentId: secondStudent.id },
+    });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request("http://localhost/api/assignments", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        subject: "Math",
+        title: "Chapter 3 worksheet",
+        dueDate: "2026-07-10",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    await postAssignments(request);
+
+    const notifications = await prisma.notification.findMany({ where: { userId: parent.id } });
+    expect(notifications).toHaveLength(1);
+  });
+
   it("rejects a missing required field with 400", async () => {
     const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
     loginAs(teacher.id, "teacher", school.id);
@@ -321,6 +411,26 @@ describe("/api/assignments/[id]", () => {
     const updated = await prisma.assignment.findUnique({ where: { id: assignment.id } });
     expect(updated?.title).toBe("Chapter 3 worksheet (revised)");
     expect(updated?.dueDate.toISOString().slice(0, 10)).toBe("2026-08-05");
+  });
+
+  it("lets the creator update the attachment", async () => {
+    const { school, teacher, assignment } = await seedAssignment();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        attachmentUrl: "/uploads/assignments/xyz.png",
+        attachmentName: "diagram.png",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    expect(response.status).toBe(200);
+
+    const updated = await prisma.assignment.findUnique({ where: { id: assignment.id } });
+    expect(updated?.attachmentUrl).toBe("/uploads/assignments/xyz.png");
+    expect(updated?.attachmentName).toBe("diagram.png");
   });
 
   it("rejects a different teacher assigned to the same class with 403", async () => {
