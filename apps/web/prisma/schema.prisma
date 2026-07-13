@@ -203,6 +203,8 @@ model Assignment {
   title          String
   description    String?
   dueDate        DateTime
+  attachmentUrl  String?
+  attachmentName String?
   createdBy      User         @relation(fields: [createdById], references: [id])
   createdById    Int
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
