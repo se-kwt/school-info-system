@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Assignment {
   id: number;
@@ -62,6 +62,10 @@ export function AssignmentRoster({
   const [editDescription, setEditDescription] = useState(assignment.description ?? "");
   const [editDueDate, setEditDueDate] = useState(assignment.dueDate);
   const [editAttachmentFile, setEditAttachmentFile] = useState<File | null>(null);
+  const [isSavingStatuses, setIsSavingStatuses] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const isSavingStatusesRef = useRef(false);
+  const isSavingEditRef = useRef(false);
 
   async function refresh() {
     const response = await fetch(`/api/assignments/${assignment.id}/statuses`);
@@ -93,68 +97,91 @@ export function AssignmentRoster({
   }, [assignment.id]);
 
   async function handleSave() {
+    if (isSavingStatusesRef.current) return;
+
     setError(null);
     setMessage(null);
-    const response = await fetch(`/api/assignments/${assignment.id}/statuses`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        entries: statuses.map((entry) => ({
-          studentId: entry.studentId,
-          status: edits[entry.studentId] ?? "pending",
-        })),
-      }),
-    });
+    isSavingStatusesRef.current = true;
+    setIsSavingStatuses(true);
+    try {
+      const response = await fetch(`/api/assignments/${assignment.id}/statuses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          entries: statuses.map((entry) => ({
+            studentId: entry.studentId,
+            status: edits[entry.studentId] ?? "pending",
+          })),
+        }),
+      });
 
-    if (response.ok) {
-      setMessage("Statuses saved");
-      await refresh();
-      onChanged();
-      return;
+      if (response.ok) {
+        setMessage("Statuses saved");
+        await refresh();
+        onChanged();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    } finally {
+      isSavingStatusesRef.current = false;
+      setIsSavingStatuses(false);
     }
-    const body = await response.json();
-    setError(body.error);
   }
 
   async function handleEditSave() {
+    if (isSavingEditRef.current) return;
+
     setError(null);
     setMessage(null);
 
-    let attachmentUrl: string | undefined;
-    let attachmentName: string | undefined;
-    if (editAttachmentFile) {
-      const uploadResult = await uploadAttachment(editAttachmentFile);
-      if (!uploadResult.ok) {
-        setError(uploadResult.error);
-        return;
-      }
-      attachmentUrl = uploadResult.attachmentUrl;
-      attachmentName = uploadResult.attachmentName;
-    }
-
-    const response = await fetch(`/api/assignments/${assignment.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        title: editTitle,
-        subject: editSubject,
-        description: editDescription || undefined,
-        dueDate: editDueDate,
-        attachmentUrl,
-        attachmentName,
-      }),
-    });
-
-    if (response.ok) {
-      setMessage("Assignment updated");
-      setEditing(false);
-      setEditAttachmentFile(null);
-      await refresh();
-      onChanged();
+    if (!editSubject.trim() || !editTitle.trim() || !editDueDate) {
+      setError("Subject, title, and due date are required");
       return;
     }
-    const body = await response.json();
-    setError(body.error);
+
+    isSavingEditRef.current = true;
+    setIsSavingEdit(true);
+    try {
+      let attachmentUrl: string | undefined;
+      let attachmentName: string | undefined;
+      if (editAttachmentFile) {
+        const uploadResult = await uploadAttachment(editAttachmentFile);
+        if (!uploadResult.ok) {
+          setError(uploadResult.error);
+          return;
+        }
+        attachmentUrl = uploadResult.attachmentUrl;
+        attachmentName = uploadResult.attachmentName;
+      }
+
+      const response = await fetch(`/api/assignments/${assignment.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle,
+          subject: editSubject,
+          description: editDescription || undefined,
+          dueDate: editDueDate,
+          attachmentUrl,
+          attachmentName,
+        }),
+      });
+
+      if (response.ok) {
+        setMessage("Assignment updated");
+        setEditing(false);
+        setEditAttachmentFile(null);
+        await refresh();
+        onChanged();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    } finally {
+      isSavingEditRef.current = false;
+      setIsSavingEdit(false);
+    }
   }
 
   const canEdit = role === "teacher" && assignment.createdById === currentUserId;
@@ -228,9 +255,10 @@ export function AssignmentRoster({
           <button
             type="button"
             onClick={handleEditSave}
-            className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
+            disabled={isSavingEdit}
+            className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Save Changes
+            {isSavingEdit ? "Saving…" : "Save Changes"}
           </button>
         </div>
       )}
@@ -279,9 +307,10 @@ export function AssignmentRoster({
         <button
           type="button"
           onClick={handleSave}
-          className="mt-4 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+          disabled={isSavingStatuses}
+          className="mt-4 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Save
+          {isSavingStatuses ? "Saving…" : "Save"}
         </button>
       )}
     </div>

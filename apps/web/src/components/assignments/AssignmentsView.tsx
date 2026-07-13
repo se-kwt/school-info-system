@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AssignmentRoster } from "./AssignmentRoster";
 
 interface ClassOption {
@@ -56,6 +56,8 @@ export function AssignmentsView({
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   async function refresh() {
     if (!classId) return;
@@ -79,47 +81,61 @@ export function AssignmentsView({
   }, [classId]);
 
   async function handleCreate() {
+    if (isSubmittingRef.current) return;
+
     setError(null);
     setMessage(null);
 
-    let attachmentUrl: string | undefined;
-    let attachmentName: string | undefined;
-    if (attachmentFile) {
-      const uploadResult = await uploadAttachment(attachmentFile);
-      if (!uploadResult.ok) {
-        setError(uploadResult.error);
-        return;
-      }
-      attachmentUrl = uploadResult.attachmentUrl;
-      attachmentName = uploadResult.attachmentName;
-    }
-
-    const response = await fetch("/api/assignments", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        classId: Number(classId),
-        subject,
-        title,
-        description: description || undefined,
-        dueDate,
-        attachmentUrl,
-        attachmentName,
-      }),
-    });
-
-    if (response.ok) {
-      setMessage("Assignment posted");
-      setSubject("");
-      setTitle("");
-      setDescription("");
-      setDueDate("");
-      setAttachmentFile(null);
-      await refresh();
+    if (!subject.trim() || !title.trim() || !dueDate) {
+      setError("Subject, title, and due date are required");
       return;
     }
-    const body = await response.json();
-    setError(body.error);
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      let attachmentUrl: string | undefined;
+      let attachmentName: string | undefined;
+      if (attachmentFile) {
+        const uploadResult = await uploadAttachment(attachmentFile);
+        if (!uploadResult.ok) {
+          setError(uploadResult.error);
+          return;
+        }
+        attachmentUrl = uploadResult.attachmentUrl;
+        attachmentName = uploadResult.attachmentName;
+      }
+
+      const response = await fetch("/api/assignments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          classId: Number(classId),
+          subject,
+          title,
+          description: description || undefined,
+          dueDate,
+          attachmentUrl,
+          attachmentName,
+        }),
+      });
+
+      if (response.ok) {
+        setMessage("Assignment posted");
+        setSubject("");
+        setTitle("");
+        setDescription("");
+        setDueDate("");
+        setAttachmentFile(null);
+        await refresh();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   }
 
   const selected = assignments.find((a) => a.id === selectedId) ?? null;
@@ -185,9 +201,10 @@ export function AssignmentsView({
           <button
             type="button"
             onClick={handleCreate}
-            className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+            disabled={isSubmitting}
+            className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
           >
-            New Assignment
+            {isSubmitting ? "Posting…" : "New Assignment"}
           </button>
         </div>
       )}
