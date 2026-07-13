@@ -9,6 +9,8 @@ interface Assignment {
   description: string | null;
   dueDate: string;
   createdById: number;
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
 }
 
 interface StatusEntry {
@@ -25,6 +27,19 @@ const STATUS_BADGE: Record<StatusEntry["status"], string> = {
 
 const inputClass =
   "rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none";
+
+async function uploadAttachment(
+  file: File
+): Promise<{ ok: true; attachmentUrl: string; attachmentName: string } | { ok: false; error: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/api/assignments/upload", { method: "POST", body: formData });
+  const body = await response.json();
+  if (!response.ok) {
+    return { ok: false, error: body.error };
+  }
+  return { ok: true, attachmentUrl: body.attachmentUrl, attachmentName: body.attachmentName };
+}
 
 export function AssignmentRoster({
   assignment,
@@ -46,6 +61,7 @@ export function AssignmentRoster({
   const [editSubject, setEditSubject] = useState(assignment.subject);
   const [editDescription, setEditDescription] = useState(assignment.description ?? "");
   const [editDueDate, setEditDueDate] = useState(assignment.dueDate);
+  const [editAttachmentFile, setEditAttachmentFile] = useState<File | null>(null);
 
   async function refresh() {
     const response = await fetch(`/api/assignments/${assignment.id}/statuses`);
@@ -103,6 +119,19 @@ export function AssignmentRoster({
   async function handleEditSave() {
     setError(null);
     setMessage(null);
+
+    let attachmentUrl: string | undefined;
+    let attachmentName: string | undefined;
+    if (editAttachmentFile) {
+      const uploadResult = await uploadAttachment(editAttachmentFile);
+      if (!uploadResult.ok) {
+        setError(uploadResult.error);
+        return;
+      }
+      attachmentUrl = uploadResult.attachmentUrl;
+      attachmentName = uploadResult.attachmentName;
+    }
+
     const response = await fetch(`/api/assignments/${assignment.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -111,12 +140,15 @@ export function AssignmentRoster({
         subject: editSubject,
         description: editDescription || undefined,
         dueDate: editDueDate,
+        attachmentUrl,
+        attachmentName,
       }),
     });
 
     if (response.ok) {
       setMessage("Assignment updated");
       setEditing(false);
+      setEditAttachmentFile(null);
       await refresh();
       onChanged();
       return;
@@ -141,6 +173,17 @@ export function AssignmentRoster({
           </button>
         )}
       </div>
+
+      {assignment.attachmentUrl && (
+        <a
+          href={assignment.attachmentUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 inline-block text-xs font-semibold text-neutral-500 underline hover:text-neutral-800"
+        >
+          {assignment.attachmentName ?? "View attachment"}
+        </a>
+      )}
 
       {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
       {message && <p className="mt-2 text-xs text-emerald-600">{message}</p>}
@@ -173,6 +216,13 @@ export function AssignmentRoster({
             aria-label="Edit due date"
             value={editDueDate}
             onChange={(event) => setEditDueDate(event.target.value)}
+            className={inputClass}
+          />
+          <input
+            type="file"
+            aria-label="Edit attachment"
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            onChange={(event) => setEditAttachmentFile(event.target.files?.[0] ?? null)}
             className={inputClass}
           />
           <button
