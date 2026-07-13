@@ -23,7 +23,9 @@ describe("AttendanceView", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ students: roster }), { status: 200 }))
+      vi.fn().mockImplementation(
+        async () => new Response(JSON.stringify({ students: roster }), { status: 200 })
+      )
     );
   });
 
