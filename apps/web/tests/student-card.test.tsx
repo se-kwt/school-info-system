@@ -15,8 +15,12 @@ describe("StudentCard", () => {
     rollNumber: "5",
     photoUrl: null,
     status: "active" as const,
+    gender: null,
+    studentIdNumber: null,
+    dateOfJoin: null,
     class: { name: "Grade 5", section: "A" },
     parents: [],
+    siblings: [],
   };
 
   it("renders the name, roll number, and class", () => {
