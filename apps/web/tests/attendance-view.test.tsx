@@ -92,11 +92,36 @@ describe("AttendanceView", () => {
     });
   });
 
-  it("does not render bulk actions or Submit All for admin", async () => {
+  it("renders bulk actions and Submit All for admin on any date", async () => {
     render(<AttendanceView classes={classes} role="admin" />);
     await waitFor(() => screen.getByText("Asha Verma"));
 
+    expect(screen.getByRole("button", { name: "Mark All Present" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit All" })).toBeInTheDocument();
+  });
+
+  it("lets admin cycle a card's status", async () => {
+    render(<AttendanceView classes={classes} role="admin" />);
+    await waitFor(() => screen.getByText("Asha Verma"));
+
+    const card = screen.getByLabelText("Attendance for Asha Verma, currently Unmarked");
+    await userEvent.click(card);
+    expect(screen.getByLabelText("Attendance for Asha Verma, currently Present")).toBeInTheDocument();
+  });
+
+  it("is read-only for a teacher viewing a non-today date", async () => {
+    render(<AttendanceView classes={classes} role="teacher" />);
+    await waitFor(() => screen.getByText("Asha Verma"));
+
+    const dateInput = screen.getByLabelText("Attendance date");
+    await userEvent.clear(dateInput);
+    await userEvent.type(dateInput, "2020-01-01");
+
     expect(screen.queryByRole("button", { name: "Mark All Present" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Submit All" })).not.toBeInTheDocument();
+
+    const card = screen.getByLabelText("Attendance for Asha Verma, currently Unmarked");
+    await userEvent.click(card);
+    expect(screen.getByLabelText("Attendance for Asha Verma, currently Unmarked")).toBeInTheDocument();
   });
 });

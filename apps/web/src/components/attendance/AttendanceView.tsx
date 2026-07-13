@@ -43,6 +43,8 @@ export function AttendanceView({
   const [message, setMessage] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
 
+  const isEditable = role === "admin" || (role === "teacher" && date === todayDateString());
+
   function applyRoster(roster: RosterEntry[]) {
     setStudents(roster);
     const nextStatusMap: Record<number, AttendanceStatusValue> = {};
@@ -149,7 +151,7 @@ export function AttendanceView({
         />
       </div>
 
-      {role === "teacher" && (
+      {isEditable && (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -186,12 +188,12 @@ export function AttendanceView({
             rollNumber={student.rollNumber}
             photoUrl={student.photoUrl}
             status={statusMap[student.studentId] ?? null}
-            onClick={role === "teacher" ? () => cycleStudent(student.studentId) : () => {}}
+            onClick={isEditable ? () => cycleStudent(student.studentId) : () => {}}
           />
         ))}
       </div>
 
-      {role === "teacher" && (
+      {isEditable && (
         <button
           type="button"
           onClick={() => setReviewOpen(true)}
