@@ -12,7 +12,8 @@ export interface ParentAssignmentHistoryEntry {
 
 export async function getParentAssignmentHistory(
   prisma: PrismaClient,
-  studentId: number
+  studentId: number,
+  options?: { status?: "pending" | "submitted" }
 ): Promise<ParentAssignmentHistoryEntry[]> {
   const statuses = await prisma.assignmentStatus.findMany({
     where: { studentId },
@@ -20,7 +21,7 @@ export async function getParentAssignmentHistory(
     orderBy: { assignment: { dueDate: "desc" } },
   });
 
-  return statuses.map((entry) => ({
+  const entries = statuses.map((entry) => ({
     id: entry.assignment.id,
     subject: entry.assignment.subject,
     title: entry.assignment.title,
@@ -28,4 +29,12 @@ export async function getParentAssignmentHistory(
     status: displayStatus(entry.status, entry.assignment.dueDate),
     className: `${entry.assignment.class.name} ${entry.assignment.class.section}`,
   }));
+
+  if (options?.status === "pending") {
+    return entries.filter((entry) => entry.status === "pending" || entry.status === "overdue");
+  }
+  if (options?.status === "submitted") {
+    return entries.filter((entry) => entry.status === "submitted");
+  }
+  return entries;
 }
