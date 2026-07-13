@@ -53,7 +53,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["teacher"]);
+    const claims = requireApiRole(["teacher", "admin"]);
 
     let classId: number | undefined;
     let date: string | undefined;
@@ -86,7 +86,9 @@ export async function POST(request: Request) {
       classId,
       date,
       academicYearId: yearResult.academicYear.id,
+      schoolId: claims.schoolId,
       teacherUserId: claims.userId,
+      role: claims.role,
       entries: entries as Array<{
         studentId: number;
         status: "present" | "absent" | "late" | null;
@@ -97,6 +99,12 @@ export async function POST(request: Request) {
     if (!result.ok) {
       if (result.error === "NOT_ASSIGNED") {
         return NextResponse.json({ error: "You are not assigned to this class" }, { status: 403 });
+      }
+      if (result.error === "DATE_LOCKED") {
+        return NextResponse.json(
+          { error: "Teachers can only edit today's attendance" },
+          { status: 403 }
+        );
       }
       return NextResponse.json(
         { error: "One or more students do not belong to this class" },

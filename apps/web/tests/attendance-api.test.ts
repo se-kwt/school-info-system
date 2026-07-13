@@ -14,6 +14,8 @@ import { createActiveYear, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getAttendance, POST as postAttendance } from "../src/app/api/attendance/route";
 
+const today = new Date().toISOString().slice(0, 10);
+
 describe("/api/attendance", () => {
   beforeEach(async () => {
     await resetDb();
@@ -107,7 +109,7 @@ describe("/api/attendance", () => {
   });
 
   it("rejects a classId from a different school with 400", async () => {
-    const { school, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school } = await seedSchoolWithClassAndTeacher();
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
     const otherClass = await prisma.class.create({
       data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
@@ -125,7 +127,7 @@ describe("/api/attendance", () => {
   });
 
   it("rejects a missing date with 400", async () => {
-    const { school, year, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request(`http://localhost/api/attendance?classId=${klass.id}`);
@@ -133,7 +135,7 @@ describe("/api/attendance", () => {
     expect(response.status).toBe(400);
   });
 
-  it("creates attendance records for a fresh mark", async () => {
+  it("creates attendance records for a fresh mark on today's date", async () => {
     const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
     loginAs(teacher.id, "teacher", school.id);
 
@@ -141,7 +143,7 @@ describe("/api/attendance", () => {
       method: "POST",
       body: JSON.stringify({
         classId: klass.id,
-        date: "2026-07-06",
+        date: today,
         entries: [{ studentId: student.id, status: "present" }],
       }),
       headers: { "content-type": "application/json" },
@@ -162,7 +164,7 @@ describe("/api/attendance", () => {
         method: "POST",
         body: JSON.stringify({
           classId: klass.id,
-          date: "2026-07-06",
+          date: today,
           entries: [{ studentId: student.id, status }],
         }),
         headers: { "content-type": "application/json" },
@@ -198,7 +200,7 @@ describe("/api/attendance", () => {
       method: "POST",
       body: JSON.stringify({
         classId: klass.id,
-        date: "2026-07-06",
+        date: today,
         entries: [{ studentId: otherStudent.id, status: "present" }],
       }),
       headers: { "content-type": "application/json" },
@@ -221,7 +223,7 @@ describe("/api/attendance", () => {
       method: "POST",
       body: JSON.stringify({
         classId: klass.id,
-        date: "2026-07-06",
+        date: today,
         entries: [{ studentId: student.id, status: "present" }],
       }),
       headers: { "content-type": "application/json" },
@@ -230,7 +232,27 @@ describe("/api/attendance", () => {
     expect(response.status).toBe(403);
   });
 
-  it("rejects an admin attempting to POST with 403", async () => {
+  it("rejects a teacher marking a non-today date with 403", async () => {
+    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request("http://localhost/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        date: "2020-01-01",
+        entries: [{ studentId: student.id, status: "present" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postAttendance(request);
+    expect(response.status).toBe(403);
+
+    const record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
+    expect(record).toBeNull();
+  });
+
+  it("allows admin to mark a non-today (past) date", async () => {
     const { school, klass, student } = await seedSchoolWithClassAndTeacher();
     const admin = await prisma.user.create({
       data: { phone: "+15550006666", role: "admin", name: "Test Admin", schoolId: school.id },
@@ -241,8 +263,35 @@ describe("/api/attendance", () => {
       method: "POST",
       body: JSON.stringify({
         classId: klass.id,
-        date: "2026-07-06",
+        date: "2020-01-01",
         entries: [{ studentId: student.id, status: "present" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postAttendance(request);
+    expect(response.status).toBe(200);
+
+    const record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
+    expect(record?.status).toBe("present");
+  });
+
+  it("rejects an admin marking a class from a different school with 403", async () => {
+    const { school } = await seedSchoolWithClassAndTeacher();
+    const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherClass = await prisma.class.create({
+      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550007777", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: otherClass.id,
+        date: today,
+        entries: [{ studentId: 999999, status: "present" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -324,7 +373,7 @@ describe("/api/attendance", () => {
   it("deletes an existing attendance record when the entry status is null", async () => {
     const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
     await prisma.attendance.create({
-      data: { studentId: student.id, date: new Date("2026-07-06"), status: "present", markedById: teacher.id },
+      data: { studentId: student.id, date: new Date(today), status: "present", markedById: teacher.id },
     });
     loginAs(teacher.id, "teacher", school.id);
 
@@ -332,7 +381,7 @@ describe("/api/attendance", () => {
       method: "POST",
       body: JSON.stringify({
         classId: klass.id,
-        date: "2026-07-06",
+        date: today,
         entries: [{ studentId: student.id, status: null }],
       }),
       headers: { "content-type": "application/json" },
@@ -352,7 +401,7 @@ describe("/api/attendance", () => {
       method: "POST",
       body: JSON.stringify({
         classId: klass.id,
-        date: "2026-07-06",
+        date: today,
         entries: [{ studentId: student.id, status: null }],
       }),
       headers: { "content-type": "application/json" },
@@ -383,7 +432,7 @@ describe("/api/attendance", () => {
       admissionNo: "SCH-503",
     });
     await prisma.attendance.create({
-      data: { studentId: thirdStudent.id, date: new Date("2026-07-06"), status: "present", markedById: teacher.id },
+      data: { studentId: thirdStudent.id, date: new Date(today), status: "present", markedById: teacher.id },
     });
     loginAs(teacher.id, "teacher", school.id);
 
@@ -391,7 +440,7 @@ describe("/api/attendance", () => {
       method: "POST",
       body: JSON.stringify({
         classId: klass.id,
-        date: "2026-07-06",
+        date: today,
         entries: [
           { studentId: student.id, status: "absent" },
           { studentId: secondStudent.id, status: "late" },
@@ -403,7 +452,7 @@ describe("/api/attendance", () => {
     const response = await postAttendance(request);
     expect(response.status).toBe(200);
 
-    const records = await prisma.attendance.findMany({ where: { date: new Date("2026-07-06") } });
+    const records = await prisma.attendance.findMany({ where: { date: new Date(today) } });
     expect(records.find((r) => r.studentId === student.id)?.status).toBe("absent");
     expect(records.find((r) => r.studentId === secondStudent.id)?.status).toBe("late");
     expect(records.find((r) => r.studentId === thirdStudent.id)).toBeUndefined();

@@ -89,7 +89,8 @@ export async function getAttendanceRoster(
 export type MarkAttendanceResult =
   | { ok: true }
   | { ok: false; error: "NOT_ASSIGNED" }
-  | { ok: false; error: "STUDENT_MISMATCH" };
+  | { ok: false; error: "STUDENT_MISMATCH" }
+  | { ok: false; error: "DATE_LOCKED" };
 
 export async function markAttendance(
   prisma: PrismaClient,
@@ -97,18 +98,32 @@ export async function markAttendance(
     classId: number;
     date: string;
     academicYearId: number;
+    schoolId: number;
     teacherUserId: number;
+    role: SessionClaims["role"];
     entries: Array<{ studentId: number; status: "present" | "absent" | "late" | null; note?: string }>;
   }
 ): Promise<MarkAttendanceResult> {
-  const assignment = await prisma.classTeacher.findFirst({
-    where: {
-      classId: params.classId,
-      teacherUserId: params.teacherUserId,
-      academicYearId: params.academicYearId,
-    },
-  });
-  if (!assignment) return { ok: false, error: "NOT_ASSIGNED" };
+  if (params.role === "teacher") {
+    const today = new Date().toISOString().slice(0, 10);
+    if (params.date !== today) {
+      return { ok: false, error: "DATE_LOCKED" };
+    }
+
+    const assignment = await prisma.classTeacher.findFirst({
+      where: {
+        classId: params.classId,
+        teacherUserId: params.teacherUserId,
+        academicYearId: params.academicYearId,
+      },
+    });
+    if (!assignment) return { ok: false, error: "NOT_ASSIGNED" };
+  } else {
+    const klass = await prisma.class.findFirst({
+      where: { id: params.classId, schoolId: params.schoolId },
+    });
+    if (!klass) return { ok: false, error: "NOT_ASSIGNED" };
+  }
 
   const enrolledCount = await prisma.enrollment.count({
     where: {
