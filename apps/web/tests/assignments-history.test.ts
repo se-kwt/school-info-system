@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { createSeedFixtures } from "../prisma/fixtures";
-import { getParentAssignmentHistory } from "../src/lib/parent/assignments-history";
+import {
+  getParentAssignmentHistory,
+  getParentAssignmentDetail,
+} from "../src/lib/parent/assignments-history";
 
 describe("getParentAssignmentHistory", () => {
   beforeEach(async () => {
@@ -115,5 +118,95 @@ describe("getParentAssignmentHistory", () => {
       status: "submitted",
     });
     expect(submitted.map((entry) => entry.title)).toEqual(["Submitted HW"]);
+  });
+});
+
+describe("getParentAssignmentDetail", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  it("returns the full detail including description and attachment for the student's own assignment", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const assignment = await prisma.assignment.create({
+      data: {
+        classId: fixtures.classA.id,
+        subject: "Mathematics",
+        title: "Worksheet 3",
+        description: "Complete pages 4-6",
+        dueDate: new Date("2026-08-01"),
+        attachmentUrl: "/uploads/assignments/abc.pdf",
+        attachmentName: "Worksheet3.pdf",
+        createdById: fixtures.teacher.id,
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+    await prisma.assignmentStatus.create({
+      data: { assignmentId: assignment.id, studentId: fixtures.student.id, status: "pending" },
+    });
+
+    const detail = await getParentAssignmentDetail(prisma, {
+      studentId: fixtures.student.id,
+      assignmentId: assignment.id,
+    });
+
+    expect(detail).toMatchObject({
+      id: assignment.id,
+      title: "Worksheet 3",
+      subject: "Mathematics",
+      className: "Grade 5 A",
+      status: "pending",
+      description: "Complete pages 4-6",
+      attachmentUrl: "/uploads/assignments/abc.pdf",
+      attachmentName: "Worksheet3.pdf",
+    });
+  });
+
+  it("returns null when the student has no status row for that assignment", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const otherStudent = await prisma.student.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Other Student",
+        dob: new Date("2015-01-01"),
+        admissionNo: "GH-2026-777",
+      },
+    });
+    const assignment = await prisma.assignment.create({
+      data: {
+        classId: fixtures.classA.id,
+        subject: "Mathematics",
+        title: "Worksheet 3",
+        dueDate: new Date("2026-08-01"),
+        createdById: fixtures.teacher.id,
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+    await prisma.assignmentStatus.create({
+      data: { assignmentId: assignment.id, studentId: otherStudent.id, status: "pending" },
+    });
+
+    const detail = await getParentAssignmentDetail(prisma, {
+      studentId: fixtures.student.id,
+      assignmentId: assignment.id,
+    });
+
+    expect(detail).toBeNull();
+  });
+
+  it("returns null for a nonexistent assignment id", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+
+    const detail = await getParentAssignmentDetail(prisma, {
+      studentId: fixtures.student.id,
+      assignmentId: 999999,
+    });
+
+    expect(detail).toBeNull();
   });
 });

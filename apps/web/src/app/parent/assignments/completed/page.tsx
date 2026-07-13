@@ -49,10 +49,15 @@ export default async function ParentCompletedAssignmentsPage({
           <ul className="space-y-2">
             {assignments.map((assignment) => (
               <li key={assignment.id} className="border-b border-neutral-50 pb-2 text-xs last:border-0">
-                <p className="font-semibold text-neutral-800">{assignment.title}</p>
-                <p className="text-neutral-400">
-                  {assignment.subject} · {assignment.className} · {assignment.dueDate}
-                </p>
+                <Link
+                  href={`/parent/assignments/${assignment.id}?studentId=${activeChild.id}`}
+                  className="block hover:opacity-70"
+                >
+                  <p className="font-semibold text-neutral-800">{assignment.title}</p>
+                  <p className="text-neutral-400">
+                    {assignment.subject} · {assignment.className} · {assignment.dueDate}
+                  </p>
+                </Link>
               </li>
             ))}
           </ul>

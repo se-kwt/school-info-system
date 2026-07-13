@@ -38,3 +38,34 @@ export async function getParentAssignmentHistory(
   }
   return entries;
 }
+
+export interface ParentAssignmentDetail extends ParentAssignmentHistoryEntry {
+  description: string | null;
+  attachmentUrl: string | null;
+  attachmentName: string | null;
+}
+
+export async function getParentAssignmentDetail(
+  prisma: PrismaClient,
+  params: { studentId: number; assignmentId: number }
+): Promise<ParentAssignmentDetail | null> {
+  const entry = await prisma.assignmentStatus.findUnique({
+    where: {
+      assignmentId_studentId: { assignmentId: params.assignmentId, studentId: params.studentId },
+    },
+    include: { assignment: { include: { class: true } } },
+  });
+  if (!entry) return null;
+
+  return {
+    id: entry.assignment.id,
+    subject: entry.assignment.subject,
+    title: entry.assignment.title,
+    dueDate: entry.assignment.dueDate.toISOString().slice(0, 10),
+    status: displayStatus(entry.status, entry.assignment.dueDate),
+    className: `${entry.assignment.class.name} ${entry.assignment.class.section}`,
+    description: entry.assignment.description,
+    attachmentUrl: entry.assignment.attachmentUrl,
+    attachmentName: entry.assignment.attachmentName,
+  };
+}
