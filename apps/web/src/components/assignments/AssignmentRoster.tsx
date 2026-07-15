@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 interface Assignment {
   id: number;
-  subject: string;
+  subjectId: number;
+  subjectName: string;
   title: string;
   description: string | null;
   dueDate: string;
@@ -43,11 +44,13 @@ async function uploadAttachment(
 
 export function AssignmentRoster({
   assignment,
+  availableSubjects,
   role,
   currentUserId,
   onChanged,
 }: {
   assignment: Assignment;
+  availableSubjects: { id: number; name: string }[];
   role: "teacher" | "admin";
   currentUserId: number;
   onChanged: () => void;
@@ -58,7 +61,7 @@ export function AssignmentRoster({
   const [message, setMessage] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(assignment.title);
-  const [editSubject, setEditSubject] = useState(assignment.subject);
+  const [editSubjectId, setEditSubjectId] = useState(String(assignment.subjectId));
   const [editDescription, setEditDescription] = useState(assignment.description ?? "");
   const [editDueDate, setEditDueDate] = useState(assignment.dueDate);
   const [editAttachmentFile, setEditAttachmentFile] = useState<File | null>(null);
@@ -89,7 +92,7 @@ export function AssignmentRoster({
     setMessage(null);
     setEditing(false);
     setEditTitle(assignment.title);
-    setEditSubject(assignment.subject);
+    setEditSubjectId(String(assignment.subjectId));
     setEditDescription(assignment.description ?? "");
     setEditDueDate(assignment.dueDate);
     refresh();
@@ -135,7 +138,7 @@ export function AssignmentRoster({
     setError(null);
     setMessage(null);
 
-    if (!editSubject.trim() || !editTitle.trim() || !editDueDate) {
+    if (!editSubjectId || !editTitle.trim() || !editDueDate) {
       setError("Subject, title, and due date are required");
       return;
     }
@@ -160,7 +163,7 @@ export function AssignmentRoster({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title: editTitle,
-          subject: editSubject,
+          subjectId: Number(editSubjectId),
           description: editDescription || undefined,
           dueDate: editDueDate,
           attachmentUrl,
@@ -217,13 +220,16 @@ export function AssignmentRoster({
 
       {editing && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <input
-            type="text"
+          <select
             aria-label="Edit subject"
-            value={editSubject}
-            onChange={(event) => setEditSubject(event.target.value)}
+            value={editSubjectId}
+            onChange={(event) => setEditSubjectId(event.target.value)}
             className={inputClass}
-          />
+          >
+            {availableSubjects.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
           <input
             type="text"
             aria-label="Edit title"

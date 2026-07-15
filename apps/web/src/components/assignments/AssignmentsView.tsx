@@ -5,13 +5,21 @@ import { AssignmentRoster } from "./AssignmentRoster";
 
 interface ClassOption {
   id: number;
-  name: string;
+  gradeId: number;
+  gradeName: string;
   section: string;
+}
+
+interface SubjectOption {
+  id: number;
+  gradeId: number;
+  name: string;
 }
 
 interface Assignment {
   id: number;
-  subject: string;
+  subjectId: number;
+  subjectName: string;
   title: string;
   description: string | null;
   dueDate: string;
@@ -39,17 +47,19 @@ async function uploadAttachment(
 
 export function AssignmentsView({
   classes,
+  subjects,
   role,
   currentUserId,
 }: {
   classes: ClassOption[];
+  subjects: SubjectOption[];
   role: "teacher" | "admin";
   currentUserId: number;
 }) {
   const [classId, setClassId] = useState(classes[0] ? String(classes[0].id) : "");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [subject, setSubject] = useState("");
+  const [subjectId, setSubjectId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -58,6 +68,9 @@ export function AssignmentsView({
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+
+  const selectedClass = classes.find((c) => String(c.id) === classId) ?? null;
+  const availableSubjects = selectedClass ? subjects.filter((s) => s.gradeId === selectedClass.gradeId) : [];
 
   async function refresh() {
     if (!classId) return;
@@ -86,7 +99,7 @@ export function AssignmentsView({
     setError(null);
     setMessage(null);
 
-    if (!subject.trim() || !title.trim() || !dueDate) {
+    if (!subjectId || !title.trim() || !dueDate) {
       setError("Subject, title, and due date are required");
       return;
     }
@@ -111,7 +124,7 @@ export function AssignmentsView({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           classId: Number(classId),
-          subject,
+          subjectId: Number(subjectId),
           title,
           description: description || undefined,
           dueDate,
@@ -122,7 +135,7 @@ export function AssignmentsView({
 
       if (response.ok) {
         setMessage("Assignment posted");
-        setSubject("");
+        setSubjectId("");
         setTitle("");
         setDescription("");
         setDueDate("");
@@ -150,7 +163,7 @@ export function AssignmentsView({
       >
         {classes.map((klass) => (
           <option key={klass.id} value={klass.id}>
-            {klass.name} {klass.section}
+            {klass.gradeName} {klass.section}
           </option>
         ))}
       </select>
@@ -160,14 +173,17 @@ export function AssignmentsView({
 
       {role === "teacher" && (
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] lg:p-5">
-          <input
-            type="text"
+          <select
             aria-label="Subject"
-            placeholder="Subject"
-            value={subject}
-            onChange={(event) => setSubject(event.target.value)}
+            value={subjectId}
+            onChange={(event) => setSubjectId(event.target.value)}
             className={inputClass}
-          />
+          >
+            <option value="">Select subject</option>
+            {availableSubjects.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
           <input
             type="text"
             aria-label="Title"
@@ -230,7 +246,7 @@ export function AssignmentsView({
                   {assignment.title}
                 </td>
                 <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
-                  {assignment.subject}
+                  {assignment.subjectName}
                 </td>
                 <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
                   {assignment.dueDate}
@@ -257,6 +273,7 @@ export function AssignmentsView({
       {selected && (
         <AssignmentRoster
           assignment={selected}
+          availableSubjects={availableSubjects}
           role={role}
           currentUserId={currentUserId}
           onChanged={refresh}

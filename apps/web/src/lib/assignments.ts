@@ -17,7 +17,8 @@ function displayStatus(
 
 export interface AssignmentSummary {
   id: number;
-  subject: string;
+  subjectId: number;
+  subjectName: string;
   title: string;
   description: string | null;
   dueDate: string;
@@ -60,7 +61,7 @@ export async function listAssignments(
 
   const assignments = await prisma.assignment.findMany({
     where: { classId: params.classId, academicYearId: params.academicYearId },
-    include: { statuses: true },
+    include: { statuses: true, subject: true },
     orderBy: { dueDate: "desc" },
   });
 
@@ -68,7 +69,8 @@ export async function listAssignments(
     ok: true,
     assignments: assignments.map((assignment) => ({
       id: assignment.id,
-      subject: assignment.subject,
+      subjectId: assignment.subjectId,
+      subjectName: assignment.subject.name,
       title: assignment.title,
       description: assignment.description,
       dueDate: assignment.dueDate.toISOString().slice(0, 10),
@@ -89,7 +91,7 @@ export async function createAssignment(
   params: {
     classId: number;
     teacherUserId: number;
-    subject: string;
+    subjectId: number;
     title: string;
     description?: string;
     dueDate: string;
@@ -101,6 +103,7 @@ export async function createAssignment(
   const link = await prisma.classTeacher.findFirst({
     where: {
       classId: params.classId,
+      subjectId: params.subjectId,
       teacherUserId: params.teacherUserId,
       academicYearId: params.academicYearId,
     },
@@ -111,7 +114,7 @@ export async function createAssignment(
     const created = await tx.assignment.create({
       data: {
         classId: params.classId,
-        subject: params.subject,
+        subjectId: params.subjectId,
         title: params.title,
         description: params.description ?? null,
         dueDate: new Date(params.dueDate),
@@ -120,6 +123,7 @@ export async function createAssignment(
         createdById: params.teacherUserId,
         academicYearId: params.academicYearId,
       },
+      include: { subject: true },
     });
 
     const enrolled = await getEnrolledStudents(tx as PrismaClient, {
@@ -145,7 +149,7 @@ export async function createAssignment(
             userId: parentUserId,
             type: "assignment_published",
             title: created.title,
-            body: `${created.subject} · Due ${params.dueDate}`,
+            body: `${created.subject.name} · Due ${params.dueDate}`,
             relatedId: created.id,
           })),
         });
@@ -169,7 +173,7 @@ export async function editAssignment(
     teacherUserId: number;
     schoolId: number;
     fields: {
-      subject?: string;
+      subjectId?: number;
       title?: string;
       description?: string;
       dueDate?: string;
@@ -186,14 +190,14 @@ export async function editAssignment(
   if (assignment.createdById !== params.teacherUserId) return { ok: false, error: "FORBIDDEN" };
 
   const data: {
-    subject?: string;
+    subjectId?: number;
     title?: string;
     description?: string;
     dueDate?: Date;
     attachmentUrl?: string;
     attachmentName?: string;
   } = {};
-  if (params.fields.subject !== undefined) data.subject = params.fields.subject;
+  if (params.fields.subjectId !== undefined) data.subjectId = params.fields.subjectId;
   if (params.fields.title !== undefined) data.title = params.fields.title;
   if (params.fields.description !== undefined) data.description = params.fields.description;
   if (params.fields.dueDate !== undefined) data.dueDate = new Date(params.fields.dueDate);
