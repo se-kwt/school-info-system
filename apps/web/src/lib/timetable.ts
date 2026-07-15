@@ -5,8 +5,11 @@ import { isUniqueConstraintViolation } from "./school-setup/prisma-errors";
 export interface TimetableEntrySummary {
   id: number;
   dayOfWeek: number;
-  period: number;
-  subject: string;
+  periodId: number;
+  periodOrder: number;
+  periodLabel: string;
+  subjectId: number;
+  subjectName: string;
   teacherUserId: number | null;
   teacherName: string | null;
 }
@@ -18,34 +21,22 @@ export type ListTimetableResult =
 
 export async function listTimetableEntries(
   prisma: PrismaClient,
-  params: {
-    classId: number;
-    schoolId: number;
-    academicYearId: number;
-    role: SessionClaims["role"];
-    userId: number;
-  }
+  params: { classId: number; schoolId: number; academicYearId: number; role: SessionClaims["role"]; userId: number }
 ): Promise<ListTimetableResult> {
   if (params.role === "teacher") {
     const link = await prisma.classTeacher.findFirst({
-      where: {
-        classId: params.classId,
-        teacherUserId: params.userId,
-        academicYearId: params.academicYearId,
-      },
+      where: { classId: params.classId, teacherUserId: params.userId, academicYearId: params.academicYearId },
     });
     if (!link) return { ok: false, error: "NOT_ASSIGNED" };
   } else {
-    const klass = await prisma.class.findFirst({
-      where: { id: params.classId, schoolId: params.schoolId },
-    });
+    const klass = await prisma.class.findFirst({ where: { id: params.classId, schoolId: params.schoolId } });
     if (!klass) return { ok: false, error: "INVALID_CLASS" };
   }
 
   const entries = await prisma.timetableEntry.findMany({
     where: { classId: params.classId, academicYearId: params.academicYearId },
-    include: { teacher: true },
-    orderBy: [{ dayOfWeek: "asc" }, { period: "asc" }],
+    include: { teacher: true, subject: true, period: true },
+    orderBy: [{ dayOfWeek: "asc" }, { period: { order: "asc" } }],
   });
 
   return {
@@ -53,8 +44,11 @@ export async function listTimetableEntries(
     entries: entries.map((entry) => ({
       id: entry.id,
       dayOfWeek: entry.dayOfWeek,
-      period: entry.period,
-      subject: entry.subject,
+      periodId: entry.periodId,
+      periodOrder: entry.period.order,
+      periodLabel: entry.period.label,
+      subjectId: entry.subjectId,
+      subjectName: entry.subject.name,
       teacherUserId: entry.teacherUserId,
       teacherName: entry.teacher ? entry.teacher.name : null,
     })),
@@ -65,6 +59,7 @@ export type CreateTimetableEntryResult =
   | { ok: true; id: number }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_DAY" }
+  | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "INVALID_TEACHER" }
   | { ok: false; error: "DUPLICATE_SLOT" };
 
@@ -75,22 +70,23 @@ export async function createTimetableEntry(
     academicYearId: number;
     classId: number;
     dayOfWeek: number;
-    period: number;
-    subject: string;
+    periodId: number;
+    subjectId: number;
     teacherUserId?: number;
   }
 ): Promise<CreateTimetableEntryResult> {
-  const klass = await prisma.class.findFirst({
-    where: { id: params.classId, schoolId: params.schoolId },
-  });
+  const klass = await prisma.class.findFirst({ where: { id: params.classId, schoolId: params.schoolId } });
   if (!klass) return { ok: false, error: "INVALID_CLASS" };
   if (params.dayOfWeek < 1 || params.dayOfWeek > 6) return { ok: false, error: "INVALID_DAY" };
 
+  const subject = await prisma.subject.findFirst({ where: { id: params.subjectId, gradeId: klass.gradeId } });
+  if (!subject) return { ok: false, error: "INVALID_SUBJECT" };
+
   if (params.teacherUserId !== undefined) {
-    const teacher = await prisma.user.findFirst({
-      where: { id: params.teacherUserId, schoolId: params.schoolId, role: "teacher" },
+    const link = await prisma.classTeacher.findFirst({
+      where: { classId: params.classId, subjectId: params.subjectId, teacherUserId: params.teacherUserId, academicYearId: params.academicYearId },
     });
-    if (!teacher) return { ok: false, error: "INVALID_TEACHER" };
+    if (!link) return { ok: false, error: "INVALID_TEACHER" };
   }
 
   try {
@@ -99,8 +95,8 @@ export async function createTimetableEntry(
         classId: params.classId,
         academicYearId: params.academicYearId,
         dayOfWeek: params.dayOfWeek,
-        period: params.period,
-        subject: params.subject,
+        periodId: params.periodId,
+        subjectId: params.subjectId,
         teacherUserId: params.teacherUserId ?? null,
       },
     });
@@ -118,26 +114,24 @@ export type EditTimetableEntryResult =
 
 export async function editTimetableEntry(
   prisma: PrismaClient,
-  params: {
-    entryId: number;
-    schoolId: number;
-    fields: { subject?: string; teacherUserId?: number | null };
-  }
+  params: { entryId: number; schoolId: number; fields: { subjectId?: number; teacherUserId?: number | null } }
 ): Promise<EditTimetableEntryResult> {
-  const entry = await prisma.timetableEntry.findUnique({
-    where: { id: params.entryId },
-    include: { class: true },
-  });
+  const entry = await prisma.timetableEntry.findUnique({ where: { id: params.entryId }, include: { class: true } });
   if (!entry || entry.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
 
-  const data: { subject?: string; teacherUserId?: number | null } = {};
-  if (params.fields.subject !== undefined) data.subject = params.fields.subject;
+  const data: { subjectId?: number; teacherUserId?: number | null } = {};
+  if (params.fields.subjectId !== undefined) data.subjectId = params.fields.subjectId;
   if (params.fields.teacherUserId !== undefined) {
     if (params.fields.teacherUserId !== null) {
-      const teacher = await prisma.user.findFirst({
-        where: { id: params.fields.teacherUserId, schoolId: params.schoolId, role: "teacher" },
+      const link = await prisma.classTeacher.findFirst({
+        where: {
+          classId: entry.classId,
+          subjectId: params.fields.subjectId ?? entry.subjectId,
+          teacherUserId: params.fields.teacherUserId,
+          academicYearId: entry.academicYearId,
+        },
       });
-      if (!teacher) return { ok: false, error: "INVALID_TEACHER" };
+      if (!link) return { ok: false, error: "INVALID_TEACHER" };
     }
     data.teacherUserId = params.fields.teacherUserId;
   }
@@ -152,10 +146,7 @@ export async function deleteTimetableEntry(
   prisma: PrismaClient,
   params: { entryId: number; schoolId: number }
 ): Promise<DeleteTimetableEntryResult> {
-  const entry = await prisma.timetableEntry.findUnique({
-    where: { id: params.entryId },
-    include: { class: true },
-  });
+  const entry = await prisma.timetableEntry.findUnique({ where: { id: params.entryId }, include: { class: true } });
   if (!entry || entry.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
 
   await prisma.timetableEntry.delete({ where: { id: params.entryId } });
