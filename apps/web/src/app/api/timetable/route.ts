@@ -54,18 +54,18 @@ export async function POST(request: Request) {
 
     let classId: number | undefined;
     let dayOfWeek: number | undefined;
-    let period: number | undefined;
-    let subject: string | undefined;
+    let periodId: number | undefined;
+    let subjectId: number | undefined;
     let teacherUserId: number | undefined;
     try {
-      ({ classId, dayOfWeek, period, subject, teacherUserId } = await request.json());
+      ({ classId, dayOfWeek, periodId, subjectId, teacherUserId } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!classId || dayOfWeek === undefined || period === undefined || !subject) {
+    if (!classId || dayOfWeek === undefined || !periodId || !subjectId) {
       return NextResponse.json(
-        { error: "classId, dayOfWeek, period, and subject are required" },
+        { error: "classId, dayOfWeek, periodId, and subjectId are required" },
         { status: 400 }
       );
     }
@@ -80,8 +80,8 @@ export async function POST(request: Request) {
       academicYearId: yearResult.academicYear.id,
       classId,
       dayOfWeek,
-      period,
-      subject,
+      periodId,
+      subjectId,
       teacherUserId,
     });
 
@@ -92,14 +92,17 @@ export async function POST(request: Request) {
       if (result.error === "INVALID_DAY") {
         return NextResponse.json({ error: "dayOfWeek must be between 1 and 6" }, { status: 400 });
       }
+      if (result.error === "INVALID_SUBJECT") {
+        return NextResponse.json({ error: "This subject does not belong to the class's grade" }, { status: 400 });
+      }
       if (result.error === "INVALID_TEACHER") {
         return NextResponse.json(
-          { error: "The selected teacher does not exist at this school" },
+          { error: "The selected teacher is not assigned to teach this subject on this class" },
           { status: 400 }
         );
       }
       return NextResponse.json(
-        { error: "A period already exists for this class, day, and period number" },
+        { error: "A period already exists for this class, day, and period" },
         { status: 409 }
       );
     }

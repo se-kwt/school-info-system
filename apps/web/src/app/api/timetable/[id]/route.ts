@@ -13,14 +13,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: "Timetable entry not found" }, { status: 404 });
     }
 
-    let body: { subject?: string; teacherUserId?: number | null };
+    let body: { subjectId?: number; teacherUserId?: number | null };
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!("subject" in body) && !("teacherUserId" in body)) {
+    if (!("subjectId" in body) && !("teacherUserId" in body)) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
@@ -35,7 +35,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         return NextResponse.json({ error: "Timetable entry not found" }, { status: 404 });
       }
       return NextResponse.json(
-        { error: "The selected teacher does not exist at this school" },
+        { error: "The selected teacher is not assigned to teach this subject on this class" },
         { status: 400 }
       );
     }
@@ -58,10 +58,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: "Timetable entry not found" }, { status: 404 });
     }
 
-    const result = await deleteTimetableEntry(prisma, {
-      entryId,
-      schoolId: claims.schoolId,
-    });
+    const result = await deleteTimetableEntry(prisma, { entryId, schoolId: claims.schoolId });
 
     if (!result.ok) {
       return NextResponse.json({ error: "Timetable entry not found" }, { status: 404 });

@@ -32,16 +32,21 @@ describe("/api/timetable", () => {
   async function seedSchoolWithClassAndTeacher() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 5" } });
+    const subject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Math" } });
+    const period = await prisma.period.create({
+      data: { schoolId: school.id, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
     const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 5", section: "A" },
+      data: { schoolId: school.id, gradeId: grade.id, section: "A", academicYearId: year.id },
     });
     const teacher = await prisma.user.create({
       data: { phone: "+15550031111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
+      data: { classId: klass.id, teacherUserId: teacher.id, subjectId: subject.id, academicYearId: year.id },
     });
-    return { school, year, klass, teacher };
+    return { school, year, grade, subject, period, klass, teacher };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -50,7 +55,7 @@ describe("/api/timetable", () => {
   }
 
   it("creates a timetable entry with a teacher assigned", async () => {
-    const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school, klass, teacher, subject, period } = await seedSchoolWithClassAndTeacher();
     const admin = await prisma.user.create({
       data: { phone: "+15550032222", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -61,8 +66,8 @@ describe("/api/timetable", () => {
       body: JSON.stringify({
         classId: klass.id,
         dayOfWeek: 1,
-        period: 1,
-        subject: "Math",
+        periodId: period.id,
+        subjectId: subject.id,
         teacherUserId: teacher.id,
       }),
       headers: { "content-type": "application/json" },
@@ -76,14 +81,14 @@ describe("/api/timetable", () => {
     expect(created).toMatchObject({
       classId: klass.id,
       dayOfWeek: 1,
-      period: 1,
-      subject: "Math",
+      periodId: period.id,
+      subjectId: subject.id,
       teacherUserId: teacher.id,
     });
   });
 
   it("creates a timetable entry with no teacher and round-trips teacherUserId as null", async () => {
-    const { school, klass } = await seedSchoolWithClassAndTeacher();
+    const { school, klass, subject, period } = await seedSchoolWithClassAndTeacher();
     const admin = await prisma.user.create({
       data: { phone: "+15550033333", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -91,7 +96,7 @@ describe("/api/timetable", () => {
 
     const postRequest = new Request("http://localhost/api/timetable", {
       method: "POST",
-      body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, period: 5, subject: "Lunch" }),
+      body: JSON.stringify({ classId: klass.id, dayOfWeek: 2, periodId: period.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     await postTimetable(postRequest);
@@ -100,14 +105,14 @@ describe("/api/timetable", () => {
     const getResponse = await getTimetable(getRequest);
     const body = await getResponse.json();
     expect(body.entries[0]).toMatchObject({
-      subject: "Lunch",
+      subjectName: "Math",
       teacherUserId: null,
       teacherName: null,
     });
   });
 
   it("rejects a missing required field with 400", async () => {
-    const { school, klass } = await seedSchoolWithClassAndTeacher();
+    const { school, klass, subject } = await seedSchoolWithClassAndTeacher();
     const admin = await prisma.user.create({
       data: { phone: "+15550034444", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -115,7 +120,7 @@ describe("/api/timetable", () => {
 
     const request = new Request("http://localhost/api/timetable", {
       method: "POST",
-      body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, subject: "Math" }),
+      body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     const response = await postTimetable(request);
@@ -123,10 +128,12 @@ describe("/api/timetable", () => {
   });
 
   it("rejects a classId from a different school with 400", async () => {
-    const { school } = await seedSchoolWithClassAndTeacher();
+    const { school, subject, period } = await seedSchoolWithClassAndTeacher();
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherGrade = await prisma.grade.create({ data: { schoolId: otherSchool.id, name: "Grade 1" } });
+    const otherYear = await createActiveYear(prisma, otherSchool.id);
     const otherClass = await prisma.class.create({
-      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
+      data: { schoolId: otherSchool.id, gradeId: otherGrade.id, section: "A", academicYearId: otherYear.id },
     });
     const admin = await prisma.user.create({
       data: { phone: "+15550035555", role: "admin", name: "Test Admin", schoolId: school.id },
@@ -135,7 +142,7 @@ describe("/api/timetable", () => {
 
     const request = new Request("http://localhost/api/timetable", {
       method: "POST",
-      body: JSON.stringify({ classId: otherClass.id, dayOfWeek: 1, period: 1, subject: "Math" }),
+      body: JSON.stringify({ classId: otherClass.id, dayOfWeek: 1, periodId: period.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     const response = await postTimetable(request);
@@ -143,7 +150,7 @@ describe("/api/timetable", () => {
   });
 
   it("rejects an out-of-range dayOfWeek with 400", async () => {
-    const { school, klass } = await seedSchoolWithClassAndTeacher();
+    const { school, klass, subject, period } = await seedSchoolWithClassAndTeacher();
     const admin = await prisma.user.create({
       data: { phone: "+15550036666", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -151,7 +158,7 @@ describe("/api/timetable", () => {
 
     const request = new Request("http://localhost/api/timetable", {
       method: "POST",
-      body: JSON.stringify({ classId: klass.id, dayOfWeek: 7, period: 1, subject: "Math" }),
+      body: JSON.stringify({ classId: klass.id, dayOfWeek: 7, periodId: period.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     const response = await postTimetable(request);
@@ -159,7 +166,7 @@ describe("/api/timetable", () => {
   });
 
   it("rejects a teacherUserId that isn't a teacher at this school with 400", async () => {
-    const { school, klass } = await seedSchoolWithClassAndTeacher();
+    const { school, klass, subject, period } = await seedSchoolWithClassAndTeacher();
     const admin = await prisma.user.create({
       data: { phone: "+15550037777", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -179,8 +186,8 @@ describe("/api/timetable", () => {
       body: JSON.stringify({
         classId: klass.id,
         dayOfWeek: 1,
-        period: 1,
-        subject: "Math",
+        periodId: period.id,
+        subjectId: subject.id,
         teacherUserId: foreignTeacher.id,
       }),
       headers: { "content-type": "application/json" },
@@ -190,38 +197,38 @@ describe("/api/timetable", () => {
   });
 
   it("rejects a duplicate (classId, dayOfWeek, period) with 409", async () => {
-    const { school, klass } = await seedSchoolWithClassAndTeacher();
+    const { school, klass, subject, period } = await seedSchoolWithClassAndTeacher();
     const admin = await prisma.user.create({
       data: { phone: "+15550039999", role: "admin", name: "Test Admin", schoolId: school.id },
     });
     loginAs(admin.id, "admin", school.id);
 
-    async function create(subject: string) {
+    async function create() {
       const request = new Request("http://localhost/api/timetable", {
         method: "POST",
-        body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, period: 1, subject }),
+        body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, periodId: period.id, subjectId: subject.id }),
         headers: { "content-type": "application/json" },
       });
       return postTimetable(request);
     }
 
-    const first = await create("Math");
+    const first = await create();
     expect(first.status).toBe(200);
-    const second = await create("Science");
+    const second = await create();
     expect(second.status).toBe(409);
 
     const rows = await prisma.timetableEntry.findMany({ where: { classId: klass.id } });
     expect(rows).toHaveLength(1);
-    expect(rows[0].subject).toBe("Math");
+    expect(rows[0].subjectId).toBe(subject.id);
   });
 
   it("rejects a teacher attempting to POST with 403", async () => {
-    const { school, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school, klass, subject, period, teacher } = await seedSchoolWithClassAndTeacher();
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request("http://localhost/api/timetable", {
       method: "POST",
-      body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, period: 1, subject: "Math" }),
+      body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, periodId: period.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     const response = await postTimetable(request);
@@ -229,27 +236,33 @@ describe("/api/timetable", () => {
   });
 
   it("lists entries sorted by day then period", async () => {
-    const { school, year, klass, teacher } = await seedSchoolWithClassAndTeacher();
+    const { school, year, grade, klass, teacher, subject, period } = await seedSchoolWithClassAndTeacher();
+    const period3 = await prisma.period.create({
+      data: { schoolId: school.id, order: 3, label: "Period 3", startTime: "11:00", endTime: "11:45" },
+    });
+    const scienceSubject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Science" } });
+    const englishSubject = await prisma.subject.create({ data: { gradeId: grade.id, name: "English" } });
+
     await prisma.timetableEntry.create({
       data: {
         classId: klass.id,
         academicYearId: year.id,
         dayOfWeek: 2,
-        period: 1,
-        subject: "Science",
+        periodId: period.id,
+        subjectId: scienceSubject.id,
         teacherUserId: teacher.id,
       },
     });
     await prisma.timetableEntry.create({
-      data: { classId: klass.id, academicYearId: year.id, dayOfWeek: 1, period: 3, subject: "English" },
+      data: { classId: klass.id, academicYearId: year.id, dayOfWeek: 1, periodId: period3.id, subjectId: englishSubject.id },
     });
     await prisma.timetableEntry.create({
       data: {
         classId: klass.id,
         academicYearId: year.id,
         dayOfWeek: 1,
-        period: 1,
-        subject: "Math",
+        periodId: period.id,
+        subjectId: subject.id,
         teacherUserId: teacher.id,
       },
     });
@@ -259,7 +272,7 @@ describe("/api/timetable", () => {
     const response = await getTimetable(request);
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.entries.map((e: { dayOfWeek: number; period: number }) => [e.dayOfWeek, e.period])).toEqual([
+    expect(body.entries.map((e: { dayOfWeek: number; periodOrder: number }) => [e.dayOfWeek, e.periodOrder])).toEqual([
       [1, 1],
       [1, 3],
       [2, 1],
@@ -294,8 +307,10 @@ describe("/api/timetable", () => {
   it("rejects a classId from a different school on GET with 400", async () => {
     const { school } = await seedSchoolWithClassAndTeacher();
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherGrade = await prisma.grade.create({ data: { schoolId: otherSchool.id, name: "Grade 1" } });
+    const otherYear = await createActiveYear(prisma, otherSchool.id);
     const otherClass = await prisma.class.create({
-      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
+      data: { schoolId: otherSchool.id, gradeId: otherGrade.id, section: "A", academicYearId: otherYear.id },
     });
     const admin = await prisma.user.create({
       data: { phone: "+15550042222", role: "admin", name: "Test Admin", schoolId: school.id },
@@ -331,23 +346,31 @@ describe("/api/timetable/[id]", () => {
   async function seedEntry() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 5" } });
+    const subject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Math" } });
+    const period = await prisma.period.create({
+      data: { schoolId: school.id, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
     const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 5", section: "A" },
+      data: { schoolId: school.id, gradeId: grade.id, section: "A", academicYearId: year.id },
     });
     const teacher = await prisma.user.create({
       data: { phone: "+15550051111", role: "teacher", name: "Test Teacher", schoolId: school.id },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: klass.id, teacherUserId: teacher.id, subjectId: subject.id, academicYearId: year.id },
     });
     const entry = await prisma.timetableEntry.create({
       data: {
         classId: klass.id,
         academicYearId: year.id,
         dayOfWeek: 1,
-        period: 1,
-        subject: "Math",
+        periodId: period.id,
+        subjectId: subject.id,
         teacherUserId: teacher.id,
       },
     });
-    return { school, year, klass, teacher, entry };
+    return { school, year, grade, subject, period, klass, teacher, entry };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -356,22 +379,24 @@ describe("/api/timetable/[id]", () => {
   }
 
   it("updates the subject and teacher", async () => {
-    const { school, entry } = await seedEntry();
+    const { school, grade, entry } = await seedEntry();
     const admin = await prisma.user.create({
       data: { phone: "+15550052222", role: "admin", name: "Test Admin", schoolId: school.id },
     });
     loginAs(admin.id, "admin", school.id);
 
+    const scienceSubject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Science" } });
+
     const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ subject: "Science" }),
+      body: JSON.stringify({ subjectId: scienceSubject.id }),
       headers: { "content-type": "application/json" },
     });
     const response = await patchTimetable(request, { params: { id: String(entry.id) } });
     expect(response.status).toBe(200);
 
     const updated = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
-    expect(updated?.subject).toBe("Science");
+    expect(updated?.subjectId).toBe(scienceSubject.id);
   });
 
   it("unsets the teacher when teacherUserId is explicitly null", async () => {
@@ -394,7 +419,7 @@ describe("/api/timetable/[id]", () => {
   });
 
   it("leaves the teacher unchanged when teacherUserId is omitted", async () => {
-    const { school, entry, teacher } = await seedEntry();
+    const { school, entry, teacher, subject } = await seedEntry();
     const admin = await prisma.user.create({
       data: { phone: "+15550054444", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -402,7 +427,7 @@ describe("/api/timetable/[id]", () => {
 
     const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ subject: "Science" }),
+      body: JSON.stringify({ subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     await patchTimetable(request, { params: { id: String(entry.id) } });
@@ -436,7 +461,7 @@ describe("/api/timetable/[id]", () => {
 
     const request = new Request("http://localhost/api/timetable/999999", {
       method: "PATCH",
-      body: JSON.stringify({ subject: "Doesn't matter" }),
+      body: JSON.stringify({ subjectId: 999999 }),
       headers: { "content-type": "application/json" },
     });
     const response = await patchTimetable(request, { params: { id: "999999" } });
@@ -465,7 +490,7 @@ describe("/api/timetable/[id]", () => {
 
     const request = new Request(`http://localhost/api/timetable/${entry.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ subject: "Doesn't matter" }),
+      body: JSON.stringify({ subjectId: 1 }),
       headers: { "content-type": "application/json" },
     });
     const response = await patchTimetable(request, { params: { id: String(entry.id) } });
