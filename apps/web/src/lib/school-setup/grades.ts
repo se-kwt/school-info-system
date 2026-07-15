@@ -29,6 +29,9 @@ export async function createGrade(
   schoolId: number,
   input: { name: string }
 ): Promise<CreateGradeResult> {
+  const existing = await prisma.grade.findFirst({ where: { schoolId, name: input.name } });
+  if (existing) return { ok: false, error: "DUPLICATE" };
+
   try {
     const created = await prisma.grade.create({
       data: { schoolId, name: input.name },
@@ -49,6 +52,11 @@ export async function editGrade(
 ): Promise<EditGradeResult> {
   const grade = await prisma.grade.findFirst({ where: { id: params.gradeId, schoolId: params.schoolId } });
   if (!grade) return { ok: false, error: "NOT_FOUND" };
+
+  const duplicate = await prisma.grade.findFirst({
+    where: { schoolId: params.schoolId, name: params.name, id: { not: params.gradeId } },
+  });
+  if (duplicate) return { ok: false, error: "DUPLICATE" };
 
   try {
     await prisma.grade.update({ where: { id: params.gradeId }, data: { name: params.name } });

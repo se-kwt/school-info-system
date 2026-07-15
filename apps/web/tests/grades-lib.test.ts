@@ -45,4 +45,47 @@ describe("grades lib", () => {
     const result = await deleteGrade(prisma, { gradeId: created.grade.id, schoolId });
     expect(result).toEqual({ ok: false, error: "HAS_HISTORY" });
   });
+
+  it("returns NOT_FOUND when editing a non-existent grade", async () => {
+    const result = await editGrade(prisma, { gradeId: 9999, schoolId, name: "Grade X" });
+    expect(result).toEqual({ ok: false, error: "NOT_FOUND" });
+  });
+
+  it("rejects renaming a grade to an existing name", async () => {
+    await createGrade(prisma, schoolId, { name: "Grade 1" });
+    const g2 = await createGrade(prisma, schoolId, { name: "Grade 2" });
+    if (!g2.ok) throw new Error("setup failed");
+    const result = await editGrade(prisma, { gradeId: g2.grade.id, schoolId, name: "Grade 1" });
+    expect(result).toEqual({ ok: false, error: "DUPLICATE" });
+  });
+
+  it("returns NOT_FOUND when deleting a non-existent grade", async () => {
+    const result = await deleteGrade(prisma, { gradeId: 9999, schoolId });
+    expect(result).toEqual({ ok: false, error: "NOT_FOUND" });
+  });
+
+  it("deletes a grade with no associations", async () => {
+    const created = await createGrade(prisma, schoolId, { name: "Grade 1" });
+    if (!created.ok) throw new Error("setup failed");
+    const result = await deleteGrade(prisma, { gradeId: created.grade.id, schoolId });
+    expect(result).toEqual({ ok: true, deleted: true });
+  });
+
+  it("blocks deleting a grade that has subjects", async () => {
+    const created = await createGrade(prisma, schoolId, { name: "Grade 1" });
+    if (!created.ok) throw new Error("setup failed");
+    await prisma.subject.create({
+      data: { gradeId: created.grade.id, name: "Mathematics" },
+    });
+
+    const result = await deleteGrade(prisma, { gradeId: created.grade.id, schoolId });
+    expect(result).toEqual({ ok: false, error: "HAS_HISTORY" });
+  });
+
+  it("allows same grade name in different schools", async () => {
+    const school2 = await prisma.school.create({ data: { name: "Other School" } });
+    await createGrade(prisma, schoolId, { name: "Grade 1" });
+    const result = await createGrade(prisma, school2.id, { name: "Grade 1" });
+    expect(result.ok).toBe(true);
+  });
 });
