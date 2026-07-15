@@ -83,6 +83,77 @@ model School {
   feeStructures FeeStructure[]
   academicYears AcademicYear[]
   promotionRuns PromotionRun[]
+  grades        Grade[]
+  periods       Period[]
+}
+
+model Grade {
+  id       Int       @id @default(autoincrement())
+  school   School    @relation(fields: [schoolId], references: [id])
+  schoolId Int
+  name     String
+  subjects Subject[]
+  classes  Class[]
+
+  @@unique([schoolId, name])
+}
+
+model Subject {
+  id      Int    @id @default(autoincrement())
+  grade   Grade  @relation(fields: [gradeId], references: [id])
+  gradeId Int
+  name    String
+
+  versions         SyllabusVersion[]
+  classTeachers    ClassTeacher[]
+  timetableEntries TimetableEntry[]
+  assignments      Assignment[]
+  marks            Mark[]
+
+  @@unique([gradeId, name])
+}
+
+model SyllabusVersion {
+  id          Int      @id @default(autoincrement())
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  subjectId   Int
+  versionNum  Int
+  title       String
+  content     String
+  fileUrl     String?
+  fileName    String?
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  @@unique([subjectId, versionNum])
+}
+
+model Period {
+  id        Int     @id @default(autoincrement())
+  school    School  @relation(fields: [schoolId], references: [id])
+  schoolId  Int
+  order     Int
+  label     String
+  isBreak   Boolean @default(false)
+  startTime String
+  endTime   String
+
+  overrides        PeriodDayOverride[]
+  timetableEntries TimetableEntry[]
+
+  @@unique([schoolId, order])
+}
+
+model PeriodDayOverride {
+  id        Int    @id @default(autoincrement())
+  period    Period @relation(fields: [periodId], references: [id])
+  periodId  Int
+  dayOfWeek Int
+  startTime String
+  endTime   String
+
+  @@unique([periodId, dayOfWeek])
 }
 
 model User {
@@ -103,6 +174,7 @@ model User {
   notifications       Notification[]
   timetableEntries    TimetableEntry[]
   promotionRunsRun    PromotionRun[]
+  syllabusVersions    SyllabusVersion[]
 }
 
 model Student {
@@ -151,12 +223,16 @@ model ParentStudent {
 }
 
 model Class {
-  id       Int    @id @default(autoincrement())
-  school   School @relation(fields: [schoolId], references: [id])
-  schoolId Int
-  name     String
-  section  String
-  archived Boolean @default(false)
+  id             Int           @id @default(autoincrement())
+  school         School        @relation(fields: [schoolId], references: [id])
+  schoolId       Int
+  name           String
+  section        String
+  archived       Boolean       @default(false)
+  grade          Grade?        @relation(fields: [gradeId], references: [id])
+  gradeId        Int?
+  academicYear   AcademicYear? @relation(fields: [academicYearId], references: [id])
+  academicYearId Int?
 
   teacherLinks     ClassTeacher[]
   assignments      Assignment[]
@@ -167,6 +243,7 @@ model Class {
   mappingsTo       PromotionMapping[] @relation("MappingTo")
 
   @@unique([schoolId, name, section])
+  @@unique([gradeId, section, academicYearId])
 }
 
 model ClassTeacher {
@@ -176,6 +253,9 @@ model ClassTeacher {
   teacher        User         @relation(fields: [teacherUserId], references: [id])
   teacherUserId  Int
   subject        String
+  subjectRef     Subject?     @relation(fields: [subjectRefId], references: [id])
+  subjectRefId   Int?
+  isClassTeacher Boolean      @default(false)
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
 
@@ -200,6 +280,8 @@ model Assignment {
   class          Class        @relation(fields: [classId], references: [id])
   classId        Int
   subject        String
+  subjectRef     Subject?     @relation(fields: [subjectRefId], references: [id])
+  subjectRefId   Int?
   title          String
   description    String?
   dueDate        DateTime
@@ -238,12 +320,14 @@ model Exam {
 }
 
 model Mark {
-  id            Int     @id @default(autoincrement())
-  exam          Exam    @relation(fields: [examId], references: [id])
+  id            Int      @id @default(autoincrement())
+  exam          Exam     @relation(fields: [examId], references: [id])
   examId        Int
-  student       Student @relation(fields: [studentId], references: [id])
+  student       Student  @relation(fields: [studentId], references: [id])
   studentId     Int
   subject       String
+  subjectRef    Subject? @relation(fields: [subjectRefId], references: [id])
+  subjectRefId  Int?
   marksObtained Float
   maxMarks      Float
   grade         String
@@ -257,7 +341,11 @@ model TimetableEntry {
   classId        Int
   dayOfWeek      Int
   period         Int
+  periodRef      Period?      @relation(fields: [periodRefId], references: [id])
+  periodRefId    Int?
   subject        String
+  subjectRef     Subject?     @relation(fields: [subjectRefId], references: [id])
+  subjectRefId   Int?
   teacher        User?        @relation(fields: [teacherUserId], references: [id])
   teacherUserId  Int?
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
@@ -336,6 +424,7 @@ model AcademicYear {
   assignments      Assignment[]
   runsFrom         PromotionRun[]   @relation("FromYear")
   runsTo           PromotionRun[]   @relation("ToYear")
+  classes          Class[]
 
   @@unique([schoolId, name])
 }
