@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
-import { createActiveYear, createEnrolledStudent } from "./helpers/enrollment";
+import { createActiveYear, createEnrolledStudent, createClass } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getMarks, POST as postMarks } from "../src/app/api/marks/route";
 
@@ -28,14 +28,13 @@ describe("GET /api/marks", () => {
   async function seedSchoolWithClassTeacherAndExam() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 5", section: "A" },
-    });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
     const teacher = await prisma.user.create({
       data: { phone: "+15550071111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
+      data: { classId: klass.id, teacherUserId: teacher.id, subjectId: subject.id, academicYearId: year.id },
     });
     const student = await createEnrolledStudent(prisma, {
       schoolId: school.id,
@@ -54,7 +53,7 @@ describe("GET /api/marks", () => {
         examDate: new Date("2026-09-01"),
       },
     });
-    return { school, year, klass, teacher, student, exam };
+    return { school, year, klass, teacher, student, exam, subject };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -75,12 +74,12 @@ describe("GET /api/marks", () => {
   });
 
   it("returns the subject-wise breakdown with computed grade", async () => {
-    const { school, klass, teacher, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     await prisma.mark.create({
       data: {
         examId: exam.id,
         studentId: student.id,
-        subject: "Math",
+        subjectId: subject.id,
         marksObtained: 95,
         maxMarks: 100,
         grade: "A",
@@ -91,8 +90,8 @@ describe("GET /api/marks", () => {
     const request = new Request(`http://localhost/api/marks?classId=${klass.id}&examId=${exam.id}`);
     const response = await getMarks(request);
     const body = await response.json();
-    expect(body.subjects).toEqual(["Math"]);
-    expect(body.students[0].marks.Math).toEqual({ marksObtained: 95, maxMarks: 100, grade: "A" });
+    expect(body.subjects).toEqual([{ id: subject.id, name: "Math" }]);
+    expect(body.students[0].marks[subject.id]).toEqual({ marksObtained: 95, maxMarks: 100, grade: "A" });
   });
 
   it("rejects a teacher viewing a class they don't teach with 403", async () => {
@@ -122,9 +121,8 @@ describe("GET /api/marks", () => {
   it("rejects a classId from a different school with 400", async () => {
     const { school, exam } = await seedSchoolWithClassTeacherAndExam();
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
-    const otherClass = await prisma.class.create({
-      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
-    });
+    const otherYear = await createActiveYear(prisma, otherSchool.id, "2026-27-other");
+    const otherClass = await createClass(prisma, { schoolId: otherSchool.id, academicYearId: otherYear.id, name: "Grade 1", section: "A" });
     const admin = await prisma.user.create({
       data: { phone: "+15550074444", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -186,14 +184,13 @@ describe("POST /api/marks", () => {
   async function seedSchoolWithClassTeacherAndExam() {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 5", section: "A" },
-    });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
     const teacher = await prisma.user.create({
       data: { phone: "+15550081111", role: "teacher", name: "Test Teacher", schoolId: school.id },
     });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
+      data: { classId: klass.id, teacherUserId: teacher.id, subjectId: subject.id, academicYearId: year.id },
     });
     const student = await createEnrolledStudent(prisma, {
       schoolId: school.id,
@@ -212,7 +209,7 @@ describe("POST /api/marks", () => {
         examDate: new Date("2026-09-01"),
       },
     });
-    return { school, year, klass, teacher, student, exam };
+    return { school, year, klass, teacher, student, exam, subject };
   }
 
   function loginAs(userId: number, role: "teacher" | "admin", schoolId: number) {
@@ -221,7 +218,7 @@ describe("POST /api/marks", () => {
   }
 
   it("creates a Mark row with the computed grade", async () => {
-    const { school, klass, teacher, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request("http://localhost/api/marks", {
@@ -229,7 +226,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: exam.id,
-        subject: "Math",
+        subjectId: subject.id,
         maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
@@ -238,12 +235,12 @@ describe("POST /api/marks", () => {
     const response = await postMarks(request);
     expect(response.status).toBe(200);
 
-    const mark = await prisma.mark.findFirst({ where: { studentId: student.id, subject: "Math" } });
+    const mark = await prisma.mark.findFirst({ where: { studentId: student.id, subjectId: subject.id } });
     expect(mark).toMatchObject({ marksObtained: 95, maxMarks: 100, grade: "A" });
   });
 
   it("upserts (re-saves) without creating a duplicate row", async () => {
-    const { school, klass, teacher, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     loginAs(teacher.id, "teacher", school.id);
 
     async function save(marksObtained: number) {
@@ -252,7 +249,7 @@ describe("POST /api/marks", () => {
         body: JSON.stringify({
           classId: klass.id,
           examId: exam.id,
-          subject: "Math",
+          subjectId: subject.id,
           maxMarks: 100,
           entries: [{ studentId: student.id, marksObtained }],
         }),
@@ -265,18 +262,18 @@ describe("POST /api/marks", () => {
     const secondResponse = await save(60);
     expect(secondResponse.status).toBe(200);
 
-    const marks = await prisma.mark.findMany({ where: { studentId: student.id, subject: "Math" } });
+    const marks = await prisma.mark.findMany({ where: { studentId: student.id, subjectId: subject.id } });
     expect(marks).toHaveLength(1);
     expect(marks[0]).toMatchObject({ marksObtained: 60, grade: "C" });
   });
 
   it("rejects a missing required field with 400", async () => {
-    const { school, klass, teacher, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, teacher, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request("http://localhost/api/marks", {
       method: "POST",
-      body: JSON.stringify({ classId: klass.id, examId: exam.id, subject: "Math" }),
+      body: JSON.stringify({ classId: klass.id, examId: exam.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     const response = await postMarks(request);
@@ -284,7 +281,7 @@ describe("POST /api/marks", () => {
   });
 
   it("rejects an examId from a different school with 400", async () => {
-    const { school, klass, teacher, student } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, teacher, student, subject } = await seedSchoolWithClassTeacherAndExam();
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
     const otherYear = await createActiveYear(prisma, otherSchool.id, "2026-27-other");
     const otherExam = await prisma.exam.create({
@@ -303,7 +300,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: otherExam.id,
-        subject: "Math",
+        subjectId: subject.id,
         maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
@@ -314,7 +311,7 @@ describe("POST /api/marks", () => {
   });
 
   it("rejects a teacher not assigned to this class+subject with 403", async () => {
-    const { school, klass, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     const otherTeacher = await prisma.user.create({
       data: { phone: "+15550082222", role: "teacher", name: "Other Teacher", schoolId: school.id },
     });
@@ -325,7 +322,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: exam.id,
-        subject: "Math",
+        subjectId: subject.id,
         maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
@@ -337,6 +334,7 @@ describe("POST /api/marks", () => {
 
   it("rejects a teacher assigned to the class for a different subject with 403", async () => {
     const { school, klass, teacher, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const otherSubject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Science" } });
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request("http://localhost/api/marks", {
@@ -344,7 +342,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: exam.id,
-        subject: "Science",
+        subjectId: otherSubject.id,
         maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
@@ -355,10 +353,8 @@ describe("POST /api/marks", () => {
   });
 
   it("rejects a studentId outside the class with 400, all-or-nothing", async () => {
-    const { school, year, klass, teacher, exam } = await seedSchoolWithClassTeacherAndExam();
-    const otherClass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 6", section: "B" },
-    });
+    const { school, year, klass, teacher, exam, subject } = await seedSchoolWithClassTeacherAndExam();
+    const otherClass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 6", section: "B" });
     const otherStudent = await createEnrolledStudent(prisma, {
       schoolId: school.id,
       classId: otherClass.id,
@@ -374,7 +370,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: exam.id,
-        subject: "Math",
+        subjectId: subject.id,
         maxMarks: 100,
         entries: [{ studentId: otherStudent.id, marksObtained: 95 }],
       }),
@@ -388,7 +384,7 @@ describe("POST /api/marks", () => {
   });
 
   it("rejects maxMarks of 0 or negative with 400", async () => {
-    const { school, klass, teacher, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request("http://localhost/api/marks", {
@@ -396,7 +392,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: exam.id,
-        subject: "Math",
+        subjectId: subject.id,
         maxMarks: 0,
         entries: [{ studentId: student.id, marksObtained: 0 }],
       }),
@@ -407,7 +403,7 @@ describe("POST /api/marks", () => {
   });
 
   it("rejects marksObtained above maxMarks with 400", async () => {
-    const { school, klass, teacher, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request("http://localhost/api/marks", {
@@ -415,7 +411,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: exam.id,
-        subject: "Math",
+        subjectId: subject.id,
         maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 105 }],
       }),
@@ -426,7 +422,7 @@ describe("POST /api/marks", () => {
   });
 
   it("rejects a negative marksObtained with 400", async () => {
-    const { school, klass, teacher, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request("http://localhost/api/marks", {
@@ -434,7 +430,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: exam.id,
-        subject: "Math",
+        subjectId: subject.id,
         maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: -5 }],
       }),
@@ -445,7 +441,7 @@ describe("POST /api/marks", () => {
   });
 
   it("rejects an admin attempting to POST with 403", async () => {
-    const { school, klass, student, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, klass, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     const admin = await prisma.user.create({
       data: { phone: "+15550083333", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -456,7 +452,7 @@ describe("POST /api/marks", () => {
       body: JSON.stringify({
         classId: klass.id,
         examId: exam.id,
-        subject: "Math",
+        subjectId: subject.id,
         maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
@@ -467,7 +463,7 @@ describe("POST /api/marks", () => {
   });
 
   it("computes the correct grade at each threshold boundary", async () => {
-    const { school, year, klass, teacher, exam } = await seedSchoolWithClassTeacherAndExam();
+    const { school, year, klass, teacher, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     loginAs(teacher.id, "teacher", school.id);
 
     const boundaries: Array<{ marksObtained: number; grade: string }> = [
@@ -496,7 +492,7 @@ describe("POST /api/marks", () => {
         body: JSON.stringify({
           classId: klass.id,
           examId: exam.id,
-          subject: "Math",
+          subjectId: subject.id,
           maxMarks: 100,
           entries: [{ studentId: student.id, marksObtained: boundary.marksObtained }],
         }),

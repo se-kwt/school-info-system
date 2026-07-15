@@ -35,7 +35,7 @@ export function PromotionWizard({
   classes,
 }: {
   upcomingYears: AcademicYearOption[];
-  classes: { id: number; name: string; section: string }[];
+  classes: { id: number; gradeName: string; section: string }[];
 }) {
   const [toAcademicYearId, setToAcademicYearId] = useState(
     upcomingYears[0] ? String(upcomingYears[0].id) : ""
@@ -52,7 +52,7 @@ export function PromotionWizard({
 
   function classLabel(classId: number) {
     const klass = classes.find((c) => c.id === classId);
-    return klass ? `${klass.name} ${klass.section}` : String(classId);
+    return klass ? `${klass.gradeName} ${klass.section}` : String(classId);
   }
 
   async function handleStart() {
@@ -192,7 +192,7 @@ export function PromotionWizard({
                   <option value="">No mapping, review individually</option>
                   {classes.map((klass) => (
                     <option key={klass.id} value={klass.id}>
-                      {klass.name} {klass.section}
+                      {klass.gradeName} {klass.section}
                     </option>
                   ))}
                 </select>

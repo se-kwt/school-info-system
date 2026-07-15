@@ -7,7 +7,8 @@ import { AssignmentRoster } from "../src/components/assignments/AssignmentRoster
 
 const assignment = {
   id: 1,
-  subject: "Math",
+  subjectId: 1,
+  subjectName: "Math",
   title: "Worksheet 1",
   description: null,
   dueDate: "2026-08-01",
@@ -15,6 +16,8 @@ const assignment = {
   attachmentUrl: null,
   attachmentName: null,
 };
+
+const availableSubjects = [{ id: 1, name: "Math" }];
 
 const statuses = [{ studentId: 1, name: "Rohan Sharma", status: "pending" as const }];
 
@@ -36,7 +39,13 @@ describe("AssignmentRoster edit form", () => {
 
   async function openEditForm() {
     render(
-      <AssignmentRoster assignment={assignment} role="teacher" currentUserId={1} onChanged={noop} />
+      <AssignmentRoster
+        assignment={assignment}
+        availableSubjects={availableSubjects}
+        role="teacher"
+        currentUserId={1}
+        onChanged={noop}
+      />
     );
     await waitFor(() => screen.getByText("Rohan Sharma"));
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -66,7 +75,13 @@ describe("AssignmentRoster edit form", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(
-      <AssignmentRoster assignment={assignment} role="teacher" currentUserId={1} onChanged={noop} />
+      <AssignmentRoster
+        assignment={assignment}
+        availableSubjects={availableSubjects}
+        role="teacher"
+        currentUserId={1}
+        onChanged={noop}
+      />
     );
     await waitFor(() => screen.getByText("Rohan Sharma"));
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -97,7 +112,13 @@ describe("AssignmentRoster edit form", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(
-      <AssignmentRoster assignment={assignment} role="teacher" currentUserId={1} onChanged={noop} />
+      <AssignmentRoster
+        assignment={assignment}
+        availableSubjects={availableSubjects}
+        role="teacher"
+        currentUserId={1}
+        onChanged={noop}
+      />
     );
     await waitFor(() => screen.getByText("Rohan Sharma"));
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { createSeedFixtures } from "../prisma/fixtures";
 import { getParentFeesHistory } from "../src/lib/parent/fees-history";
+import { createClass } from "./helpers/enrollment";
 
 describe("getParentFeesHistory", () => {
   beforeEach(async () => {
@@ -25,8 +26,11 @@ describe("getParentFeesHistory", () => {
         status: "archived",
       },
     });
-    const priorClass = await prisma.class.create({
-      data: { schoolId: fixtures.school.id, name: "Grade 4", section: "A" },
+    const priorClass = await createClass(prisma, {
+      schoolId: fixtures.school.id,
+      academicYearId: priorYear.id,
+      name: "Grade 4",
+      section: "A",
     });
     await prisma.enrollment.create({
       data: {

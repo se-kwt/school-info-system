@@ -11,7 +11,7 @@ interface ExamOption {
 
 interface ClassOption {
   id: number;
-  name: string;
+  gradeName: string;
   section: string;
 }
 
@@ -186,7 +186,7 @@ export function MarksView({
         >
           {classes.map((klass) => (
             <option key={klass.id} value={klass.id}>
-              {klass.name} {klass.section}
+              {klass.gradeName} {klass.section}
             </option>
           ))}
         </select>

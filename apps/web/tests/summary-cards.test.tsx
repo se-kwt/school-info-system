@@ -53,8 +53,8 @@ describe("AssignmentsCard", () => {
     render(
       <AssignmentsCard
         assignments={[
-          { id: 1, subject: "Mathematics", title: "Worksheet 3", dueDate: "2026-08-01", status: "pending" },
-          { id: 2, subject: "Science", title: "Lab Report", dueDate: "2026-07-05", status: "overdue" },
+          { id: 1, subjectId: 1, subjectName: "Mathematics", title: "Worksheet 3", dueDate: "2026-08-01", status: "pending" },
+          { id: 2, subjectId: 2, subjectName: "Science", title: "Lab Report", dueDate: "2026-07-05", status: "overdue" },
         ]}
       />
     );
@@ -79,7 +79,7 @@ describe("MarksCard", () => {
         latestExam={{
           examName: "Final Term",
           term: "Term 2",
-          subjects: [{ subject: "Mathematics", marksObtained: 91, maxMarks: 100, grade: "A" }],
+          subjects: [{ subjectId: 1, subjectName: "Mathematics", marksObtained: 91, maxMarks: 100, grade: "A" }],
         }}
       />
     );

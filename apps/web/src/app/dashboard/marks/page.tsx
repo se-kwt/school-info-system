@@ -11,22 +11,23 @@ export default async function MarksPage() {
   const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
   const classes =
     claims.role === "teacher"
-      ? (await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)).map((klass) => ({
-          id: klass.id,
-          name: klass.gradeName,
-          section: klass.section,
-        }))
+      ? await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)
       : await listClasses(prisma, claims.schoolId);
 
   const exams = await listExams(prisma, claims.schoolId);
 
-  const teacherSubjects =
+  const teacherSubjectLinks =
     claims.role === "teacher"
       ? await prisma.classTeacher.findMany({
           where: { teacherUserId: claims.userId, academicYearId: activeYear?.id ?? -1 },
-          select: { classId: true, subject: true },
+          include: { subject: true },
         })
       : [];
+  const teacherSubjects = teacherSubjectLinks.map((link) => ({
+    classId: link.classId,
+    subjectId: link.subjectId,
+    subjectName: link.subject.name,
+  }));
 
   return (
     <div className="flex flex-col gap-4">

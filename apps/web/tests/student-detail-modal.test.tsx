@@ -6,8 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { StudentDetailModal } from "../src/components/school-setup/StudentDetailModal";
 
 const classes = [
-  { id: 1, name: "Grade 5", section: "A" },
-  { id: 2, name: "Grade 6", section: "B" },
+  { id: 1, gradeName: "Grade 5", section: "A" },
+  { id: 2, gradeName: "Grade 6", section: "B" },
 ];
 
 const existingStudent = {
@@ -20,14 +20,14 @@ const existingStudent = {
   gender: "male" as const,
   studentIdNumber: "STU-1",
   dateOfJoin: "2026-06-01",
-  class: { name: "Grade 5", section: "A" },
+  class: { gradeName: "Grade 5", section: "A" },
   parents: [],
   siblings: [],
 };
 
 const allStudents = [
-  { id: 2, name: "Priya Sharma", admissionNo: "SCH-9", gender: "female" as const, class: { name: "Grade 5", section: "A" } },
-  { id: 3, name: "Amit Rao", admissionNo: "SCH-10", gender: "male" as const, class: { name: "Grade 6", section: "B" } },
+  { id: 2, name: "Priya Sharma", admissionNo: "SCH-9", gender: "female" as const, class: { gradeName: "Grade 5", section: "A" } },
+  { id: 3, name: "Amit Rao", admissionNo: "SCH-10", gender: "male" as const, class: { gradeName: "Grade 6", section: "B" } },
 ];
 
 function noop() {}

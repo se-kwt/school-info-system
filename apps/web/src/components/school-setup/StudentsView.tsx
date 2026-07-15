@@ -24,7 +24,7 @@ export function StudentsView({
   isAdmin,
 }: {
   initialStudents: StudentRow[];
-  classes: { id: number; name: string; section: string }[];
+  classes: { id: number; gradeName: string; section: string }[];
   isAdmin: boolean;
 }) {
   const [students, setStudents] = useState(initialStudents);
@@ -39,7 +39,7 @@ export function StudentsView({
       ? students
       : students.filter(
           (student) =>
-            selectedClass && student.class?.name === selectedClass.name && student.class?.section === selectedClass.section
+            selectedClass && student.class?.gradeName === selectedClass.gradeName && student.class?.section === selectedClass.section
         );
 
   async function refresh() {
@@ -211,7 +211,7 @@ export function StudentsView({
           <option value="all">All classes</option>
           {classes.map((klass) => (
             <option key={klass.id} value={klass.id}>
-              {klass.name} {klass.section}
+              {klass.gradeName} {klass.section}
             </option>
           ))}
         </select>

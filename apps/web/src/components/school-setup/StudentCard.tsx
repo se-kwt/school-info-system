@@ -10,14 +10,14 @@ export interface StudentRow {
   gender: "male" | "female" | null;
   studentIdNumber: string | null;
   dateOfJoin: string | null;
-  class: { name: string; section: string } | null;
+  class: { gradeName: string; section: string } | null;
   parents: { relationship: string; name: string; phone: string; email: string | null }[];
   siblings: {
     id: number;
     name: string;
     admissionNo: string;
     gender: "male" | "female" | null;
-    class: { name: string; section: string } | null;
+    class: { gradeName: string; section: string } | null;
   }[];
 }
 
@@ -49,7 +49,7 @@ export function StudentCard({ student, onClick }: { student: StudentRow; onClick
       <span className="text-xs font-semibold text-neutral-800">{student.name}</span>
       {student.rollNumber && <span className="text-[11px] text-neutral-400">Roll No. {student.rollNumber}</span>}
       <span className="text-[11px] text-neutral-400">
-        {student.class ? `${student.class.name} ${student.class.section}` : "Unassigned"}
+        {student.class ? `${student.class.gradeName} ${student.class.section}` : "Unassigned"}
       </span>
       {student.status !== "active" && (
         <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-bold text-neutral-600">

@@ -33,14 +33,20 @@ describe("getParentMarksHistory", () => {
         academicYearId: fixtures.academicYear.id,
       },
     });
-    await prisma.mark.create({
-      data: { examId: olderExam.id, studentId: fixtures.student.id, subject: "Mathematics", marksObtained: 70, maxMarks: 100, grade: "C" },
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
+    const scienceSubject = await prisma.subject.create({
+      data: { gradeId: fixtures.classA.gradeId, name: "Science" },
     });
     await prisma.mark.create({
-      data: { examId: newerExam.id, studentId: fixtures.student.id, subject: "Mathematics", marksObtained: 91, maxMarks: 100, grade: "A" },
+      data: { examId: olderExam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 70, maxMarks: 100, grade: "C" },
     });
     await prisma.mark.create({
-      data: { examId: newerExam.id, studentId: fixtures.student.id, subject: "Science", marksObtained: 85, maxMarks: 100, grade: "B" },
+      data: { examId: newerExam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 91, maxMarks: 100, grade: "A" },
+    });
+    await prisma.mark.create({
+      data: { examId: newerExam.id, studentId: fixtures.student.id, subjectId: scienceSubject.id, marksObtained: 85, maxMarks: 100, grade: "B" },
     });
 
     const history = await getParentMarksHistory(prisma, fixtures.student.id);

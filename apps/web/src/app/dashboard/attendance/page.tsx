@@ -10,11 +10,7 @@ export default async function AttendancePage() {
   const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
   const classes =
     claims.role === "teacher"
-      ? (await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)).map((klass) => ({
-          id: klass.id,
-          name: klass.gradeName,
-          section: klass.section,
-        }))
+      ? await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)
       : await listClasses(prisma, claims.schoolId);
 
   return (

@@ -1,5 +1,27 @@
 import type { PrismaClient } from "@prisma/client";
 
+export async function createClass(
+  prisma: PrismaClient,
+  params: { schoolId: number; academicYearId: number; name?: string; section?: string; gradeId?: number }
+) {
+  const gradeId =
+    params.gradeId ??
+    (
+      await prisma.grade.create({
+        data: { schoolId: params.schoolId, name: params.name ?? `Grade ${Math.floor(Math.random() * 100000)}` },
+      })
+    ).id;
+  return prisma.class.create({
+    data: {
+      schoolId: params.schoolId,
+      gradeId,
+      section: params.section ?? "A",
+      academicYearId: params.academicYearId,
+    },
+    include: { grade: true },
+  });
+}
+
 export async function createActiveYear(prisma: PrismaClient, schoolId: number, name = "2026-27") {
   return prisma.academicYear.create({
     data: {

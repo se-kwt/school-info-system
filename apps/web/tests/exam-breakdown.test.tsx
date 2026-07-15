@@ -11,7 +11,7 @@ describe("ExamBreakdown", () => {
     render(
       <ExamBreakdown
         examName="Final Term"
-        subjects={[{ subject: "Mathematics", marksObtained: 91, maxMarks: 100, grade: "A" }]}
+        subjects={[{ subjectId: 1, subjectName: "Mathematics", marksObtained: 91, maxMarks: 100, grade: "A" }]}
       />
     );
     expect(screen.getByText("Final Term")).toBeInTheDocument();

@@ -18,11 +18,17 @@ describe("getParentAssignmentHistory", () => {
 
   it("returns every assignment status for the student regardless of status, newest due date first", async () => {
     const fixtures = await createSeedFixtures(prisma);
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
+    const scienceSubject = await prisma.subject.create({
+      data: { gradeId: fixtures.classA.gradeId, name: "Science" },
+    });
 
     const older = await prisma.assignment.create({
       data: {
         classId: fixtures.classA.id,
-        subject: "Mathematics",
+        subjectId: mathSubject.id,
         title: "Worksheet 1",
         dueDate: new Date("2026-07-01"),
         createdById: fixtures.teacher.id,
@@ -32,7 +38,7 @@ describe("getParentAssignmentHistory", () => {
     const newer = await prisma.assignment.create({
       data: {
         classId: fixtures.classA.id,
-        subject: "Science",
+        subjectId: scienceSubject.id,
         title: "Lab Report",
         dueDate: new Date("2026-08-01"),
         createdById: fixtures.teacher.id,
@@ -66,11 +72,20 @@ describe("getParentAssignmentHistory", () => {
 
   it("filters to pending (including overdue) when status: 'pending' is passed", async () => {
     const fixtures = await createSeedFixtures(prisma);
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
+    const scienceSubject = await prisma.subject.create({
+      data: { gradeId: fixtures.classA.gradeId, name: "Science" },
+    });
+    const englishSubject = await prisma.subject.create({
+      data: { gradeId: fixtures.classA.gradeId, name: "English" },
+    });
 
     const pendingAssignment = await prisma.assignment.create({
       data: {
         classId: fixtures.classA.id,
-        subject: "Mathematics",
+        subjectId: mathSubject.id,
         title: "Pending HW",
         dueDate: new Date("2026-08-01"),
         createdById: fixtures.teacher.id,
@@ -80,7 +95,7 @@ describe("getParentAssignmentHistory", () => {
     const overdueAssignment = await prisma.assignment.create({
       data: {
         classId: fixtures.classA.id,
-        subject: "Science",
+        subjectId: scienceSubject.id,
         title: "Overdue HW",
         dueDate: new Date("2020-01-01"),
         createdById: fixtures.teacher.id,
@@ -90,7 +105,7 @@ describe("getParentAssignmentHistory", () => {
     const submittedAssignment = await prisma.assignment.create({
       data: {
         classId: fixtures.classA.id,
-        subject: "English",
+        subjectId: englishSubject.id,
         title: "Submitted HW",
         dueDate: new Date("2026-07-01"),
         createdById: fixtures.teacher.id,
@@ -133,10 +148,13 @@ describe("getParentAssignmentDetail", () => {
 
   it("returns the full detail including description and attachment for the student's own assignment", async () => {
     const fixtures = await createSeedFixtures(prisma);
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
     const assignment = await prisma.assignment.create({
       data: {
         classId: fixtures.classA.id,
-        subject: "Mathematics",
+        subjectId: mathSubject.id,
         title: "Worksheet 3",
         description: "Complete pages 4-6",
         dueDate: new Date("2026-08-01"),
@@ -158,7 +176,8 @@ describe("getParentAssignmentDetail", () => {
     expect(detail).toMatchObject({
       id: assignment.id,
       title: "Worksheet 3",
-      subject: "Mathematics",
+      subjectId: mathSubject.id,
+      subjectName: "Mathematics",
       className: "Grade 5 A",
       status: "pending",
       description: "Complete pages 4-6",
@@ -177,10 +196,13 @@ describe("getParentAssignmentDetail", () => {
         admissionNo: "GH-2026-777",
       },
     });
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
     const assignment = await prisma.assignment.create({
       data: {
         classId: fixtures.classA.id,
-        subject: "Mathematics",
+        subjectId: mathSubject.id,
         title: "Worksheet 3",
         dueDate: new Date("2026-08-01"),
         createdById: fixtures.teacher.id,

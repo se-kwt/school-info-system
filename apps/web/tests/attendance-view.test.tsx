@@ -5,7 +5,7 @@ import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AttendanceView } from "../src/components/attendance/AttendanceView";
 
-const classes = [{ id: 1, name: "Grade 5", section: "A" }];
+const classes = [{ id: 1, gradeName: "Grade 5", section: "A" }];
 const roster = [
   { studentId: 1, name: "Asha Verma", rollNumber: "1", photoUrl: null, status: null, note: null, monthPercent: 0 },
   {

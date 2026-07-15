@@ -11,9 +11,9 @@ export interface StudentSummary {
   gender: "male" | "female" | null;
   studentIdNumber: string | null;
   dateOfJoin: string | null;
-  class: { name: string; section: string } | null;
+  class: { gradeName: string; section: string } | null;
   parents: { relationship: string; name: string; phone: string; email: string | null }[];
-  siblings: { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { name: string; section: string } | null }[];
+  siblings: { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { gradeName: string; section: string } | null }[];
 }
 
 export async function listStudents(prisma: PrismaClient, schoolId: number): Promise<StudentSummary[]> {
@@ -24,7 +24,7 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
       parentLinks: { include: { parent: true } },
       enrollments: {
         where: activeYear ? { academicYearId: activeYear.id } : { id: -1 },
-        include: { class: true },
+        include: { class: { include: { grade: true } } },
       },
     },
     orderBy: { name: "asc" },
@@ -45,7 +45,7 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
       name: s.name,
       admissionNo: s.admissionNo,
       gender: s.gender,
-      class: enrollment ? { name: enrollment.class.name, section: enrollment.class.section } : null,
+      class: enrollment ? { gradeName: enrollment.class.grade.name, section: enrollment.class.section } : null,
     };
   }
 
@@ -75,7 +75,7 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
       gender: student.gender,
       studentIdNumber: student.studentIdNumber,
       dateOfJoin: student.dateOfJoin ? student.dateOfJoin.toISOString().slice(0, 10) : null,
-      class: enrollment ? { name: enrollment.class.name, section: enrollment.class.section } : null,
+      class: enrollment ? { gradeName: enrollment.class.grade.name, section: enrollment.class.section } : null,
       parents: student.parentLinks.map((link) => ({
         relationship: link.relationship,
         name: link.parent.name,

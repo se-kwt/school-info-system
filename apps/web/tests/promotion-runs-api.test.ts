@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createClass } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { POST as postPromotionRuns } from "../src/app/api/promotion-runs/route";
 import {
@@ -60,11 +61,17 @@ describe("/api/promotion-runs", () => {
     const admin = await prisma.user.create({
       data: { phone: "+15550951111", role: "admin", name: "Test Admin", schoolId: school.id },
     });
-    const gradeOne = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 1", section: "A" },
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
     });
-    const gradeTwo = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 2", section: "A" },
+    const gradeTwo = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 2",
+      section: "A",
     });
     const student = await prisma.student.create({
       data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-API1" },

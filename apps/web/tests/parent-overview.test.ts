@@ -134,6 +134,9 @@ describe("getParentOverview", () => {
     const past = new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString().slice(0, 10);
     const soon = new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString().slice(0, 10);
     const later = new Date(Date.now() + 1000 * 60 * 60 * 24 * 9).toISOString().slice(0, 10);
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
 
     for (const [title, dueDate] of [
       ["Overdue Homework", past],
@@ -144,7 +147,7 @@ describe("getParentOverview", () => {
       const assignment = await prisma.assignment.create({
         data: {
           classId: fixtures.classA.id,
-          subject: "Mathematics",
+          subjectId: mathSubject.id,
           title,
           dueDate: new Date(dueDate),
           createdById: fixtures.teacher.id,
@@ -188,14 +191,20 @@ describe("getParentOverview", () => {
         academicYearId: fixtures.academicYear.id,
       },
     });
-    await prisma.mark.create({
-      data: { examId: olderExam.id, studentId: fixtures.student.id, subject: "Mathematics", marksObtained: 80, maxMarks: 100, grade: "B" },
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
+    const scienceSubject = await prisma.subject.create({
+      data: { gradeId: fixtures.classA.gradeId, name: "Science" },
     });
     await prisma.mark.create({
-      data: { examId: newerExam.id, studentId: fixtures.student.id, subject: "Mathematics", marksObtained: 91, maxMarks: 100, grade: "A" },
+      data: { examId: olderExam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 80, maxMarks: 100, grade: "B" },
     });
     await prisma.mark.create({
-      data: { examId: newerExam.id, studentId: fixtures.student.id, subject: "Science", marksObtained: 85, maxMarks: 100, grade: "B" },
+      data: { examId: newerExam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 91, maxMarks: 100, grade: "A" },
+    });
+    await prisma.mark.create({
+      data: { examId: newerExam.id, studentId: fixtures.student.id, subjectId: scienceSubject.id, marksObtained: 85, maxMarks: 100, grade: "B" },
     });
 
     const overview = await getParentOverview(prisma, {
@@ -205,7 +214,7 @@ describe("getParentOverview", () => {
 
     expect(overview.latestExam?.examName).toBe("Final Term");
     expect(overview.latestExam?.subjects).toHaveLength(2);
-    expect(overview.latestExam?.subjects.find((s) => s.subject === "Mathematics")?.marksObtained).toBe(91);
+    expect(overview.latestExam?.subjects.find((s) => s.subjectName === "Mathematics")?.marksObtained).toBe(91);
   });
 
   it("returns null latestExam when the student has no marks", async () => {

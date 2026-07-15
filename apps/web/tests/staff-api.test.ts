@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
-import { createActiveYear } from "./helpers/enrollment";
+import { createActiveYear, createClass } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getStaff, POST as postStaff } from "../src/app/api/staff/route";
 import { PATCH as patchStaff, DELETE as deleteStaffRoute } from "../src/app/api/staff/[id]/route";
@@ -62,11 +62,10 @@ describe("/api/staff", () => {
 
   it("creates a teacher with a class assignment and reflects it in the list", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
-    await createActiveYear(prisma, school.id);
+    const year = await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 7", section: "A" },
-    });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 7", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Science" } });
 
     const postRequest = new Request("http://localhost/api/staff", {
       method: "POST",
@@ -75,7 +74,7 @@ describe("/api/staff", () => {
         phone: "+15559990002",
         role: "teacher",
         classId: klass.id,
-        subject: "Science",
+        subjectId: subject.id,
       }),
       headers: { "content-type": "application/json" },
     });
@@ -83,7 +82,7 @@ describe("/api/staff", () => {
     expect(postResponse.status).toBe(201);
 
     const classTeacherRow = await prisma.classTeacher.findFirst({
-      where: { classId: klass.id, subject: "Science" },
+      where: { classId: klass.id, subjectId: subject.id },
     });
     expect(classTeacherRow).not.toBeNull();
 
@@ -91,9 +90,9 @@ describe("/api/staff", () => {
     const list = await getResponse.json();
     const teacher = list.find((entry: { role: string }) => entry.role === "teacher");
     expect(teacher.classAssignment).toEqual({
-      className: "Grade 7",
+      gradeName: "Grade 7",
       section: "A",
-      subject: "Science",
+      subjectName: "Science",
     });
   });
 
@@ -116,11 +115,9 @@ describe("/api/staff", () => {
 
   it("rejects a teacher with a classId but no subject with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
-    await createActiveYear(prisma, school.id);
+    const year = await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 8", section: "A" },
-    });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 8", section: "A" });
 
     const postRequest = new Request("http://localhost/api/staff", {
       method: "POST",
@@ -153,9 +150,9 @@ describe("/api/staff", () => {
     await createActiveYear(prisma, school.id);
     await loginAsAdmin(school.id);
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
-    const otherClass = await prisma.class.create({
-      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
-    });
+    const otherYear = await createActiveYear(prisma, otherSchool.id, "2026-27-other");
+    const otherClass = await createClass(prisma, { schoolId: otherSchool.id, academicYearId: otherYear.id, name: "Grade 1", section: "A" });
+    const otherSubject = await prisma.subject.create({ data: { gradeId: otherClass.gradeId, name: "Math" } });
 
     const postRequest = new Request("http://localhost/api/staff", {
       method: "POST",
@@ -164,7 +161,7 @@ describe("/api/staff", () => {
         phone: "+15559990099",
         role: "teacher",
         classId: otherClass.id,
-        subject: "Math",
+        subjectId: otherSubject.id,
       }),
       headers: { "content-type": "application/json" },
     });
@@ -220,12 +217,13 @@ describe("/api/staff/[id]", () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
     const { admin, teacher } = await seedAdminAndTeacher(school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 5", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
     loginAs(admin.id, school.id);
 
     const request = new Request(`http://localhost/api/staff/${teacher.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ classId: klass.id, subject: "Math" }),
+      body: JSON.stringify({ classId: klass.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     const response = await patchStaff(request, { params: { id: String(teacher.id) } });
@@ -234,16 +232,17 @@ describe("/api/staff/[id]", () => {
     const assignment = await prisma.classTeacher.findFirst({
       where: { teacherUserId: teacher.id, academicYearId: year.id },
     });
-    expect(assignment).toMatchObject({ classId: klass.id, subject: "Math" });
+    expect(assignment).toMatchObject({ classId: klass.id, subjectId: subject.id });
   });
 
   it("clears a class assignment when role changes away from teacher", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
     const { admin, teacher } = await seedAdminAndTeacher(school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 5", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
+      data: { classId: klass.id, teacherUserId: teacher.id, subjectId: subject.id, academicYearId: year.id },
     });
     loginAs(admin.id, school.id);
 
@@ -261,14 +260,15 @@ describe("/api/staff/[id]", () => {
 
   it("rejects assigning a class to a non-teacher role with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
-    await createActiveYear(prisma, school.id);
+    const year = await createActiveYear(prisma, school.id);
     const { admin, teacher } = await seedAdminAndTeacher(school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 5", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
     loginAs(admin.id, school.id);
 
     const request = new Request(`http://localhost/api/staff/${teacher.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ role: "accountant", classId: klass.id, subject: "Math" }),
+      body: JSON.stringify({ role: "accountant", classId: klass.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
     const response = await patchStaff(request, { params: { id: String(teacher.id) } });
@@ -292,13 +292,17 @@ describe("/api/staff/[id]", () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
     const { admin, teacher } = await seedAdminAndTeacher(school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 5", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
+    const period = await prisma.period.create({
+      data: { schoolId: school.id, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
     await prisma.timetableEntry.create({
       data: {
         classId: klass.id,
         dayOfWeek: 1,
-        period: 1,
-        subject: "Math",
+        periodId: period.id,
+        subjectId: subject.id,
         teacherUserId: teacher.id,
         academicYearId: year.id,
       },
@@ -326,9 +330,10 @@ describe("/api/staff/[id]", () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
     const { admin, teacher } = await seedAdminAndTeacher(school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 5", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
     await prisma.classTeacher.create({
-      data: { classId: klass.id, teacherUserId: teacher.id, subject: "Math", academicYearId: year.id },
+      data: { classId: klass.id, teacherUserId: teacher.id, subjectId: subject.id, academicYearId: year.id },
     });
     loginAs(admin.id, school.id);
 

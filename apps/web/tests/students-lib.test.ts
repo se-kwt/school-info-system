@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
-import { createActiveYear, createEnrolledStudent } from "./helpers/enrollment";
+import { createActiveYear, createClass, createEnrolledStudent } from "./helpers/enrollment";
 import { createStudent, editStudent, listStudents } from "../src/lib/school-setup/students";
 
 describe("students.ts scalar fields", () => {
@@ -16,7 +16,7 @@ describe("students.ts scalar fields", () => {
   it("creates a student with gender, studentIdNumber, and dateOfJoin", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
 
     const result = await createStudent(prisma, school.id, year.id, {
       name: "New Student",
@@ -42,7 +42,7 @@ describe("students.ts scalar fields", () => {
   it("rejects a duplicate studentIdNumber on create with DUPLICATE_STUDENT_ID", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
     await createStudent(prisma, school.id, year.id, {
       name: "First",
       dob: "2016-01-01",
@@ -66,7 +66,7 @@ describe("students.ts scalar fields", () => {
   it("edits gender, studentIdNumber, and dateOfJoin", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
     const student = await createEnrolledStudent(prisma, {
       schoolId: school.id,
       classId: klass.id,
@@ -92,7 +92,7 @@ describe("students.ts scalar fields", () => {
   it("rejects a duplicate studentIdNumber on edit with DUPLICATE_STUDENT_ID", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
     await createStudent(prisma, school.id, year.id, {
       name: "First",
       dob: "2016-01-01",
@@ -133,7 +133,7 @@ describe("students.ts multiple parents", () => {
   it("creates a student with two parents", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
 
     const result = await createStudent(prisma, school.id, year.id, {
       name: "Two Parent Student",
@@ -158,7 +158,7 @@ describe("students.ts multiple parents", () => {
   it("rejects create with zero parents", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
 
     const result = await createStudent(prisma, school.id, year.id, {
       name: "No Parent",
@@ -173,7 +173,7 @@ describe("students.ts multiple parents", () => {
   it("reconciles parents on edit: adds, removes, and updates", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
     const createResult = await createStudent(prisma, school.id, year.id, {
       name: "Reconcile Student",
       dob: "2016-01-01",
@@ -221,7 +221,7 @@ describe("students.ts sibling links", () => {
   it("links a sibling on create and it's visible from both sides", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
     const existingSibling = await createEnrolledStudent(prisma, {
       schoolId: school.id,
       classId: klass.id,
@@ -252,7 +252,7 @@ describe("students.ts sibling links", () => {
   it("rejects a self-reference sibling with INVALID_SIBLING", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
     const student = await createEnrolledStudent(prisma, {
       schoolId: school.id,
       classId: klass.id,
@@ -274,7 +274,7 @@ describe("students.ts sibling links", () => {
   it("rejects a sibling id from another school with INVALID_SIBLING", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
     const student = await createEnrolledStudent(prisma, {
       schoolId: school.id,
       classId: klass.id,
@@ -285,7 +285,7 @@ describe("students.ts sibling links", () => {
     });
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
     const otherYear = await createActiveYear(prisma, otherSchool.id);
-    const otherClass = await prisma.class.create({ data: { schoolId: otherSchool.id, name: "Grade 3", section: "A" } });
+    const otherClass = await createClass(prisma, { schoolId: otherSchool.id, academicYearId: otherYear.id, name: "Grade 3", section: "A" });
     const otherStudent = await createEnrolledStudent(prisma, {
       schoolId: otherSchool.id,
       classId: otherClass.id,
@@ -307,7 +307,7 @@ describe("students.ts sibling links", () => {
   it("replaces the sibling set on edit", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({ data: { schoolId: school.id, name: "Grade 3", section: "A" } });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
     const siblingA = await createEnrolledStudent(prisma, {
       schoolId: school.id,
       classId: klass.id,

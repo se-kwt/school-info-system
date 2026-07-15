@@ -6,8 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { StudentsView } from "../src/components/school-setup/StudentsView";
 
 const classes = [
-  { id: 1, name: "Grade 5", section: "A" },
-  { id: 2, name: "Grade 6", section: "B" },
+  { id: 1, gradeName: "Grade 5", section: "A" },
+  { id: 2, gradeName: "Grade 6", section: "B" },
 ];
 
 const students = [
@@ -21,9 +21,9 @@ const students = [
     gender: null as null,
     studentIdNumber: null as null,
     dateOfJoin: null as null,
-    class: { name: "Grade 5", section: "A" },
+    class: { gradeName: "Grade 5", section: "A" },
     parents: [] as { relationship: string; name: string; phone: string; email: string | null }[],
-    siblings: [] as { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { name: string; section: string } | null }[],
+    siblings: [] as { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { gradeName: string; section: string } | null }[],
   },
   {
     id: 2,
@@ -35,9 +35,9 @@ const students = [
     gender: null as null,
     studentIdNumber: null as null,
     dateOfJoin: null as null,
-    class: { name: "Grade 6", section: "B" },
+    class: { gradeName: "Grade 6", section: "B" },
     parents: [] as { relationship: string; name: string; phone: string; email: string | null }[],
-    siblings: [] as { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { name: string; section: string } | null }[],
+    siblings: [] as { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { gradeName: string; section: string } | null }[],
   },
 ];
 

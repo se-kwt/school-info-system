@@ -14,7 +14,7 @@ describe("StaffCard", () => {
     phone: "+15550001111",
     role: "teacher" as const,
     status: "active" as const,
-    classAssignment: { className: "Grade 5", section: "A", subject: "Math" },
+    classAssignment: { gradeName: "Grade 5", section: "A", subjectName: "Math" },
   };
 
   it("renders the name and capitalized role", () => {

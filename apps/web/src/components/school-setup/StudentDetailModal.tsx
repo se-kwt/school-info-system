@@ -46,13 +46,13 @@ export function StudentDetailModal({
 }: {
   mode: "create" | "edit";
   student?: StudentRow;
-  classes: { id: number; name: string; section: string }[];
+  classes: { id: number; gradeName: string; section: string }[];
   allStudents: {
     id: number;
     name: string;
     admissionNo: string;
     gender: "male" | "female" | null;
-    class: { name: string; section: string } | null;
+    class: { gradeName: string; section: string } | null;
   }[];
   isAdmin: boolean;
   defaultClassId?: number;
@@ -212,7 +212,7 @@ export function StudentDetailModal({
                 {mode === "edit" && <option value="">Keep current class</option>}
                 {classes.map((klass) => (
                   <option key={klass.id} value={klass.id}>
-                    {klass.name} {klass.section}
+                    {klass.gradeName} {klass.section}
                   </option>
                 ))}
               </select>
@@ -375,7 +375,7 @@ export function StudentDetailModal({
                         id={`sibling-${index}-class`}
                         type="text"
                         aria-label="Sibling class"
-                        value={selected?.class ? `${selected.class.name} ${selected.class.section}` : ""}
+                        value={selected?.class ? `${selected.class.gradeName} ${selected.class.section}` : ""}
                         disabled
                         className="w-full rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500"
                       />

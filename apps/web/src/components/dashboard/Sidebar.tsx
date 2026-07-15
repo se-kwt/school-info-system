@@ -58,7 +58,7 @@ export function Sidebar({
 }: {
   navItems: NavItem[];
   workspaceItems: NavItem[];
-  pinnedClasses: { id: number; name: string; section: string }[];
+  pinnedClasses: { id: number; gradeName: string; section: string }[];
   userName: string;
   userInitials: string;
   userRole: string;
@@ -164,14 +164,14 @@ export function Sidebar({
                   <Link
                     href="/dashboard/classes"
                     className={navLinkClass}
-                    title={collapsed ? `${klass.name} ${klass.section}` : undefined}
+                    title={collapsed ? `${klass.gradeName} ${klass.section}` : undefined}
                   >
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-[10px] font-bold text-indigo-600">
-                      {klass.name[0]}
+                      {klass.gradeName[0]}
                     </span>
                     {!collapsed && (
                       <span className="truncate">
-                        {klass.name} {klass.section}
+                        {klass.gradeName} {klass.section}
                       </span>
                     )}
                   </Link>

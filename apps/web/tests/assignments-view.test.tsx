@@ -5,7 +5,8 @@ import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AssignmentsView } from "../src/components/assignments/AssignmentsView";
 
-const classes = [{ id: 1, name: "Grade 5", section: "A" }];
+const classes = [{ id: 1, gradeId: 1, gradeName: "Grade 5", section: "A" }];
+const subjects = [{ id: 1, name: "Math", gradeId: 1 }];
 
 function jsonResponse(body: unknown, ok = true) {
   return { ok, json: async () => body } as Response;
@@ -22,7 +23,7 @@ describe("AssignmentsView", () => {
   });
 
   it("shows an error and does not call fetch when required fields are empty", async () => {
-    render(<AssignmentsView classes={classes} role="teacher" currentUserId={1} />);
+    render(<AssignmentsView classes={classes} subjects={subjects} role="teacher" currentUserId={1} />);
     await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
 
     const callsBefore = vi.mocked(fetch).mock.calls.length;
@@ -44,10 +45,10 @@ describe("AssignmentsView", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<AssignmentsView classes={classes} role="teacher" currentUserId={1} />);
+    render(<AssignmentsView classes={classes} subjects={subjects} role="teacher" currentUserId={1} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
-    await userEvent.type(screen.getByLabelText("Subject"), "Math");
+    await userEvent.selectOptions(screen.getByLabelText("Subject"), "Math");
     await userEvent.type(screen.getByLabelText("Title"), "Worksheet 1");
     await userEvent.type(screen.getByLabelText("Due date"), "2026-08-01");
 
@@ -76,10 +77,10 @@ describe("AssignmentsView", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<AssignmentsView classes={classes} role="teacher" currentUserId={1} />);
+    render(<AssignmentsView classes={classes} subjects={subjects} role="teacher" currentUserId={1} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
-    await userEvent.type(screen.getByLabelText("Subject"), "Math");
+    await userEvent.selectOptions(screen.getByLabelText("Subject"), "Math");
     await userEvent.type(screen.getByLabelText("Title"), "Worksheet 1");
     await userEvent.type(screen.getByLabelText("Due date"), "2026-08-01");
 

@@ -5,7 +5,7 @@ import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MarksView } from "../src/components/marks/MarksView";
 
-const classes = [{ id: 1, name: "Grade 5", section: "A" }];
+const classes = [{ id: 1, gradeName: "Grade 5", section: "A" }];
 
 function mockExamCreationFlow() {
   return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {

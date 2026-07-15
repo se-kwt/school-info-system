@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
-import { createActiveYear, createEnrolledStudent } from "./helpers/enrollment";
+import { createActiveYear, createClass, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getClasses, POST as postClasses } from "../src/app/api/classes/route";
 import { PATCH as patchClass, DELETE as deleteClassRoute } from "../src/app/api/classes/[id]/route";
@@ -39,31 +39,37 @@ describe("/api/classes", () => {
   it("creates a class and lists it", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
+    const year = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 6" } });
 
     const postRequest = new Request("http://localhost/api/classes", {
       method: "POST",
-      body: JSON.stringify({ name: "Grade 6", section: "B" }),
+      body: JSON.stringify({ gradeId: grade.id, section: "B", academicYearId: year.id }),
       headers: { "content-type": "application/json" },
     });
     const postResponse = await postClasses(postRequest);
     expect(postResponse.status).toBe(201);
     const created = await postResponse.json();
-    expect(created).toMatchObject({ name: "Grade 6", section: "B" });
+    expect(created).toMatchObject({ gradeId: grade.id, gradeName: "Grade 6", section: "B", academicYearId: year.id });
 
     const getResponse = await getClasses(new Request("http://localhost/api/classes"));
     expect(getResponse.status).toBe(200);
     const list = await getResponse.json();
-    expect(list).toEqual([{ id: created.id, name: "Grade 6", section: "B", archived: false }]);
+    expect(list).toEqual([
+      { id: created.id, gradeId: grade.id, gradeName: "Grade 6", section: "B", academicYearId: year.id, archived: false },
+    ]);
   });
 
-  it("rejects a duplicate name+section with 409", async () => {
+  it("rejects a duplicate grade+section+year with 409", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
-    await prisma.class.create({ data: { schoolId: school.id, name: "Grade 6", section: "B" } });
+    const year = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 6" } });
+    await prisma.class.create({ data: { schoolId: school.id, gradeId: grade.id, section: "B", academicYearId: year.id } });
 
     const postRequest = new Request("http://localhost/api/classes", {
       method: "POST",
-      body: JSON.stringify({ name: "Grade 6", section: "B" }),
+      body: JSON.stringify({ gradeId: grade.id, section: "B", academicYearId: year.id }),
       headers: { "content-type": "application/json" },
     });
     const postResponse = await postClasses(postRequest);
@@ -73,10 +79,11 @@ describe("/api/classes", () => {
   it("rejects a missing field with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 6" } });
 
     const postRequest = new Request("http://localhost/api/classes", {
       method: "POST",
-      body: JSON.stringify({ name: "Grade 6" }),
+      body: JSON.stringify({ gradeId: grade.id }),
       headers: { "content-type": "application/json" },
     });
     const postResponse = await postClasses(postRequest);
@@ -104,16 +111,16 @@ describe("/api/classes", () => {
   it("excludes archived classes by default but includes them with includeArchived=true", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
-    const active = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 9", section: "A" },
-    });
-    await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 10", section: "A", archived: true },
-    });
+    const year = await createActiveYear(prisma, school.id);
+    const active = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
+    const archived = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 10", section: "A" });
+    await prisma.class.update({ where: { id: archived.id }, data: { archived: true } });
 
     const defaultResponse = await getClasses(new Request("http://localhost/api/classes"));
     const defaultList = await defaultResponse.json();
-    expect(defaultList).toEqual([{ id: active.id, name: "Grade 9", section: "A", archived: false }]);
+    expect(defaultList).toEqual([
+      { id: active.id, gradeId: active.gradeId, gradeName: "Grade 9", section: "A", academicYearId: year.id, archived: false },
+    ]);
 
     const allResponse = await getClasses(new Request("http://localhost/api/classes?includeArchived=true"));
     const allList = await allResponse.json();
@@ -140,16 +147,15 @@ describe("/api/classes/[id]", () => {
     cookieStore.get.mockReturnValue({ value: token });
   }
 
-  it("edits a class's name and section", async () => {
+  it("edits a class's section", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 9", section: "A" },
-    });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ name: "Grade 9", section: "B" }),
+      body: JSON.stringify({ section: "B" }),
       headers: { "content-type": "application/json" },
     });
     const response = await patchClass(request, { params: { id: String(klass.id) } });
@@ -159,13 +165,13 @@ describe("/api/classes/[id]", () => {
     expect(updated?.section).toBe("B");
   });
 
-  it("rejects an edit that collides with another class's name+section", async () => {
+  it("rejects an edit that collides with another class's grade+section+year", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
-    await prisma.class.create({ data: { schoolId: school.id, name: "Grade 9", section: "B" } });
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 9", section: "A" },
-    });
+    const year = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 9" } });
+    await prisma.class.create({ data: { schoolId: school.id, gradeId: grade.id, section: "B", academicYearId: year.id } });
+    const klass = await prisma.class.create({ data: { schoolId: school.id, gradeId: grade.id, section: "A", academicYearId: year.id } });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}`, {
       method: "PATCH",
@@ -179,9 +185,8 @@ describe("/api/classes/[id]", () => {
   it("deletes a class with zero history", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 9", section: "A" },
-    });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}`, { method: "DELETE" });
     const response = await deleteClassRoute(request, { params: { id: String(klass.id) } });
@@ -195,9 +200,7 @@ describe("/api/classes/[id]", () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
     const year = await createActiveYear(prisma, school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 9", section: "A" },
-    });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
     await createEnrolledStudent(prisma, {
       schoolId: school.id,
       classId: klass.id,
@@ -220,9 +223,8 @@ describe("/api/classes/[id]", () => {
   it("archives a class", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 9", section: "A" },
-    });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}/archive`, { method: "PATCH" });
     const response = await archiveClassRoute(request, { params: { id: String(klass.id) } });
@@ -235,9 +237,9 @@ describe("/api/classes/[id]", () => {
   it("unarchives a class", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
-    const klass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 9", section: "A", archived: true },
-    });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
+    await prisma.class.update({ where: { id: klass.id }, data: { archived: true } });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}/unarchive`, { method: "PATCH" });
     const response = await unarchiveClassRoute(request, { params: { id: String(klass.id) } });
@@ -251,9 +253,9 @@ describe("/api/classes/[id]", () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
-    const otherClass = await prisma.class.create({
-      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A", archived: true },
-    });
+    const otherYear = await createActiveYear(prisma, otherSchool.id);
+    const otherClass = await createClass(prisma, { schoolId: otherSchool.id, academicYearId: otherYear.id, name: "Grade 1", section: "A" });
+    await prisma.class.update({ where: { id: otherClass.id }, data: { archived: true } });
 
     const request = new Request(`http://localhost/api/classes/${otherClass.id}/unarchive`, {
       method: "PATCH",
@@ -266,14 +268,13 @@ describe("/api/classes/[id]", () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
-    const otherClass = await prisma.class.create({
-      data: { schoolId: otherSchool.id, name: "Grade 1", section: "A" },
-    });
+    const otherYear = await createActiveYear(prisma, otherSchool.id);
+    const otherClass = await createClass(prisma, { schoolId: otherSchool.id, academicYearId: otherYear.id, name: "Grade 1", section: "A" });
 
     const patchResponse = await patchClass(
       new Request(`http://localhost/api/classes/${otherClass.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: "Hijack" }),
+        body: JSON.stringify({ section: "Z" }),
         headers: { "content-type": "application/json" },
       }),
       { params: { id: String(otherClass.id) } }

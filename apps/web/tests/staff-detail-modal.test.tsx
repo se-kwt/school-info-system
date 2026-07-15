@@ -5,7 +5,8 @@ import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StaffDetailModal } from "../src/components/school-setup/StaffDetailModal";
 
-const classes = [{ id: 1, name: "Grade 5", section: "A" }];
+const classes = [{ id: 1, gradeId: 10, gradeName: "Grade 5", section: "A" }];
+const subjects = [{ id: 1, name: "Science", gradeId: 10 }];
 
 const existingStaff = {
   id: 2,
@@ -13,7 +14,7 @@ const existingStaff = {
   phone: "+15550001111",
   role: "teacher" as const,
   status: "active" as const,
-  classAssignment: { className: "Grade 5", section: "A", subject: "Math" },
+  classAssignment: { gradeName: "Grade 5", section: "A", subjectName: "Math" },
 };
 
 function noop() {}
@@ -27,6 +28,7 @@ describe("StaffDetailModal", () => {
       <StaffDetailModal
         mode="create"
         classes={classes}
+        subjects={subjects}
         isSelf={false}
         serverError={null}
         deleteBlocked={false}
@@ -42,7 +44,7 @@ describe("StaffDetailModal", () => {
     await userEvent.type(screen.getByLabelText("Name"), "New Teacher");
     await userEvent.type(screen.getByLabelText("Phone"), "+15559998888");
     await userEvent.selectOptions(screen.getByLabelText("Class assignment"), "1");
-    await userEvent.type(screen.getByLabelText("Subject"), "Science");
+    await userEvent.selectOptions(screen.getByLabelText("Subject"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onSave).toHaveBeenCalledWith({
@@ -50,7 +52,7 @@ describe("StaffDetailModal", () => {
       phone: "+15559998888",
       role: "teacher",
       classId: 1,
-      subject: "Science",
+      subjectId: 1,
     });
   });
 
@@ -60,6 +62,7 @@ describe("StaffDetailModal", () => {
       <StaffDetailModal
         mode="create"
         classes={classes}
+        subjects={subjects}
         isSelf={false}
         serverError={null}
         deleteBlocked={false}
@@ -83,7 +86,7 @@ describe("StaffDetailModal", () => {
       phone: "+15559998888",
       role: "admin",
       classId: null,
-      subject: null,
+      subjectId: null,
     });
   });
 
@@ -93,6 +96,7 @@ describe("StaffDetailModal", () => {
         mode="edit"
         staff={existingStaff}
         classes={classes}
+        subjects={subjects}
         isSelf={false}
         serverError={null}
         deleteBlocked={false}
@@ -115,6 +119,7 @@ describe("StaffDetailModal", () => {
         mode="edit"
         staff={existingStaff}
         classes={classes}
+        subjects={subjects}
         isSelf={true}
         serverError={null}
         deleteBlocked={false}
@@ -136,6 +141,7 @@ describe("StaffDetailModal", () => {
         mode="edit"
         staff={existingStaff}
         classes={classes}
+        subjects={subjects}
         isSelf={false}
         serverError={null}
         deleteBlocked={false}
@@ -159,6 +165,7 @@ describe("StaffDetailModal", () => {
         mode="edit"
         staff={existingStaff}
         classes={classes}
+        subjects={subjects}
         isSelf={false}
         serverError={null}
         deleteBlocked={true}
@@ -184,6 +191,7 @@ describe("StaffDetailModal", () => {
         mode="edit"
         staff={{ ...existingStaff, status: "inactive" }}
         classes={classes}
+        subjects={subjects}
         isSelf={false}
         serverError={null}
         deleteBlocked={false}
@@ -204,6 +212,7 @@ describe("StaffDetailModal", () => {
       <StaffDetailModal
         mode="create"
         classes={classes}
+        subjects={subjects}
         isSelf={false}
         serverError="This phone number is already registered"
         deleteBlocked={false}

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
+import { createClass } from "./helpers/enrollment";
 
 describe("startOrResumePromotionRun", () => {
   beforeEach(async () => {
@@ -25,11 +26,17 @@ describe("startOrResumePromotionRun", () => {
     const admin = await prisma.user.create({
       data: { phone: "+15550991111", role: "admin", name: "Test Admin", schoolId: school.id },
     });
-    const gradeOne = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 1", section: "A" },
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
     });
-    const gradeTwo = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 2", section: "A" },
+    const gradeTwo = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 2",
+      section: "A",
     });
     const student = await prisma.student.create({
       data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-1" },
@@ -158,11 +165,17 @@ describe("updateMappings", () => {
     const admin = await prisma.user.create({
       data: { phone: "+15550981111", role: "admin", name: "Test Admin", schoolId: school.id },
     });
-    const gradeOne = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 1", section: "A" },
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
     });
-    const gradeTwo = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 2", section: "A" },
+    const gradeTwo = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 2",
+      section: "A",
     });
     const student = await prisma.student.create({
       data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-2" },
@@ -230,8 +243,11 @@ describe("updateMappings", () => {
     const admin = await prisma.user.create({
       data: { phone: "+15550982222", role: "admin", name: "Test Admin", schoolId: school.id },
     });
-    const unrelatedClass = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 9", section: "Z" },
+    const unrelatedClass = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 9",
+      section: "Z",
     });
     void fromYear;
 
@@ -285,11 +301,17 @@ describe("getRosterForReview / setStudentDecisions / getRunSummary", () => {
     const admin = await prisma.user.create({
       data: { phone: "+15550971111", role: "admin", name: "Test Admin", schoolId: school.id },
     });
-    const gradeOne = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 1", section: "A" },
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
     });
-    const gradeTwo = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 2", section: "A" },
+    const gradeTwo = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 2",
+      section: "A",
     });
     const studentA = await prisma.student.create({
       data: { schoolId: school.id, name: "Student A", dob: new Date("2016-01-01"), admissionNo: "SCH-A" },
@@ -434,11 +456,17 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
     const admin = await prisma.user.create({
       data: { phone: "+15550961111", role: "admin", name: "Test Admin", schoolId: school.id },
     });
-    const gradeOne = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 1", section: "A" },
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
     });
-    const gradeTwo = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 2", section: "A" },
+    const gradeTwo = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 2",
+      section: "A",
     });
     const promotedStudent = await prisma.student.create({
       data: { schoolId: school.id, name: "Promoted Student", dob: new Date("2016-01-01"), admissionNo: "SCH-P" },
@@ -566,8 +594,11 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
     const admin = await prisma.user.create({
       data: { phone: "+15550962222", role: "admin", name: "Test Admin", schoolId: school.id },
     });
-    const gradeOne = await prisma.class.create({
-      data: { schoolId: school.id, name: "Grade 1", section: "A" },
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
     });
     const student = await prisma.student.create({
       data: { schoolId: school.id, name: "Undecided Student", dob: new Date("2016-01-01"), admissionNo: "SCH-U" },

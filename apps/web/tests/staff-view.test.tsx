@@ -5,7 +5,8 @@ import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StaffView } from "../src/components/school-setup/StaffView";
 
-const classes = [{ id: 1, name: "Grade 5", section: "A" }];
+const classes = [{ id: 1, gradeId: 10, gradeName: "Grade 5", section: "A" }];
+const subjects = [{ id: 1, name: "Math", gradeId: 10 }];
 
 const staff = [
   {
@@ -22,7 +23,7 @@ const staff = [
     phone: "+15550001111",
     role: "teacher" as const,
     status: "active" as const,
-    classAssignment: { className: "Grade 5", section: "A", subject: "Math" },
+    classAssignment: { gradeName: "Grade 5", section: "A", subjectName: "Math" },
   },
 ];
 
@@ -30,13 +31,13 @@ describe("StaffView", () => {
   afterEach(() => cleanup());
 
   it("renders one card per staff member", () => {
-    render(<StaffView initialStaff={staff} classes={classes} currentUserId={1} />);
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
     expect(screen.getByText("Current Admin")).toBeInTheDocument();
     expect(screen.getByText("Jane Teacher")).toBeInTheDocument();
   });
 
   it("filters the grid by role", async () => {
-    render(<StaffView initialStaff={staff} classes={classes} currentUserId={1} />);
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
     await userEvent.selectOptions(screen.getByLabelText("Filter by role"), "teacher");
     expect(screen.queryByText("Current Admin")).not.toBeInTheDocument();
     expect(screen.getByText("Jane Teacher")).toBeInTheDocument();
@@ -51,7 +52,7 @@ describe("StaffView", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(staff), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<StaffView initialStaff={staff} classes={classes} currentUserId={1} />);
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
     await userEvent.click(screen.getByRole("button", { name: "Add new staff" }));
     await userEvent.type(screen.getByLabelText("Name"), "New Person");
     await userEvent.type(screen.getByLabelText("Phone"), "+15559997777");
@@ -70,7 +71,7 @@ describe("StaffView", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(staff), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<StaffView initialStaff={staff} classes={classes} currentUserId={1} />);
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
     await userEvent.click(screen.getByRole("button", { name: /Jane Teacher/ }));
     const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
     await userEvent.clear(nameInput);
@@ -92,7 +93,7 @@ describe("StaffView", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(staff), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<StaffView initialStaff={staff} classes={classes} currentUserId={1} />);
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
     await userEvent.click(screen.getByRole("button", { name: /Jane Teacher/ }));
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
 
@@ -109,7 +110,7 @@ describe("StaffView", () => {
   });
 
   it("hides Delete on the current user's own card", async () => {
-    render(<StaffView initialStaff={staff} classes={classes} currentUserId={1} />);
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
     await userEvent.click(screen.getByRole("button", { name: /Current Admin/ }));
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });

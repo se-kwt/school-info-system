@@ -30,7 +30,7 @@ export async function getParentFeesHistory(
       })),
     },
     include: {
-      class: true,
+      class: { include: { grade: true } },
       academicYear: true,
       payments: { where: { studentId } },
     },
@@ -42,7 +42,7 @@ export async function getParentFeesHistory(
     return {
       id: structure.id,
       term: structure.term,
-      className: `${structure.class.name} ${structure.class.section}`,
+      className: `${structure.class.grade.name} ${structure.class.section}`,
       academicYearName: structure.academicYear.name,
       amount: structure.amount,
       amountPaid: payment?.amountPaid ?? 0,

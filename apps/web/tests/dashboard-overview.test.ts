@@ -17,8 +17,16 @@ describe("getDashboardOverview", () => {
   it("scopes a teacher's overview to only their assigned classes", async () => {
     const fixtures = await createSeedFixtures(prisma);
 
+    const otherGrade = await prisma.grade.create({
+      data: { schoolId: fixtures.school.id, name: "Grade 6" },
+    });
     const otherClass = await prisma.class.create({
-      data: { schoolId: fixtures.school.id, name: "Grade 6", section: "B" },
+      data: {
+        schoolId: fixtures.school.id,
+        gradeId: otherGrade.id,
+        section: "B",
+        academicYearId: fixtures.academicYear.id,
+      },
     });
     const otherStudent = await prisma.student.create({
       data: {
@@ -56,8 +64,16 @@ describe("getDashboardOverview", () => {
   it("scopes an admin's overview to every class in the school", async () => {
     const fixtures = await createSeedFixtures(prisma);
 
+    const otherGrade = await prisma.grade.create({
+      data: { schoolId: fixtures.school.id, name: "Grade 6" },
+    });
     const otherClass = await prisma.class.create({
-      data: { schoolId: fixtures.school.id, name: "Grade 6", section: "B" },
+      data: {
+        schoolId: fixtures.school.id,
+        gradeId: otherGrade.id,
+        section: "B",
+        academicYearId: fixtures.academicYear.id,
+      },
     });
     const otherStudent = await prisma.student.create({
       data: {
