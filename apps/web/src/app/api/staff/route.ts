@@ -33,9 +33,9 @@ export async function POST(request: Request) {
     let phone: string | undefined;
     let role: unknown;
     let classId: number | undefined;
-    let subject: string | undefined;
+    let subjectId: number | undefined;
     try {
-      ({ name, phone, role, classId, subject } = await request.json());
+      ({ name, phone, role, classId, subjectId } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -44,9 +44,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "name, phone, and role are required" }, { status: 400 });
     }
 
-    if (classId && !subject) {
+    if (classId && !subjectId) {
       return NextResponse.json(
-        { error: "subject is required when assigning a class" },
+        { error: "subjectId is required when assigning a class" },
         { status: 400 }
       );
     }
@@ -61,11 +61,14 @@ export async function POST(request: Request) {
       phone,
       role,
       classId,
-      subject,
+      subjectId,
     });
     if (!result.ok) {
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
+      }
+      if (result.error === "INVALID_SUBJECT") {
+        return NextResponse.json({ error: "This subject does not belong to the class's grade" }, { status: 400 });
       }
       return NextResponse.json({ error: "This phone number is already registered" }, { status: 409 });
     }

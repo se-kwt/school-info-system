@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       phone?: string;
       role?: "teacher" | "admin" | "accountant";
       classId?: number | null;
-      subject?: string | null;
+      subjectId?: number | null;
     };
     try {
       body = await request.json();
@@ -44,11 +44,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
       }
+      if (result.error === "INVALID_SUBJECT") {
+        return NextResponse.json({ error: "This subject does not belong to the class's grade" }, { status: 400 });
+      }
       if (result.error === "ROLE_CLASS_MISMATCH") {
         return NextResponse.json({ error: "Only a teacher can have a class assignment" }, { status: 400 });
       }
       if (result.error === "SUBJECT_REQUIRED") {
-        return NextResponse.json({ error: "subject is required when assigning a class" }, { status: 400 });
+        return NextResponse.json({ error: "subjectId is required when assigning a class" }, { status: 400 });
       }
       return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
     }
