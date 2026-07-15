@@ -9,7 +9,8 @@
     "test": "vitest run",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:test": "dotenv -e .env.test -- prisma migrate deploy",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "backfill:grades": "tsx scripts/run-backfill.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
