@@ -66,4 +66,27 @@ describe("runBackfill", () => {
 
     void admin;
   });
+
+  it("is idempotent — running twice produces no duplicates", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School 2" } });
+    const admin = await prisma.user.create({
+      data: { schoolId: school.id, phone: "+10000000010", role: "admin", name: "Admin2" },
+    });
+    const year = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-06-01"), endDate: new Date("2027-04-30"), status: "active" },
+    });
+    const klass = await prisma.class.create({
+      data: { schoolId: school.id, name: "Grade 2", section: "B" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: klass.id, teacherUserId: admin.id, subject: "Science", academicYearId: year.id },
+    });
+
+    await runBackfill(prisma);
+    await runBackfill(prisma);
+
+    expect(await prisma.grade.count({ where: { schoolId: school.id } })).toBe(1);
+    expect(await prisma.subject.count()).toBeGreaterThanOrEqual(1);
+    expect(await prisma.syllabusVersion.count()).toBeGreaterThanOrEqual(1);
+  });
 });
