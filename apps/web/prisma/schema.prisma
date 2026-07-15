@@ -147,7 +147,7 @@ model Period {
 
 model PeriodDayOverride {
   id        Int    @id @default(autoincrement())
-  period    Period @relation(fields: [periodId], references: [id])
+  period    Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
   periodId  Int
   dayOfWeek Int
   startTime String
@@ -243,7 +243,6 @@ model Class {
   mappingsTo       PromotionMapping[] @relation("MappingTo")
 
   @@unique([schoolId, name, section])
-  @@unique([gradeId, section, academicYearId])
 }
 
 model ClassTeacher {
