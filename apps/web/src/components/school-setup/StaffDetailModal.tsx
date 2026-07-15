@@ -11,13 +11,14 @@ export interface SaveStaffFields {
   phone: string;
   role: Role;
   classId: number | null;
-  subject: string | null;
+  subjectId: number | null;
 }
 
 export function StaffDetailModal({
   mode,
   staff,
   classes,
+  subjects,
   isSelf,
   serverError,
   deleteBlocked,
@@ -30,7 +31,8 @@ export function StaffDetailModal({
 }: {
   mode: "create" | "edit";
   staff?: StaffRow;
-  classes: { id: number; name: string; section: string }[];
+  classes: { id: number; gradeId: number; gradeName: string; section: string }[];
+  subjects: { id: number; name: string; gradeId: number }[];
   isSelf: boolean;
   serverError: string | null;
   deleteBlocked: boolean;
@@ -45,7 +47,10 @@ export function StaffDetailModal({
   const [phone, setPhone] = useState(staff?.phone ?? "");
   const [role, setRole] = useState<Role>(staff?.role ?? "teacher");
   const [classId, setClassId] = useState("");
-  const [subject, setSubject] = useState(staff?.classAssignment?.subject ?? "");
+  const [subjectId, setSubjectId] = useState("");
+
+  const selectedClass = classes.find((klass) => String(klass.id) === classId);
+  const availableSubjects = selectedClass ? subjects.filter((s) => s.gradeId === selectedClass.gradeId) : [];
 
   function handleSave() {
     onSave({
@@ -53,7 +58,7 @@ export function StaffDetailModal({
       phone,
       role,
       classId: role === "teacher" && classId ? Number(classId) : null,
-      subject: role === "teacher" && classId ? subject : null,
+      subjectId: role === "teacher" && classId && subjectId ? Number(subjectId) : null,
     });
   }
 
@@ -95,24 +100,29 @@ export function StaffDetailModal({
             <select
               aria-label="Class assignment"
               value={classId}
-              onChange={(event) => setClassId(event.target.value)}
+              onChange={(event) => { setClassId(event.target.value); setSubjectId(""); }}
               className="rounded border border-gray-300 px-3 py-2 text-sm"
             >
               <option value="">No class assignment</option>
               {classes.map((klass) => (
                 <option key={klass.id} value={klass.id}>
-                  {klass.name} {klass.section}
+                  {klass.gradeName} {klass.section}
                 </option>
               ))}
             </select>
-            <input
-              type="text"
-              aria-label="Subject"
-              value={subject}
-              onChange={(event) => setSubject(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm"
-              placeholder="Subject (required if assigning a class)"
-            />
+            {classId && (
+              <select
+                aria-label="Subject"
+                value={subjectId}
+                onChange={(event) => setSubjectId(event.target.value)}
+                className="rounded border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">Select subject</option>
+                {availableSubjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>{subject.name}</option>
+                ))}
+              </select>
+            )}
           </>
         )}
       </div>

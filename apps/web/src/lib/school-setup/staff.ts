@@ -9,7 +9,7 @@ export interface StaffSummary {
   phone: string;
   role: StaffRole;
   status: "active" | "inactive";
-  classAssignment: { className: string; section: string; subject: string } | null;
+  classAssignment: { gradeName: string; section: string; subjectName: string } | null;
 }
 
 export async function listStaff(prisma: PrismaClient, schoolId: number): Promise<StaffSummary[]> {
@@ -19,7 +19,7 @@ export async function listStaff(prisma: PrismaClient, schoolId: number): Promise
     include: {
       classesTaught: {
         where: activeYear ? { academicYearId: activeYear.id } : { id: -1 },
-        include: { class: true },
+        include: { class: { include: { grade: true } }, subject: true },
         take: 1,
       },
     },
@@ -35,7 +35,7 @@ export async function listStaff(prisma: PrismaClient, schoolId: number): Promise
       role: user.role as StaffRole,
       status: user.status,
       classAssignment: assignment
-        ? { className: assignment.class.name, section: assignment.class.section, subject: assignment.subject }
+        ? { gradeName: assignment.class.grade.name, section: assignment.class.section, subjectName: assignment.subject.name }
         : null,
     };
   });
@@ -44,20 +44,26 @@ export async function listStaff(prisma: PrismaClient, schoolId: number): Promise
 export type CreateStaffResult =
   | { ok: true; staff: { id: number; name: string; phone: string; role: Role } }
   | { ok: false; error: "DUPLICATE_PHONE" }
-  | { ok: false; error: "INVALID_CLASS" };
+  | { ok: false; error: "INVALID_CLASS" }
+  | { ok: false; error: "INVALID_SUBJECT" };
 
 export async function createStaff(
   prisma: PrismaClient,
   schoolId: number,
   academicYearId: number,
-  input: { name: string; phone: string; role: Role; classId?: number; subject?: string }
+  input: { name: string; phone: string; role: Role; classId?: number; subjectId?: number }
 ): Promise<CreateStaffResult> {
   const existing = await prisma.user.findUnique({ where: { phone: input.phone } });
   if (existing) return { ok: false, error: "DUPLICATE_PHONE" };
 
+  let targetClass = null;
   if (input.role === "teacher" && input.classId) {
-    const targetClass = await prisma.class.findFirst({ where: { id: input.classId, schoolId } });
+    targetClass = await prisma.class.findFirst({ where: { id: input.classId, schoolId } });
     if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
+    if (input.subjectId) {
+      const subject = await prisma.subject.findFirst({ where: { id: input.subjectId, gradeId: targetClass.gradeId } });
+      if (!subject) return { ok: false, error: "INVALID_SUBJECT" };
+    }
   }
 
   try {
@@ -66,12 +72,12 @@ export async function createStaff(
         data: { schoolId, name: input.name, phone: input.phone, role: input.role },
       });
 
-      if (input.role === "teacher" && input.classId && input.subject) {
+      if (input.role === "teacher" && input.classId && input.subjectId) {
         await tx.classTeacher.create({
           data: {
             classId: input.classId,
             teacherUserId: created.id,
-            subject: input.subject,
+            subjectId: input.subjectId,
             academicYearId,
           },
         });
@@ -92,6 +98,7 @@ export type EditStaffResult =
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "DUPLICATE_PHONE" }
   | { ok: false; error: "INVALID_CLASS" }
+  | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "ROLE_CLASS_MISMATCH" }
   | { ok: false; error: "SUBJECT_REQUIRED" }
   | { ok: false; error: "NO_ACTIVE_YEAR" };
@@ -107,7 +114,7 @@ export async function editStaff(
       phone?: string;
       role?: Role;
       classId?: number | null;
-      subject?: string | null;
+      subjectId?: number | null;
     };
   }
 ): Promise<EditStaffResult> {
@@ -123,13 +130,14 @@ export async function editStaff(
   const assigningClass = params.fields.classId !== undefined && params.fields.classId !== null;
 
   if (assigningClass && nextRole !== "teacher") return { ok: false, error: "ROLE_CLASS_MISMATCH" };
-  if (assigningClass && !params.fields.subject) return { ok: false, error: "SUBJECT_REQUIRED" };
+  if (assigningClass && !params.fields.subjectId) return { ok: false, error: "SUBJECT_REQUIRED" };
+  let targetClass = null;
   if (assigningClass) {
-    const targetClass = await prisma.class.findFirst({
-      where: { id: params.fields.classId as number, schoolId: params.schoolId },
-    });
+    targetClass = await prisma.class.findFirst({ where: { id: params.fields.classId as number, schoolId: params.schoolId } });
     if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
     if (!params.academicYearId) return { ok: false, error: "NO_ACTIVE_YEAR" };
+    const subject = await prisma.subject.findFirst({ where: { id: params.fields.subjectId as number, gradeId: targetClass.gradeId } });
+    if (!subject) return { ok: false, error: "INVALID_SUBJECT" };
   }
 
   await prisma.$transaction(async (tx) => {
@@ -153,7 +161,7 @@ export async function editStaff(
         data: {
           classId: params.fields.classId as number,
           teacherUserId: params.userId,
-          subject: params.fields.subject as string,
+          subjectId: params.fields.subjectId as number,
           academicYearId: params.academicYearId,
         },
       });

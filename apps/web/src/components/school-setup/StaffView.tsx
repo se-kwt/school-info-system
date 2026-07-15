@@ -10,10 +10,12 @@ type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
 export function StaffView({
   initialStaff,
   classes,
+  subjects,
   currentUserId,
 }: {
   initialStaff: StaffRow[];
-  classes: { id: number; name: string; section: string }[];
+  classes: { id: number; gradeId: number; gradeName: string; section: string }[];
+  subjects: { id: number; name: string; gradeId: number }[];
   currentUserId: number;
 }) {
   const [staff, setStaff] = useState(initialStaff);
@@ -58,7 +60,7 @@ export function StaffView({
           phone: fields.phone,
           role: fields.role,
           classId: fields.classId ?? undefined,
-          subject: fields.subject ?? undefined,
+          subjectId: fields.subjectId ?? undefined,
         }),
       });
       if (response.status === 201) {
@@ -79,7 +81,7 @@ export function StaffView({
           phone: fields.phone,
           role: fields.role,
           classId: fields.classId,
-          subject: fields.subject,
+          subjectId: fields.subjectId,
         }),
       });
       if (response.ok) {
@@ -167,6 +169,7 @@ export function StaffView({
           mode={modalState.mode}
           staff={editingStaff}
           classes={classes}
+          subjects={subjects}
           isSelf={modalState.mode === "edit" && modalState.id === currentUserId}
           serverError={error}
           deleteBlocked={modalState.mode === "edit" && deleteBlockedId === modalState.id}

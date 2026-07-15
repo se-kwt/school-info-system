@@ -8,7 +8,7 @@ export interface StaffRow {
   phone: string;
   role: Role;
   status: "active" | "inactive";
-  classAssignment: { className: string; section: string; subject: string } | null;
+  classAssignment: { gradeName: string; section: string; subjectName: string } | null;
 }
 
 function initials(name: string): string {
@@ -35,8 +35,7 @@ export function StaffCard({ member, onClick }: { member: StaffRow; onClick: () =
       <span className="text-[11px] capitalize text-neutral-400">{member.role}</span>
       {member.role === "teacher" && member.classAssignment && (
         <span className="text-[11px] text-neutral-400">
-          {member.classAssignment.className} {member.classAssignment.section} ·{" "}
-          {member.classAssignment.subject}
+          {member.classAssignment.gradeName} {member.classAssignment.section} · {member.classAssignment.subjectName}
         </span>
       )}
       {member.status === "inactive" && (
