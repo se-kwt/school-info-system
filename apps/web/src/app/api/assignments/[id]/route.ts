@@ -14,7 +14,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     let body: {
-      subject?: string;
+      subjectId?: number;
       title?: string;
       description?: string;
       dueDate?: string;
@@ -28,7 +28,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     if (
-      body.subject === undefined &&
+      body.subjectId === undefined &&
       body.title === undefined &&
       body.description === undefined &&
       body.dueDate === undefined &&

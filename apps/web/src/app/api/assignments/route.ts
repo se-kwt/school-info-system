@@ -53,22 +53,22 @@ export async function POST(request: Request) {
     const claims = requireApiRole(["teacher"]);
 
     let classId: number | undefined;
-    let subject: string | undefined;
+    let subjectId: number | undefined;
     let title: string | undefined;
     let description: string | undefined;
     let dueDate: string | undefined;
     let attachmentUrl: string | undefined;
     let attachmentName: string | undefined;
     try {
-      ({ classId, subject, title, description, dueDate, attachmentUrl, attachmentName } =
+      ({ classId, subjectId, title, description, dueDate, attachmentUrl, attachmentName } =
         await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!classId || !subject || !title || !dueDate) {
+    if (!classId || !subjectId || !title || !dueDate) {
       return NextResponse.json(
-        { error: "classId, subject, title, and dueDate are required" },
+        { error: "classId, subjectId, title, and dueDate are required" },
         { status: 400 }
       );
     }
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     const result = await createAssignment(prisma, {
       classId,
       teacherUserId: claims.userId,
-      subject,
+      subjectId,
       title,
       description,
       dueDate,
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     });
 
     if (!result.ok) {
-      return NextResponse.json({ error: "You are not assigned to this class" }, { status: 403 });
+      return NextResponse.json({ error: "You are not assigned to this class and subject" }, { status: 403 });
     }
 
     return NextResponse.json({ id: result.id });
