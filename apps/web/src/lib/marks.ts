@@ -8,62 +8,55 @@ export interface MarkCell {
   grade: string;
 }
 
+export interface SubjectOption {
+  id: number;
+  name: string;
+}
+
 export interface MarksStudentRow {
   studentId: number;
   name: string;
-  marks: Record<string, MarkCell | null>;
+  marks: Record<number, MarkCell | null>;
 }
 
 export type GetMarksResult =
-  | { ok: true; subjects: string[]; students: MarksStudentRow[] }
+  | { ok: true; subjects: SubjectOption[]; students: MarksStudentRow[] }
   | { ok: false; error: "NOT_ASSIGNED" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_EXAM" };
 
 export async function getMarksForClassExam(
   prisma: PrismaClient,
-  params: {
-    classId: number;
-    examId: number;
-    schoolId: number;
-    academicYearId: number;
-    role: SessionClaims["role"];
-    userId: number;
-  }
+  params: { classId: number; examId: number; schoolId: number; academicYearId: number; role: SessionClaims["role"]; userId: number }
 ): Promise<GetMarksResult> {
   if (params.role === "teacher") {
     const link = await prisma.classTeacher.findFirst({
-      where: {
-        classId: params.classId,
-        teacherUserId: params.userId,
-        academicYearId: params.academicYearId,
-      },
+      where: { classId: params.classId, teacherUserId: params.userId, academicYearId: params.academicYearId },
     });
     if (!link) return { ok: false, error: "NOT_ASSIGNED" };
   } else {
-    const klass = await prisma.class.findFirst({
-      where: { id: params.classId, schoolId: params.schoolId },
-    });
+    const klass = await prisma.class.findFirst({ where: { id: params.classId, schoolId: params.schoolId } });
     if (!klass) return { ok: false, error: "INVALID_CLASS" };
   }
 
   const exam = await prisma.exam.findFirst({ where: { id: params.examId, schoolId: params.schoolId } });
   if (!exam) return { ok: false, error: "INVALID_EXAM" };
 
-  const enrolled = await getEnrolledStudents(prisma, {
-    classId: params.classId,
-    academicYearId: params.academicYearId,
-  });
+  const enrolled = await getEnrolledStudents(prisma, { classId: params.classId, academicYearId: params.academicYearId });
   const marks = await prisma.mark.findMany({
     where: { examId: params.examId, studentId: { in: enrolled.map((s) => s.id) } },
+    include: { subject: true },
   });
-  const subjects = Array.from(new Set(marks.map((mark) => mark.subject))).sort();
+
+  const subjectMap = new Map<number, string>();
+  for (const mark of marks) subjectMap.set(mark.subjectId, mark.subject.name);
+  const subjects = [...subjectMap.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
 
   const students = enrolled.map((student) => {
-    const marksBySubject: Record<string, MarkCell | null> = {};
+    const marksBySubject: Record<number, MarkCell | null> = {};
     for (const subject of subjects) {
-      const mark = marks.find((m) => m.studentId === student.id && m.subject === subject);
-      marksBySubject[subject] = mark
+      const mark = marks.find((m) => m.studentId === student.id && m.subjectId === subject.id);
+      marksBySubject[subject.id] = mark
         ? { marksObtained: mark.marksObtained, maxMarks: mark.maxMarks, grade: mark.grade }
         : null;
     }
@@ -95,59 +88,40 @@ export async function enterMarks(
   params: {
     classId: number;
     examId: number;
-    subject: string;
+    subjectId: number;
     maxMarks: number;
     teacherUserId: number;
     schoolId: number;
     academicYearId: number;
-    entries: Array<{ studentId: number; marksObtained: number }>;
+    entries: { studentId: number; marksObtained: number }[];
   }
 ): Promise<EnterMarksResult> {
   const exam = await prisma.exam.findFirst({ where: { id: params.examId, schoolId: params.schoolId } });
   if (!exam) return { ok: false, error: "INVALID_EXAM" };
 
   const link = await prisma.classTeacher.findFirst({
-    where: {
-      classId: params.classId,
-      subject: params.subject,
-      teacherUserId: params.teacherUserId,
-      academicYearId: params.academicYearId,
-    },
+    where: { classId: params.classId, subjectId: params.subjectId, teacherUserId: params.teacherUserId, academicYearId: params.academicYearId },
   });
   if (!link) return { ok: false, error: "NOT_ASSIGNED" };
 
-  const enrolledCount = await prisma.enrollment.count({
-    where: {
-      classId: params.classId,
-      academicYearId: params.academicYearId,
-      status: "active",
-      studentId: { in: params.entries.map((entry) => entry.studentId) },
-    },
-  });
-  if (enrolledCount !== params.entries.length) return { ok: false, error: "STUDENT_MISMATCH" };
-
   if (params.maxMarks <= 0) return { ok: false, error: "INVALID_MAX_MARKS" };
 
-  for (const entry of params.entries) {
-    if (entry.marksObtained < 0 || entry.marksObtained > params.maxMarks) {
-      return { ok: false, error: "INVALID_MARKS_RANGE" };
-    }
-  }
+  const enrolled = await getEnrolledStudents(prisma, { classId: params.classId, academicYearId: params.academicYearId });
+  const enrolledIds = new Set(enrolled.map((s) => s.id));
+  const allEnrolled = params.entries.every((e) => enrolledIds.has(e.studentId));
+  if (!allEnrolled) return { ok: false, error: "STUDENT_MISMATCH" };
+
+  const allValid = params.entries.every((e) => e.marksObtained >= 0 && e.marksObtained <= params.maxMarks);
+  if (!allValid) return { ok: false, error: "INVALID_MARKS_RANGE" };
 
   await prisma.$transaction(
     params.entries.map((entry) =>
       prisma.mark.upsert({
-        where: {
-          examId_studentId_subject: {
-            examId: params.examId,
-            studentId: entry.studentId,
-            subject: params.subject,
-          },
-        },
+        where: { examId_studentId_subjectId: { examId: params.examId, studentId: entry.studentId, subjectId: params.subjectId } },
         create: {
           examId: params.examId,
           studentId: entry.studentId,
-          subject: params.subject,
+          subjectId: params.subjectId,
           marksObtained: entry.marksObtained,
           maxMarks: params.maxMarks,
           grade: computeGrade(entry.marksObtained, params.maxMarks),

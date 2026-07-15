@@ -17,7 +17,8 @@ interface ClassOption {
 
 interface TeacherClassSubject {
   classId: number;
-  subject: string;
+  subjectId: number;
+  subjectName: string;
 }
 
 interface MarkCell {
@@ -26,10 +27,15 @@ interface MarkCell {
   grade: string;
 }
 
+interface SubjectOption {
+  id: number;
+  name: string;
+}
+
 interface StudentRow {
   studentId: number;
   name: string;
-  marks: Record<string, MarkCell | null>;
+  marks: Record<number, MarkCell | null>;
 }
 
 const inputClass =
@@ -49,11 +55,11 @@ export function MarksView({
   const [exams, setExams] = useState(initialExams);
   const [examId, setExamId] = useState(exams[0] ? String(exams[0].id) : "");
   const [classId, setClassId] = useState(classes[0] ? String(classes[0].id) : "");
-  const [subjects, setSubjects] = useState<string[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [entrySubject, setEntrySubject] = useState("");
+  const [entrySubjectId, setEntrySubjectId] = useState("");
   const [maxMarks, setMaxMarks] = useState("");
   const [marksEdits, setMarksEdits] = useState<Record<number, string>>({});
   const [newExamName, setNewExamName] = useState("");
@@ -62,7 +68,7 @@ export function MarksView({
 
   const availableSubjects = teacherSubjects
     .filter((ts) => ts.classId === Number(classId))
-    .map((ts) => ts.subject);
+    .map((ts) => ({ id: ts.subjectId, name: ts.subjectName }));
 
   async function refresh() {
     if (!classId || !examId) return;
@@ -87,21 +93,21 @@ export function MarksView({
   }, [classId, examId]);
 
   useEffect(() => {
-    setEntrySubject(availableSubjects[0] ?? "");
+    setEntrySubjectId(availableSubjects[0] ? String(availableSubjects[0].id) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
 
   useEffect(() => {
     const map: Record<number, string> = {};
     for (const student of students) {
-      const cell = student.marks[entrySubject];
+      const cell = student.marks[Number(entrySubjectId)];
       map[student.studentId] = cell ? String(cell.marksObtained) : "";
     }
     setMarksEdits(map);
-    const anyCell = students.map((s) => s.marks[entrySubject]).find((c) => c);
+    const anyCell = students.map((s) => s.marks[Number(entrySubjectId)]).find((c) => c);
     setMaxMarks(anyCell ? String(anyCell.maxMarks) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entrySubject, students]);
+  }, [entrySubjectId, students]);
 
   async function handleCreateExam() {
     setError(null);
@@ -139,7 +145,7 @@ export function MarksView({
       body: JSON.stringify({
         classId: Number(classId),
         examId: Number(examId),
-        subject: entrySubject,
+        subjectId: Number(entrySubjectId),
         maxMarks: Number(maxMarks),
         entries: students.map((student) => ({
           studentId: student.studentId,
@@ -230,8 +236,8 @@ export function MarksView({
             <tr className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
               <th className="border-b border-neutral-100 pb-2 pr-4">Name</th>
               {subjects.map((subject) => (
-                <th key={subject} className="border-b border-neutral-100 pb-2 pr-4">
-                  {subject}
+                <th key={subject.id} className="border-b border-neutral-100 pb-2 pr-4">
+                  {subject.name}
                 </th>
               ))}
             </tr>
@@ -243,9 +249,9 @@ export function MarksView({
                   {student.name}
                 </td>
                 {subjects.map((subject) => {
-                  const cell = student.marks[subject];
+                  const cell = student.marks[subject.id];
                   return (
-                    <td key={subject} className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
+                    <td key={subject.id} className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
                       {cell ? `${cell.marksObtained}/${cell.maxMarks} (${cell.grade})` : "—"}
                     </td>
                   );
@@ -262,13 +268,13 @@ export function MarksView({
           <div className="flex gap-2">
             <select
               aria-label="Entry subject"
-              value={entrySubject}
-              onChange={(event) => setEntrySubject(event.target.value)}
+              value={entrySubjectId}
+              onChange={(event) => setEntrySubjectId(event.target.value)}
               className={inputClass}
             >
               {availableSubjects.map((subject) => (
-                <option key={subject} value={subject}>
-                  {subject}
+                <option key={subject.id} value={subject.id}>
+                  {subject.name}
                 </option>
               ))}
             </select>

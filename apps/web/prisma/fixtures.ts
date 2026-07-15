@@ -13,8 +13,16 @@ export async function createSeedFixtures(prisma: PrismaClient) {
     },
   });
 
+  const grade = await prisma.grade.create({
+    data: { schoolId: school.id, name: "Grade 5" },
+  });
+
+  const subject = await prisma.subject.create({
+    data: { gradeId: grade.id, name: "Mathematics" },
+  });
+
   const classA = await prisma.class.create({
-    data: { schoolId: school.id, name: "Grade 5", section: "A" },
+    data: { schoolId: school.id, gradeId: grade.id, section: "A", academicYearId: academicYear.id },
   });
 
   const teacher = await prisma.user.create({
@@ -60,7 +68,7 @@ export async function createSeedFixtures(prisma: PrismaClient) {
     data: {
       classId: classA.id,
       teacherUserId: teacher.id,
-      subject: "Mathematics",
+      subjectId: subject.id,
       academicYearId: academicYear.id,
     },
   });
