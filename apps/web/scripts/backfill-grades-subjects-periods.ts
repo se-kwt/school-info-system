@@ -116,10 +116,11 @@ export async function runBackfill(prisma: PrismaClient): Promise<void> {
 
       // Step 3b: Build year → target class mapping.
       // The @@unique([schoolId, name, section]) constraint is still in place (Task 3 will change it),
-      // so we reuse the original row for the first year and create new rows only when the
-      // original row already has a gradeId set (i.e., already been claimed by a prior year pass).
+      // so we reuse the original row for the first unclaimed year and fall back to the original
+      // class ID for any subsequent years (no new rows until Task 3 drops the old constraint).
       const yearIdList = [...yearIds];
       const targetClassByYear = new Map<number, number>();
+      let originalKlassUsed = false;
 
       for (const academicYearId of yearIdList) {
         // Check if a matching year-scoped class already exists.
@@ -129,21 +130,15 @@ export async function runBackfill(prisma: PrismaClient): Promise<void> {
         let targetId: number;
         if (existing) {
           targetId = existing.id;
-        } else if (klass.gradeId === null) {
-          // Original row is still unclaimed — reuse it for this year.
+          if (existing.id === klass.id) originalKlassUsed = true;
+        } else if (!originalKlassUsed) {
+          // Original row not yet claimed — reuse it for this year.
           targetId = klass.id;
+          originalKlassUsed = true;
         } else {
-          // Original row was already claimed; create a new class row.
-          const created = await prisma.class.create({
-            data: {
-              schoolId: school.id,
-              name: klass.name,
-              section: klass.section,
-              gradeId,
-              academicYearId,
-            },
-          });
-          targetId = created.id;
+          // Can't create another row with same school+name+section until Task 3 drops the old
+          // unique constraint. Use the original class row as a safe fallback for now.
+          targetId = klass.id;
         }
         targetClassByYear.set(academicYearId, targetId);
       }
