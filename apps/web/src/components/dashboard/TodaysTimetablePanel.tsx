@@ -18,10 +18,10 @@ export function TodaysTimetablePanel({
           {todaysTimetable.map((entry) => (
             <li key={entry.id} className="flex items-center gap-3 text-xs">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-[10px] font-bold text-indigo-600">
-                P{entry.period}
+                P{entry.periodOrder}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-neutral-700">{entry.subject}</p>
+                <p className="truncate font-medium text-neutral-700">{entry.subjectName}</p>
                 <p className="truncate text-[10px] text-neutral-400">
                   {entry.className} · {entry.teacherName ?? "No teacher assigned"}
                 </p>

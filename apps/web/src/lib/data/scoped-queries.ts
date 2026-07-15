@@ -1,4 +1,4 @@
-import type { PrismaClient, Student, Class } from "@prisma/client";
+import type { PrismaClient, Student } from "@prisma/client";
 
 export async function getStudentsForParent(
   prisma: PrismaClient,
@@ -15,11 +15,16 @@ export async function getClassesForTeacher(
   prisma: PrismaClient,
   teacherUserId: number,
   academicYearId: number
-): Promise<Class[]> {
+): Promise<Array<{ id: number; gradeId: number; gradeName: string; section: string }>> {
   const links = await prisma.classTeacher.findMany({
     where: { teacherUserId, academicYearId },
-    include: { class: true },
+    include: { class: { include: { grade: true } } },
     distinct: ["classId"],
   });
-  return links.map((link) => link.class);
+  return links.map((link) => ({
+    id: link.class.id,
+    gradeId: link.class.gradeId,
+    gradeName: link.class.grade.name,
+    section: link.class.section,
+  }));
 }

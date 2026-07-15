@@ -27,7 +27,8 @@ export interface StaffOverviewEntry {
 export interface AssignmentDueEntry {
   id: number;
   className: string;
-  subject: string;
+  subjectId: number;
+  subjectName: string;
   title: string;
   dueDate: string;
   status: "pending" | "submitted" | "overdue";
@@ -35,8 +36,10 @@ export interface AssignmentDueEntry {
 
 export interface TimetablePeriodEntry {
   id: number;
-  period: number;
-  subject: string;
+  periodOrder: number;
+  periodLabel: string;
+  subjectId: number;
+  subjectName: string;
   className: string;
   teacherName: string | null;
 }
@@ -184,7 +187,7 @@ async function getAcademicOverview(
     });
     classPerformance.push({
       classId: klass.id,
-      name: klass.name,
+      name: klass.gradeName,
       section: klass.section,
       attendancePercent: attendancePercent(records),
     });
@@ -261,7 +264,7 @@ async function getAcademicOverview(
 
   const dueAssignments = await prisma.assignment.findMany({
     where: { classId: { in: classIds } },
-    include: { class: true, statuses: true },
+    include: { class: { include: { grade: true } }, statuses: true, subject: true },
     orderBy: { dueDate: "asc" },
     take: 8,
   });
@@ -278,8 +281,9 @@ async function getAcademicOverview(
         : "pending";
     return {
       id: assignment.id,
-      className: `${assignment.class.name} ${assignment.class.section}`,
-      subject: assignment.subject,
+      className: `${assignment.class.grade.name} ${assignment.class.section}`,
+      subjectId: assignment.subjectId,
+      subjectName: assignment.subject.name,
       title: assignment.title,
       dueDate: assignment.dueDate.toISOString().slice(0, 10),
       status,
@@ -289,14 +293,16 @@ async function getAcademicOverview(
   const todayDayOfWeek = new Date().getDay();
   const todaysTimetableRows = await prisma.timetableEntry.findMany({
     where: { classId: { in: classIds }, dayOfWeek: todayDayOfWeek },
-    include: { class: true, teacher: true },
-    orderBy: { period: "asc" },
+    include: { class: { include: { grade: true } }, teacher: true, subject: true, period: true },
+    orderBy: { period: { order: "asc" } },
   });
   const todaysTimetable: TimetablePeriodEntry[] = todaysTimetableRows.map((entry) => ({
     id: entry.id,
-    period: entry.period,
-    subject: entry.subject,
-    className: `${entry.class.name} ${entry.class.section}`,
+    periodOrder: entry.period.order,
+    periodLabel: entry.period.label,
+    subjectId: entry.subjectId,
+    subjectName: entry.subject.name,
+    className: `${entry.class.grade.name} ${entry.class.section}`,
     teacherName: entry.teacher?.name ?? null,
   }));
 
@@ -318,7 +324,7 @@ async function getAcademicOverview(
 async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<FeesOverview> {
   const feeStructures = await prisma.feeStructure.findMany({
     where: { schoolId },
-    include: { class: true, payments: true },
+    include: { class: { include: { grade: true } }, payments: true },
     orderBy: { dueDate: "desc" },
   });
 
@@ -358,7 +364,7 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
     return {
       id: fs.id,
       term: fs.term,
-      className: `${fs.class.name} ${fs.class.section}`,
+      className: `${fs.class.grade.name} ${fs.class.section}`,
       totalDue,
       totalPaid,
       collectionPercent: totalDue === 0 ? 0 : Math.round((totalPaid / totalDue) * 100),
@@ -373,14 +379,14 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
 
   const recentPaymentRows = await prisma.feePayment.findMany({
     where: { feeStructure: { schoolId } },
-    include: { student: true, feeStructure: { include: { class: true } } },
+    include: { student: true, feeStructure: { include: { class: { include: { grade: true } } } } },
     orderBy: { paidDate: "desc" },
     take: 8,
   });
   const recentPayments: RecentPaymentEntry[] = recentPaymentRows.map((payment) => ({
     id: payment.id,
     studentName: payment.student.name,
-    className: `${payment.feeStructure.class.name} ${payment.feeStructure.class.section}`,
+    className: `${payment.feeStructure.class.grade.name} ${payment.feeStructure.class.section}`,
     amountPaid: payment.amountPaid,
     paidDate: payment.paidDate ? payment.paidDate.toISOString().slice(0, 10) : null,
   }));

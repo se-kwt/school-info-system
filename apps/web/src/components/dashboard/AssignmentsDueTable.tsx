@@ -33,7 +33,7 @@ export function AssignmentsDueTable({ assignmentsDue }: { assignmentsDue: Assign
                 </td>
                 <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
                   {assignment.title}
-                  <span className="ml-1 text-neutral-400">({assignment.subject})</span>
+                  <span className="ml-1 text-neutral-400">({assignment.subjectName})</span>
                 </td>
                 <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
                   {assignment.dueDate}

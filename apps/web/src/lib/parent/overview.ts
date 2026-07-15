@@ -29,12 +29,12 @@ export async function getParentChildrenWithClass(
     children.map(async (child) => {
       const enrollment = await prisma.enrollment.findFirst({
         where: { studentId: child.id, status: "active" },
-        include: { class: true },
+        include: { class: { include: { grade: true } } },
       });
       return {
         id: child.id,
         name: child.name,
-        className: enrollment ? `${enrollment.class.name} ${enrollment.class.section}` : null,
+        className: enrollment ? `${enrollment.class.grade.name} ${enrollment.class.section}` : null,
       };
     })
   );
@@ -42,14 +42,16 @@ export async function getParentChildrenWithClass(
 
 export interface ParentAssignmentEntry {
   id: number;
-  subject: string;
+  subjectId: number;
+  subjectName: string;
   title: string;
   dueDate: string;
   status: "pending" | "overdue";
 }
 
 export interface ParentExamSubject {
-  subject: string;
+  subjectId: number;
+  subjectName: string;
   marksObtained: number;
   maxMarks: number;
   grade: string;
@@ -136,13 +138,14 @@ export async function getParentOverview(
           academicYearId: activeEnrollment.academicYearId,
         },
       },
-      include: { assignment: true },
+      include: { assignment: { include: { subject: true } } },
       orderBy: { assignment: { dueDate: "asc" } },
       take: 3,
     });
     upcomingAssignments = pendingStatuses.map((entry) => ({
       id: entry.assignment.id,
-      subject: entry.assignment.subject,
+      subjectId: entry.assignment.subjectId,
+      subjectName: entry.assignment.subject.name,
       title: entry.assignment.title,
       dueDate: entry.assignment.dueDate.toISOString().slice(0, 10),
       status: displayStatus(entry.status, entry.assignment.dueDate) === "overdue" ? "overdue" : "pending",
@@ -176,12 +179,14 @@ export async function getParentOverview(
   if (latestMark) {
     const examMarks = await prisma.mark.findMany({
       where: { studentId: params.studentId, examId: latestMark.examId },
+      include: { subject: true },
     });
     latestExam = {
       examName: latestMark.exam.name,
       term: latestMark.exam.term,
       subjects: examMarks.map((mark) => ({
-        subject: mark.subject,
+        subjectId: mark.subjectId,
+        subjectName: mark.subject.name,
         marksObtained: mark.marksObtained,
         maxMarks: mark.maxMarks,
         grade: mark.grade,

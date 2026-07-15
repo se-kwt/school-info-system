@@ -61,7 +61,7 @@ export default async function ParentAssignmentsPage({
                 >
                   <p className="font-semibold text-neutral-800">{assignment.title}</p>
                   <p className={assignment.status === "overdue" ? "text-red-600" : "text-neutral-400"}>
-                    {assignment.subject} · {assignment.className} · {assignment.dueDate} · {assignment.status}
+                    {assignment.subjectName} · {assignment.className} · {assignment.dueDate} · {assignment.status}
                   </p>
                 </Link>
               </li>

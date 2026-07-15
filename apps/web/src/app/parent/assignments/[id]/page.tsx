@@ -68,7 +68,7 @@ export default async function ParentAssignmentDetailPage({
             <div>
               <h1 className="text-sm font-bold text-neutral-800">{assignment.title}</h1>
               <p className="mt-1 text-xs text-neutral-400">
-                {assignment.subject} · {assignment.className} · Due {assignment.dueDate}
+                {assignment.subjectName} · {assignment.className} · Due {assignment.dueDate}
               </p>
             </div>
             <span

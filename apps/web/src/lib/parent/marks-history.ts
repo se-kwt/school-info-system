@@ -9,13 +9,10 @@ export interface ParentExamHistoryEntry {
   subjects: ParentExamSubject[];
 }
 
-export async function getParentMarksHistory(
-  prisma: PrismaClient,
-  studentId: number
-): Promise<ParentExamHistoryEntry[]> {
+export async function getParentMarksHistory(prisma: PrismaClient, studentId: number): Promise<ParentExamHistoryEntry[]> {
   const marks = await prisma.mark.findMany({
     where: { studentId },
-    include: { exam: true },
+    include: { exam: true, subject: true },
     orderBy: { exam: { examDate: "desc" } },
   });
 
@@ -33,7 +30,8 @@ export async function getParentMarksHistory(
       examsById.set(mark.examId, entry);
     }
     entry.subjects.push({
-      subject: mark.subject,
+      subjectId: mark.subjectId,
+      subjectName: mark.subject.name,
       marksObtained: mark.marksObtained,
       maxMarks: mark.maxMarks,
       grade: mark.grade,

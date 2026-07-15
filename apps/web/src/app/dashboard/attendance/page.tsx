@@ -12,7 +12,7 @@ export default async function AttendancePage() {
     claims.role === "teacher"
       ? (await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)).map((klass) => ({
           id: klass.id,
-          name: klass.name,
+          name: klass.gradeName,
           section: klass.section,
         }))
       : await listClasses(prisma, claims.schoolId);

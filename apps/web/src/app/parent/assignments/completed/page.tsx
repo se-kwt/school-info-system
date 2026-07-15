@@ -55,7 +55,7 @@ export default async function ParentCompletedAssignmentsPage({
                 >
                   <p className="font-semibold text-neutral-800">{assignment.title}</p>
                   <p className="text-neutral-400">
-                    {assignment.subject} · {assignment.className} · {assignment.dueDate}
+                    {assignment.subjectName} · {assignment.className} · {assignment.dueDate}
                   </p>
                 </Link>
               </li>

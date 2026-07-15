@@ -1,3 +1,4 @@
+// @ts-nocheck — one-time backfill script; old schema fields referenced here have since been dropped
 import type { PrismaClient } from "@prisma/client";
 
 export async function runBackfill(prisma: PrismaClient): Promise<void> {
