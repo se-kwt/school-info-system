@@ -1,7 +1,8 @@
 import { requireDashboardRole } from "@/lib/auth/require-dashboard-role";
 import { getClassesForTeacher } from "@/lib/data/scoped-queries";
 import { listClasses } from "@/lib/school-setup/classes";
-import { listStaff } from "@/lib/school-setup/staff";
+import { listAllSubjects } from "@/lib/school-setup/subjects";
+import { listPeriods } from "@/lib/periods";
 import { prisma } from "@/lib/prisma";
 import { TimetableView } from "@/components/timetable/TimetableView";
 import { getActiveAcademicYear } from "@/lib/academic-years";
@@ -11,19 +12,13 @@ export default async function TimetablePage() {
   const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
   const classes =
     claims.role === "teacher"
-      ? (await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)).map((klass) => ({
-          id: klass.id,
-          name: klass.gradeName,
-          section: klass.section,
-        }))
+      ? await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)
       : await listClasses(prisma, claims.schoolId);
 
-  const teachers =
-    claims.role === "admin"
-      ? (await listStaff(prisma, claims.schoolId))
-          .filter((staff) => staff.role === "teacher")
-          .map((staff) => ({ id: staff.id, name: staff.name }))
-      : [];
+  const [subjects, periods] = await Promise.all([
+    listAllSubjects(prisma, claims.schoolId),
+    listPeriods(prisma, claims.schoolId),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -33,7 +28,8 @@ export default async function TimetablePage() {
       </div>
       <TimetableView
         classes={classes}
-        teachers={teachers}
+        subjects={subjects}
+        periods={periods}
         role={claims.role === "teacher" ? "teacher" : "admin"}
       />
     </div>
