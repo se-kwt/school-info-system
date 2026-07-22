@@ -13,6 +13,7 @@ export default async function DashboardLayout({
 }) {
   const claims = requireDashboardRole(["teacher", "admin", "accountant"]);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: claims.userId } });
+  const school = await prisma.school.findUniqueOrThrow({ where: { id: claims.schoolId } });
   const navItems = getNavItemsForRole(claims.role);
   const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
 
@@ -39,6 +40,8 @@ export default async function DashboardLayout({
         userName={user.name}
         userInitials={initials}
         userRole={claims.role}
+        schoolName={school.name}
+        schoolLogoUrl={school.logoUrl}
       />
       <div className="flex flex-1 flex-col">
         <header className="border-b border-neutral-200/50 px-6 py-4">

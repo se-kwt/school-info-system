@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IconName } from "@/lib/dashboard/nav-items";
+import { SchoolLogo } from "@/components/SchoolLogo";
 
 interface NavItem {
   href: string;
@@ -59,6 +60,8 @@ export function Sidebar({
   userName,
   userInitials,
   userRole,
+  schoolName,
+  schoolLogoUrl,
 }: {
   navItems: NavItem[];
   workspaceItems: NavItem[];
@@ -66,6 +69,8 @@ export function Sidebar({
   userName: string;
   userInitials: string;
   userRole: string;
+  schoolName: string;
+  schoolLogoUrl: string | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -91,12 +96,10 @@ export function Sidebar({
       <div className="p-4">
         <div className="flex items-center justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-xs font-bold text-white">
-              SI
-            </div>
+            <SchoolLogo logoUrl={schoolLogoUrl} schoolName={schoolName} className="h-7 w-7" />
             {!collapsed && (
               <div>
-                <p className="text-sm font-semibold tracking-tight text-neutral-900">School Info System</p>
+                <p className="truncate text-sm font-semibold tracking-tight text-neutral-900">{schoolName}</p>
                 <p className="text-[10px] font-medium text-neutral-400">School Workspace</p>
               </div>
             )}

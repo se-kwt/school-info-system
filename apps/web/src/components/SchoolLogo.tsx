@@ -10,16 +10,18 @@ function schoolInitials(schoolName: string): string {
 export function SchoolLogo({
   logoUrl,
   schoolName,
+  className = "h-9 w-9",
 }: {
   logoUrl: string | null;
   schoolName: string;
+  className?: string;
 }) {
   if (logoUrl) {
     return (
       <img
         src={logoUrl}
         alt={schoolName}
-        className="h-9 w-9 shrink-0 rounded-lg object-cover"
+        className={`${className} shrink-0 rounded-lg object-cover`}
       />
     );
   }
@@ -28,7 +30,7 @@ export function SchoolLogo({
     <div
       role="img"
       aria-label={schoolName}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-200 text-xs font-bold text-neutral-600"
+      className={`${className} flex shrink-0 items-center justify-center rounded-lg bg-neutral-200 text-xs font-bold text-neutral-600`}
     >
       {schoolInitials(schoolName)}
     </div>
