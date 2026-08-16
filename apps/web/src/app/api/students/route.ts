@@ -99,6 +99,12 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+      if (result.error === "PHONE_BELONGS_TO_ANOTHER_SCHOOL") {
+        return NextResponse.json(
+          { error: "This parent phone number is associated with a different school" },
+          { status: 409 }
+        );
+      }
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
       }

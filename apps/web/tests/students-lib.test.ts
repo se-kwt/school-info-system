@@ -351,4 +351,68 @@ describe("students.ts sibling links", () => {
     const main = list.find((s) => s.admissionNo === "SCH-306");
     expect(main?.siblings.map((s) => s.admissionNo)).toEqual(["SCH-305"]);
   });
+
+
+  it("rejects createStudent when the parent phone belongs to a user in a different school", async () => {
+    const schoolA = await prisma.school.create({ data: { name: "School A" } });
+    const schoolB = await prisma.school.create({ data: { name: "School B" } });
+    const yearA = await createActiveYear(prisma, schoolA.id);
+    const yearB = await createActiveYear(prisma, schoolB.id);
+    const classA = await createClass(prisma, { schoolId: schoolA.id, academicYearId: yearA.id, name: "Grade 3", section: "A" });
+    const classB = await createClass(prisma, { schoolId: schoolB.id, academicYearId: yearB.id, name: "Grade 3", section: "A" });
+
+    await createStudent(prisma, schoolA.id, yearA.id, {
+      name: "Student A",
+      dob: "2016-01-01",
+      classId: classA.id,
+      admissionNo: "A-100",
+      parents: [{ relationship: "Mother", name: "Shared Parent", phone: "+15550009999" }],
+    });
+
+    const result = await createStudent(prisma, schoolB.id, yearB.id, {
+      name: "Student B",
+      dob: "2016-01-01",
+      classId: classB.id,
+      admissionNo: "B-100",
+      parents: [{ relationship: "Mother", name: "Shared Parent", phone: "+15550009999" }],
+    });
+
+    expect(result).toMatchObject({ ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" });
+  });
+
+  it("rejects editStudent when the new parent phone belongs to a user in a different school", async () => {
+    const schoolA = await prisma.school.create({ data: { name: "School A" } });
+    const schoolB = await prisma.school.create({ data: { name: "School B" } });
+    const yearA = await createActiveYear(prisma, schoolA.id);
+    const yearB = await createActiveYear(prisma, schoolB.id);
+    const classA = await createClass(prisma, { schoolId: schoolA.id, academicYearId: yearA.id, name: "Grade 3", section: "A" });
+    const classB = await createClass(prisma, { schoolId: schoolB.id, academicYearId: yearB.id, name: "Grade 3", section: "A" });
+
+    await createStudent(prisma, schoolA.id, yearA.id, {
+      name: "Student A",
+      dob: "2016-01-01",
+      classId: classA.id,
+      admissionNo: "A-101",
+      parents: [{ relationship: "Mother", name: "Shared Parent", phone: "+15550008888" }],
+    });
+
+    const studentB = await createEnrolledStudent(prisma, {
+      schoolId: schoolB.id,
+      classId: classB.id,
+      academicYearId: yearB.id,
+      name: "Student B",
+      dob: new Date("2016-01-01"),
+      admissionNo: "B-101",
+    });
+
+    const result = await editStudent(prisma, {
+      studentId: studentB.id,
+      schoolId: schoolB.id,
+      academicYearId: yearB.id,
+      fields: { parents: [{ relationship: "Father", name: "Shared Parent", phone: "+15550008888" }] },
+    });
+
+    expect(result).toMatchObject({ ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" });
+  });
+
 });

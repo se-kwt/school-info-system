@@ -93,6 +93,7 @@ export type CreateStudentResult =
   | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
   | { ok: false; error: "DUPLICATE_STUDENT_ID" }
   | { ok: false; error: "PHONE_WRONG_ROLE" }
+  | { ok: false; error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" }
   | { ok: false; error: "PARENT_REQUIRED" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SIBLING" };
@@ -135,6 +136,7 @@ export async function createStudent(
   for (const parentInput of input.parents) {
     const existingParent = await prisma.user.findUnique({ where: { phone: parentInput.phone } });
     if (existingParent && existingParent.role !== "parent") return { ok: false, error: "PHONE_WRONG_ROLE" };
+    if (existingParent && existingParent.schoolId !== schoolId) return { ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" };
   }
 
   if (input.siblingStudentIds && input.siblingStudentIds.length > 0) {
@@ -219,6 +221,7 @@ export type EditStudentResult =
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
   | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
   | { ok: false; error: "DUPLICATE_STUDENT_ID" }
+  | { ok: false; error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SIBLING" }
   | { ok: false; error: "NO_ACTIVE_ENROLLMENT" };
@@ -263,6 +266,15 @@ export async function editStudent(
       where: { id: { in: params.fields.siblingStudentIds }, schoolId: params.schoolId },
     });
     if (siblingCount !== params.fields.siblingStudentIds.length) return { ok: false, error: "INVALID_SIBLING" };
+  }
+
+  if (params.fields.parents !== undefined) {
+    for (const parentInput of params.fields.parents) {
+      const existingParent = await prisma.user.findUnique({ where: { phone: parentInput.phone } });
+      if (existingParent && existingParent.schoolId !== params.schoolId) {
+        return { ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" };
+      }
+    }
   }
 
   let enrollment: { classId: number } | null = null;

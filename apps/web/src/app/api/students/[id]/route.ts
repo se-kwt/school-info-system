@@ -59,6 +59,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (result.error === "DUPLICATE_STUDENT_ID") {
         return NextResponse.json({ error: "A student with this ID number already exists" }, { status: 409 });
       }
+      if (result.error === "PHONE_BELONGS_TO_ANOTHER_SCHOOL") {
+        return NextResponse.json(
+          { error: "This parent phone number is associated with a different school" },
+          { status: 409 }
+        );
+      }
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
       }
