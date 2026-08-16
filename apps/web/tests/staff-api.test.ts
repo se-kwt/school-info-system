@@ -49,7 +49,8 @@ describe("/api/staff", () => {
     const postResponse = await postStaff(postRequest);
     expect(postResponse.status).toBe(201);
 
-    const getResponse = await getStaff();
+    const getRequest = new Request("http://localhost/api/staff");
+    const getResponse = await getStaff(getRequest);
     const list = await getResponse.json();
     expect(list).toHaveLength(2);
     const accountant = list.find((entry: { role: string }) => entry.role === "accountant");
@@ -86,7 +87,8 @@ describe("/api/staff", () => {
     });
     expect(classTeacherRow).not.toBeNull();
 
-    const getResponse = await getStaff();
+    const getRequest = new Request("http://localhost/api/staff");
+    const getResponse = await getStaff(getRequest);
     const list = await getResponse.json();
     const teacher = list.find((entry: { role: string }) => entry.role === "teacher");
     expect(teacher.classAssignment).toEqual({
@@ -141,7 +143,8 @@ describe("/api/staff", () => {
     const token = signSessionToken({ userId: teacher.id, role: "teacher", schoolId: school.id });
     cookieStore.get.mockReturnValue({ value: token });
 
-    const getResponse = await getStaff();
+    const getRequest = new Request("http://localhost/api/staff");
+    const getResponse = await getStaff(getRequest);
     expect(getResponse.status).toBe(403);
   });
 

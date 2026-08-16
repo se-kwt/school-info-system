@@ -66,3 +66,38 @@ describe("staff lib subject assignment", () => {
     expect(result).toEqual({ ok: false, error: "INVALID_PHONE" });
   });
 });
+
+describe("staff lib pagination", () => {
+  let schoolId: number;
+  let yearId: number;
+
+  beforeEach(async () => {
+    await resetDb();
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    schoolId = school.id;
+    const year = await prisma.academicYear.create({
+      data: { schoolId, name: "2026-27", startDate: new Date(), endDate: new Date(), status: "active" },
+    });
+    yearId = year.id;
+  });
+
+  it("listStaff respects page/pageSize and returns a smaller slice", async () => {
+    for (let i = 0; i < 5; i++) {
+      await createStaff(prisma, schoolId, yearId, {
+        name: `Staff ${i}`,
+        phone: `+1000000${100 + i}`,
+        role: "admin",
+      });
+    }
+
+    const firstPage = await listStaff(prisma, schoolId, { page: 1, pageSize: 2 });
+    const secondPage = await listStaff(prisma, schoolId, { page: 2, pageSize: 2 });
+
+    expect(firstPage).toHaveLength(2);
+    expect(secondPage).toHaveLength(2);
+    expect(firstPage.map((s) => s.phone)).not.toEqual(secondPage.map((s) => s.phone));
+
+    const allStaff = await listStaff(prisma, schoolId); // no options -- unchanged behavior
+    expect(allStaff.length).toBeGreaterThanOrEqual(5);
+  });
+});

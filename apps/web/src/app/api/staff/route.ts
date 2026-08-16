@@ -12,10 +12,22 @@ function isValidRole(value: unknown): value is StaffRole {
   return typeof value === "string" && (VALID_ROLES as readonly string[]).includes(value);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const claims = await requireApiRole(["admin"]);
-    const staff = await listStaff(prisma, claims.schoolId);
+    const { searchParams } = new URL(request.url);
+
+    const pageParam = searchParams.get("page");
+    const pageSizeParam = searchParams.get("pageSize");
+
+    const page = pageParam ? Number(pageParam) : undefined;
+    const pageSize = pageSizeParam ? Number(pageSizeParam) : undefined;
+
+    const options = (page && pageSize && !isNaN(page) && !isNaN(pageSize))
+      ? { page, pageSize }
+      : undefined;
+
+    const staff = await listStaff(prisma, claims.schoolId, options);
     return NextResponse.json(staff);
   } catch (err) {
     if (err instanceof AuthError) {

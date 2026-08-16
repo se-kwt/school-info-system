@@ -487,3 +487,39 @@ describe("students.ts sibling links", () => {
   });
 
 });
+
+describe("students.ts pagination", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  it("listStudents respects page/pageSize and returns a smaller slice", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+    for (let i = 0; i < 5; i++) {
+      await createStudent(prisma, school.id, year.id, {
+        name: `Student ${i}`,
+        dob: "2016-01-01",
+        classId: klass.id,
+        admissionNo: `PAGE-${i}`,
+        parents: [{ relationship: "Mother", name: "A Parent", phone: `+1555000${1000 + i}` }],
+      });
+    }
+
+    const firstPage = await listStudents(prisma, school.id, { page: 1, pageSize: 2 });
+    const secondPage = await listStudents(prisma, school.id, { page: 2, pageSize: 2 });
+
+    expect(firstPage).toHaveLength(2);
+    expect(secondPage).toHaveLength(2);
+    expect(firstPage.map((s) => s.admissionNo)).not.toEqual(secondPage.map((s) => s.admissionNo));
+
+    const allStudents = await listStudents(prisma, school.id); // no options -- unchanged behavior
+    expect(allStudents.length).toBeGreaterThanOrEqual(5);
+  });
+});

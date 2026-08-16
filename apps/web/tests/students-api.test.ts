@@ -86,7 +86,8 @@ describe("/api/students", () => {
     const newParent = await prisma.user.findUnique({ where: { phone: "+15558880002" } });
     expect(newParent).toMatchObject({ name: "Brand New Parent", role: "parent" });
 
-    const getResponse = await getStudents();
+    const getRequest = new Request("http://localhost/api/students");
+    const getResponse = await getStudents(getRequest);
     const list = await getResponse.json();
     const created = list.find((entry: { admissionNo: string }) => entry.admissionNo === "SCH-002");
     expect(created.parents).toEqual([
@@ -213,7 +214,8 @@ describe("/api/students", () => {
     const postResponse = await postStudents(postRequest);
     expect(postResponse.status).toBe(201);
 
-    const getResponse = await getStudents();
+    const getRequest = new Request("http://localhost/api/students");
+    const getResponse = await getStudents(getRequest);
     const list = await getResponse.json();
     const created = list.find((entry: { admissionNo: string }) => entry.admissionNo === "SCH-ROLL-1");
     expect(created).toMatchObject({ rollNumber: "5", photoUrl: "/uploads/students/x.png" });

@@ -17,7 +17,11 @@ export interface StudentSummary {
   siblings: { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { gradeName: string; section: string } | null }[];
 }
 
-export async function listStudents(prisma: PrismaClient, schoolId: number): Promise<StudentSummary[]> {
+export async function listStudents(
+  prisma: PrismaClient,
+  schoolId: number,
+  options?: { page?: number; pageSize?: number }
+): Promise<StudentSummary[]> {
   const activeYear = await prisma.academicYear.findFirst({ where: { schoolId, status: "active" } });
   const students = await prisma.student.findMany({
     where: { schoolId },
@@ -29,6 +33,9 @@ export async function listStudents(prisma: PrismaClient, schoolId: number): Prom
       },
     },
     orderBy: { name: "asc" },
+    ...(options?.page && options?.pageSize
+      ? { skip: (options.page - 1) * options.pageSize, take: options.pageSize }
+      : {}),
   });
 
   const studentIds = students.map((s) => s.id);

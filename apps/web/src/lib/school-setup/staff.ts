@@ -13,7 +13,11 @@ export interface StaffSummary {
   classAssignment: { gradeName: string; section: string; subjectName: string } | null;
 }
 
-export async function listStaff(prisma: PrismaClient, schoolId: number): Promise<StaffSummary[]> {
+export async function listStaff(
+  prisma: PrismaClient,
+  schoolId: number,
+  options?: { page?: number; pageSize?: number }
+): Promise<StaffSummary[]> {
   const activeYear = await prisma.academicYear.findFirst({ where: { schoolId, status: "active" } });
   const users = await prisma.user.findMany({
     where: { schoolId, role: { in: ["teacher", "admin", "accountant"] } },
@@ -25,6 +29,9 @@ export async function listStaff(prisma: PrismaClient, schoolId: number): Promise
       },
     },
     orderBy: { name: "asc" },
+    ...(options?.page && options?.pageSize
+      ? { skip: (options.page - 1) * options.pageSize, take: options.pageSize }
+      : {}),
   });
 
   return users.map((user) => {
