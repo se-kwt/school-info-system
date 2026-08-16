@@ -21,6 +21,8 @@ describe("Sidebar", () => {
         userName="Jane Admin"
         userInitials="JA"
         userRole="admin"
+        schoolName="Test School"
+        schoolLogoUrl={null}
       />
     );
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
@@ -36,6 +38,8 @@ describe("Sidebar", () => {
         userName="Jane Admin"
         userInitials="JA"
         userRole="admin"
+        schoolName="Test School"
+        schoolLogoUrl={null}
       />
     );
     await userEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
@@ -52,6 +56,8 @@ describe("Sidebar", () => {
         userName="Jane Admin"
         userInitials="JA"
         userRole="admin"
+        schoolName="Test School"
+        schoolLogoUrl={null}
       />
     );
     await userEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
@@ -66,6 +72,8 @@ describe("Sidebar", () => {
         userName="Jane Admin"
         userInitials="JA"
         userRole="admin"
+        schoolName="Test School"
+        schoolLogoUrl={null}
       />
     );
     expect(await screen.findByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();

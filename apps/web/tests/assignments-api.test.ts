@@ -247,7 +247,7 @@ describe("/api/assignments", () => {
         academicYearId: year.id,
         subjectId: subject.id,
         title: "Chapter 3 worksheet",
-        dueDate: new Date("2026-08-01"),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         createdById: teacher.id,
       },
     });
@@ -318,7 +318,7 @@ describe("/api/assignments", () => {
         academicYearId: year.id,
         subjectId: subject.id,
         title: "Chapter 3 worksheet",
-        dueDate: new Date("2026-08-01"),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         createdById: teacher.id,
       },
     });
@@ -397,7 +397,7 @@ describe("/api/assignments/[id]", () => {
         academicYearId: year.id,
         subjectId: subject.id,
         title: "Chapter 3 worksheet",
-        dueDate: new Date("2026-08-01"),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         createdById: teacher.id,
       },
     });
@@ -557,7 +557,7 @@ describe("/api/assignments/[id]/statuses", () => {
         academicYearId: year.id,
         subjectId: subject.id,
         title: "Chapter 3 worksheet",
-        dueDate: new Date("2026-08-01"),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         createdById: teacher.id,
       },
     });

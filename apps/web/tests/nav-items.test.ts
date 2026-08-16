@@ -14,16 +14,18 @@ describe("getNavItemsForRole", () => {
     ]);
   });
 
-  it("returns all ten items for admin, including Classes, Staff, and Academic Years", () => {
+  it("returns all twelve items for admin, including Classes, Staff, Grades, Periods, and Academic Years", () => {
     const items = getNavItemsForRole("admin");
     expect(items.map((item) => item.href)).toEqual([
       "/dashboard",
+      "/dashboard/grades",
       "/dashboard/classes",
       "/dashboard/staff",
       "/dashboard/students",
       "/dashboard/attendance",
       "/dashboard/assignments",
       "/dashboard/marks",
+      "/dashboard/periods",
       "/dashboard/timetable",
       "/dashboard/fees",
       "/dashboard/academic-years",
