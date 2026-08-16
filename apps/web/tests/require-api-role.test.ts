@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { requireApiRole } from "../src/lib/auth/require-api-role";
 import { signSessionToken } from "../src/lib/auth/jwt";
+import { AuthError } from "../src/lib/auth/rbac";
 
 describe("requireApiRole", () => {
   beforeEach(async () => {
@@ -35,7 +36,9 @@ describe("requireApiRole", () => {
   it("throws a 401 AuthError when there is no session cookie", async () => {
     cookieStore.get.mockReturnValue(undefined);
 
-    await expect(requireApiRole(["admin"])).rejects.toMatchObject({ status: 401 });
+    const result = requireApiRole(["admin"]);
+    await expect(result).rejects.toBeInstanceOf(AuthError);
+    await expect(result).rejects.toMatchObject({ status: 401 });
   });
 
   it("throws a 403 AuthError when the role is not allowed", async () => {
@@ -46,7 +49,9 @@ describe("requireApiRole", () => {
     const token = signSessionToken({ userId: teacher.id, role: "teacher", schoolId: school.id });
     cookieStore.get.mockReturnValue({ value: token });
 
-    await expect(requireApiRole(["admin"])).rejects.toMatchObject({ status: 403 });
+    const result = requireApiRole(["admin"]);
+    await expect(result).rejects.toBeInstanceOf(AuthError);
+    await expect(result).rejects.toMatchObject({ status: 403 });
   });
 
   it("rejects a request from a user whose status is inactive, even with a valid session", async () => {
@@ -61,7 +66,9 @@ describe("requireApiRole", () => {
 
     cookieStore.get.mockReturnValue({ value: token });
 
-    await expect(requireApiRole(["teacher", "admin"])).rejects.toMatchObject({ status: 401 });
+    const result = requireApiRole(["teacher", "admin"]);
+    await expect(result).rejects.toBeInstanceOf(AuthError);
+    await expect(result).rejects.toMatchObject({ status: 401 });
   });
 
   it("throws a 401 AuthError when the DB user no longer exists", async () => {
@@ -69,6 +76,8 @@ describe("requireApiRole", () => {
     const token = signSessionToken({ userId: 999999, role: "admin", schoolId: school.id });
     cookieStore.get.mockReturnValue({ value: token });
 
-    await expect(requireApiRole(["admin"])).rejects.toMatchObject({ status: 401 });
+    const result = requireApiRole(["admin"]);
+    await expect(result).rejects.toBeInstanceOf(AuthError);
+    await expect(result).rejects.toMatchObject({ status: 401 });
   });
 });
