@@ -96,6 +96,39 @@ describe("POST /api/auth/session", () => {
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
+  it("returns 429 with a clear message after too many incorrect attempts", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: { phone: "+15550008888", role: "teacher", name: "Test Teacher", schoolId: school.id },
+    });
+
+    const smsSender = new FakeSmsSender();
+    await sendOtp("+15550008888", { prisma, smsSender });
+    const code = extractCode(smsSender.lastMessage);
+
+    for (let i = 0; i < 5; i++) {
+      const request = new Request("http://localhost/api/auth/session", {
+        method: "POST",
+        body: JSON.stringify({ phone: "+15550008888", code: "000000" }),
+        headers: { "content-type": "application/json" },
+      });
+      const response = await sessionRoute(request);
+      expect(response.status).toBe(401);
+    }
+
+    const request = new Request("http://localhost/api/auth/session", {
+      method: "POST",
+      body: JSON.stringify({ phone: "+15550008888", code }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await sessionRoute(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(body).toEqual({ error: "Too many incorrect attempts. Request a new code." });
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it("returns 400 for a malformed request body", async () => {
     const request = new Request("http://localhost/api/auth/session", {
       method: "POST",

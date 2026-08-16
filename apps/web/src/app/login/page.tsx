@@ -57,6 +57,10 @@ export default function LoginPage() {
       router.push(body.role === "parent" ? "/parent" : "/dashboard");
       return;
     }
+    if (response.status === 429) {
+      setError("Too many incorrect attempts. Request a new code.");
+      return;
+    }
     if (response.status === 401) {
       setError("Incorrect or expired code. Try again");
       return;
