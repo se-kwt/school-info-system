@@ -128,6 +128,7 @@ model SyllabusVersion {
   createdAt   DateTime @default(now())
 
   @@unique([subjectId, versionNum])
+  @@index([createdById])
 }
 
 model Period {
@@ -176,6 +177,8 @@ model User {
   timetableEntries    TimetableEntry[]
   promotionRunsRun    PromotionRun[]
   syllabusVersions    SyllabusVersion[]
+
+  @@index([schoolId])
 }
 
 model Student {
@@ -200,6 +203,8 @@ model Student {
   promotionLogEntries PromotionLogEntry[]
   siblingLinks        StudentSibling[]    @relation("StudentSiblingA")
   siblingOfLinks      StudentSibling[]    @relation("StudentSiblingB")
+
+  @@index([schoolId])
 }
 
 model StudentSibling {
@@ -210,6 +215,7 @@ model StudentSibling {
   siblingId Int
 
   @@unique([studentId, siblingId])
+  @@index([siblingId])
 }
 
 model ParentStudent {
@@ -221,6 +227,7 @@ model ParentStudent {
   relationship String  @default("Guardian")
 
   @@unique([parentUserId, studentId])
+  @@index([studentId])
 }
 
 model Class {
@@ -243,6 +250,8 @@ model Class {
   mappingsTo       PromotionMapping[] @relation("MappingTo")
 
   @@unique([gradeId, section, academicYearId])
+  @@index([schoolId])
+  @@index([academicYearId])
 }
 
 model ClassTeacher {
@@ -258,6 +267,9 @@ model ClassTeacher {
   academicYearId Int
 
   @@unique([classId, teacherUserId, subjectId, academicYearId])
+  @@index([teacherUserId])
+  @@index([subjectId])
+  @@index([academicYearId])
 }
 
 model Attendance {
@@ -271,6 +283,7 @@ model Attendance {
   note       String?
 
   @@unique([studentId, date])
+  @@index([markedById])
 }
 
 model Assignment {
@@ -290,6 +303,11 @@ model Assignment {
   academicYearId Int
 
   statuses AssignmentStatus[]
+
+  @@index([classId])
+  @@index([subjectId])
+  @@index([createdById])
+  @@index([academicYearId])
 }
 
 model AssignmentStatus {
@@ -301,6 +319,7 @@ model AssignmentStatus {
   status       AssignmentStatusValue @default(pending)
 
   @@unique([assignmentId, studentId])
+  @@index([studentId])
 }
 
 model Exam {
@@ -314,6 +333,9 @@ model Exam {
   academicYearId Int
 
   marks Mark[]
+
+  @@index([schoolId])
+  @@index([academicYearId])
 }
 
 model Mark {
@@ -329,6 +351,8 @@ model Mark {
   grade         String
 
   @@unique([examId, studentId, subjectId])
+  @@index([studentId])
+  @@index([subjectId])
 }
 
 model TimetableEntry {
@@ -346,6 +370,10 @@ model TimetableEntry {
   academicYearId Int
 
   @@unique([classId, dayOfWeek, periodId, academicYearId])
+  @@index([periodId])
+  @@index([subjectId])
+  @@index([teacherUserId])
+  @@index([academicYearId])
 }
 
 model FeeStructure {
@@ -361,6 +389,10 @@ model FeeStructure {
   academicYearId Int
 
   payments FeePayment[]
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([academicYearId])
 }
 
 model FeePayment {
@@ -376,6 +408,8 @@ model FeePayment {
   status         FeeStatus    @default(unpaid)
 
   @@unique([studentId, feeStructureId])
+  @@index([feeStructureId])
+  @@index([recordedById])
 }
 
 model Notification {
@@ -388,6 +422,8 @@ model Notification {
   relatedId Int?
   readAt    DateTime?
   createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model OtpCode {
@@ -399,6 +435,8 @@ model OtpCode {
   attempts  Int       @default(0)
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+
+  @@index([phone])
 }
 
 model AcademicYear {
@@ -437,6 +475,7 @@ model Enrollment {
 
   @@unique([studentId, academicYearId])
   @@unique([classId, academicYearId, rollNumber])
+  @@index([academicYearId])
 }
 
 model PromotionRun {
@@ -455,6 +494,11 @@ model PromotionRun {
 
   mappings   PromotionMapping[]
   logEntries PromotionLogEntry[]
+
+  @@index([schoolId])
+  @@index([fromAcademicYearId])
+  @@index([toAcademicYearId])
+  @@index([initiatedById])
 }
 
 model PromotionMapping {
@@ -467,6 +511,8 @@ model PromotionMapping {
   toClassId      Int?
 
   @@unique([promotionRunId, fromClassId])
+  @@index([fromClassId])
+  @@index([toClassId])
 }
 
 model PromotionLogEntry {
@@ -480,4 +526,5 @@ model PromotionLogEntry {
   action         EnrollmentStatus
 
   @@unique([promotionRunId, studentId])
+  @@index([studentId])
 }
