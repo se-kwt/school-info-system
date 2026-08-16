@@ -370,6 +370,7 @@ model TimetableEntry {
   academicYearId Int
 
   @@unique([classId, dayOfWeek, periodId, academicYearId])
+  @@unique([teacherUserId, dayOfWeek, periodId, academicYearId])
   @@index([periodId])
   @@index([subjectId])
   @@index([teacherUserId])

@@ -78,4 +78,35 @@ describe("timetable lib", () => {
 
     expect(result).toMatchObject({ ok: false, error: "INVALID_SUBJECT" });
   });
+
+  it("rejects creating a second timetable entry for the same teacher in the same slot, in a different class", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 5" } });
+    const classA = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, gradeId: grade.id, section: "A" });
+    const classB = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, gradeId: grade.id, section: "B" });
+    const subject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Math" } });
+    const period = await prisma.period.create({ data: { schoolId: school.id, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" } });
+    const teacher = await prisma.user.create({
+      data: { schoolId: school.id, phone: "+15550004444", name: "A Teacher", role: "teacher" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: classA.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: year.id },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: classB.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: year.id },
+    });
+
+    const firstBooking = await createTimetableEntry(prisma, {
+      schoolId: school.id, academicYearId: year.id, classId: classA.id,
+      dayOfWeek: 1, periodId: period.id, subjectId: subject.id, teacherUserId: teacher.id,
+    });
+    expect(firstBooking.ok).toBe(true);
+
+    const clashingBooking = await createTimetableEntry(prisma, {
+      schoolId: school.id, academicYearId: year.id, classId: classB.id,
+      dayOfWeek: 1, periodId: period.id, subjectId: subject.id, teacherUserId: teacher.id,
+    });
+    expect(clashingBooking).toMatchObject({ ok: false, error: "TEACHER_ALREADY_BOOKED" });
+  });
 });

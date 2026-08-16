@@ -101,6 +101,12 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
+      if (result.error === "TEACHER_ALREADY_BOOKED") {
+        return NextResponse.json(
+          { error: "This teacher is already booked for another class at this day and period" },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
         { error: "A period already exists for this class, day, and period" },
         { status: 409 }

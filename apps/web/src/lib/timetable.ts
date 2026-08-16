@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "./auth/jwt";
-import { isUniqueConstraintViolation } from "./school-setup/prisma-errors";
+import { isUniqueConstraintViolation, uniqueConstraintTarget } from "./school-setup/prisma-errors";
 
 export interface TimetableEntrySummary {
   id: number;
@@ -61,6 +61,7 @@ export type CreateTimetableEntryResult =
   | { ok: false; error: "INVALID_DAY" }
   | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "INVALID_TEACHER" }
+  | { ok: false; error: "TEACHER_ALREADY_BOOKED" }
   | { ok: false; error: "DUPLICATE_SLOT" };
 
 export async function createTimetableEntry(
@@ -89,6 +90,18 @@ export async function createTimetableEntry(
     if (!link) return { ok: false, error: "INVALID_TEACHER" };
   }
 
+  if (params.teacherUserId !== undefined) {
+    const clash = await prisma.timetableEntry.findFirst({
+      where: {
+        teacherUserId: params.teacherUserId,
+        dayOfWeek: params.dayOfWeek,
+        periodId: params.periodId,
+        academicYearId: params.academicYearId,
+      },
+    });
+    if (clash) return { ok: false, error: "TEACHER_ALREADY_BOOKED" };
+  }
+
   try {
     const created = await prisma.timetableEntry.create({
       data: {
@@ -102,7 +115,11 @@ export async function createTimetableEntry(
     });
     return { ok: true, id: created.id };
   } catch (err) {
-    if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE_SLOT" };
+    if (isUniqueConstraintViolation(err)) {
+      const target = uniqueConstraintTarget(err);
+      if (target?.includes("teacherUserId")) return { ok: false, error: "TEACHER_ALREADY_BOOKED" };
+      return { ok: false, error: "DUPLICATE_SLOT" };
+    }
     throw err;
   }
 }
@@ -111,7 +128,8 @@ export type EditTimetableEntryResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "INVALID_SUBJECT" }
-  | { ok: false; error: "INVALID_TEACHER" };
+  | { ok: false; error: "INVALID_TEACHER" }
+  | { ok: false; error: "TEACHER_ALREADY_BOOKED" };
 
 export async function editTimetableEntry(
   prisma: PrismaClient,
@@ -139,12 +157,31 @@ export async function editTimetableEntry(
         },
       });
       if (!link) return { ok: false, error: "INVALID_TEACHER" };
+
+      const clash = await prisma.timetableEntry.findFirst({
+        where: {
+          teacherUserId: params.fields.teacherUserId,
+          dayOfWeek: entry.dayOfWeek,
+          periodId: entry.periodId,
+          academicYearId: entry.academicYearId,
+          id: { not: params.entryId },
+        },
+      });
+      if (clash) return { ok: false, error: "TEACHER_ALREADY_BOOKED" };
     }
     data.teacherUserId = params.fields.teacherUserId;
   }
 
-  await prisma.timetableEntry.update({ where: { id: params.entryId }, data });
-  return { ok: true };
+  try {
+    await prisma.timetableEntry.update({ where: { id: params.entryId }, data });
+    return { ok: true };
+  } catch (err) {
+    if (isUniqueConstraintViolation(err)) {
+      const target = uniqueConstraintTarget(err);
+      if (target?.includes("teacherUserId")) return { ok: false, error: "TEACHER_ALREADY_BOOKED" };
+    }
+    throw err;
+  }
 }
 
 export type DeleteTimetableEntryResult = { ok: true } | { ok: false; error: "NOT_FOUND" };

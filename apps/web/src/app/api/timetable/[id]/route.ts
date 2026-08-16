@@ -37,6 +37,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (result.error === "INVALID_SUBJECT") {
         return NextResponse.json({ error: "This subject does not belong to the class's grade" }, { status: 400 });
       }
+      if (result.error === "TEACHER_ALREADY_BOOKED") {
+        return NextResponse.json(
+          { error: "This teacher is already booked for another class at this day and period" },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
         { error: "The selected teacher is not assigned to teach this subject on this class" },
         { status: 400 }
