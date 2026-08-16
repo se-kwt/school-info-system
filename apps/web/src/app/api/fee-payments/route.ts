@@ -14,9 +14,17 @@ import { getFeeRoster, recordPayment, type RecordPaymentResult } from "@/lib/fee
  * cleanly succeeding. Retry once — the retry reads the other request's
  * already-committed write and either succeeds or returns a normal
  * business-rule error (e.g. EXCEEDS_AMOUNT_DUE), never a 500.
+ *
+ * P2028 (transaction API error, e.g. the interactive transaction's timeout
+ * being exceeded under contention) is treated the same way — it's another
+ * failure mode that shows up specifically under contention and should be
+ * retried/handled like a conflict rather than escaping as an unhandled 500.
  */
 function isTransactionConflict(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034";
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    (err.code === "P2034" || err.code === "P2028")
+  );
 }
 
 async function recordPaymentWithRetry(
