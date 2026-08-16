@@ -10,7 +10,9 @@ export async function sendOtp(
 ): Promise<{ success: true; code?: string }> {
   const user = await deps.prisma.user.findUnique({ where: { phone } });
   if (!user || user.status === "inactive") {
-    throw new Error("PHONE_NOT_REGISTERED");
+    // Do not reveal whether this phone is registered -- return the same shape
+    // as a real send, having done nothing.
+    return { success: true };
   }
 
   const code = generateOtpCode();

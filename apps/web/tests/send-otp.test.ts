@@ -53,14 +53,26 @@ describe("sendOtp", () => {
     expect(smsSender.sentMessages[0].message).toContain(result.code!);
   });
 
-  it("rejects an unregistered phone number", async () => {
-    const smsSender = new FakeSmsSender();
-    await expect(sendOtp("+15559999999", { prisma, smsSender })).rejects.toThrow(
-      "PHONE_NOT_REGISTERED"
-    );
+  it("returns the identical response shape for an unregistered phone as for a registered one, and does not create an OtpCode row", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: { schoolId: school.id, phone: "+15550002222", name: "Registered", role: "parent" },
+    });
+
+    const fakeSmsSender = new FakeSmsSender();
+
+    const registeredResult = await sendOtp("+15550002222", { prisma, smsSender: fakeSmsSender });
+    const unregisteredResult = await sendOtp("+15550009999", { prisma, smsSender: fakeSmsSender });
+
+    expect(registeredResult).toEqual({ success: true });
+    expect(unregisteredResult).toEqual({ success: true }); // identical shape -- no way to tell them apart
+    expect(fakeSmsSender.sentMessages).toHaveLength(1); // only the registered phone actually got an SMS
+
+    const otpRows = await prisma.otpCode.findMany({ where: { phone: "+15550009999" } });
+    expect(otpRows).toHaveLength(0); // nothing generated/stored for the unregistered phone
   });
 
-  it("rejects a deactivated user's phone exactly like an unregistered one", async () => {
+  it("treats a deactivated user's phone the same as an unregistered one — returns success without sending SMS or creating OtpCode", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await prisma.user.create({
       data: {
@@ -73,10 +85,13 @@ describe("sendOtp", () => {
     });
 
     const smsSender = new FakeSmsSender();
-    await expect(sendOtp("+15550002222", { prisma, smsSender })).rejects.toThrow(
-      "PHONE_NOT_REGISTERED"
-    );
-    expect(smsSender.sentMessages).toHaveLength(0);
+    const result = await sendOtp("+15550002222", { prisma, smsSender });
+
+    expect(result).toEqual({ success: true });
+    expect(smsSender.sentMessages).toHaveLength(0); // no SMS sent
+    
+    const otpRows = await prisma.otpCode.findMany({ where: { phone: "+15550002222" } });
+    expect(otpRows).toHaveLength(0); // no OTP created
   });
 
   it("returns a clean 400 JSON error for a malformed request body instead of throwing", async () => {
