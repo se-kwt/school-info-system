@@ -5,4 +5,4 @@
 
 */
 -- CreateIndex
-CREATE UNIQUE INDEX "TimetableEntry_teacherUserId_dayOfWeek_periodId_academicYearId_key" ON "TimetableEntry"("teacherUserId", "dayOfWeek", "periodId", "academicYearId");
+CREATE UNIQUE INDEX "TimetableEntry_teacherUserId_dayOfWeek_periodId_academicYea_key" ON "TimetableEntry"("teacherUserId", "dayOfWeek", "periodId", "academicYearId");
