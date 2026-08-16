@@ -37,7 +37,9 @@ describe("sendOtp", () => {
     const stored = await prisma.otpCode.findFirst({ where: { phone: "+15550001111" } });
     expect(stored).not.toBeNull();
     expect(stored?.codeHash).not.toBe("");
-    expect(result.code).toBeUndefined();
+    if (result.success) {
+      expect(result.code).toBeUndefined();
+    }
   });
 
   it("only returns the plaintext code when exposeCodeForTesting is explicitly passed", async () => {
@@ -49,8 +51,11 @@ describe("sendOtp", () => {
     const smsSender = new FakeSmsSender();
     const result = await sendOtp("+15550003333", { prisma, smsSender, exposeCodeForTesting: true });
 
-    expect(result.code).toMatch(/^\d{6}$/);
-    expect(smsSender.sentMessages[0].message).toContain(result.code!);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.code).toMatch(/^\d{6}$/);
+      expect(smsSender.sentMessages[0].message).toContain(result.code!);
+    }
   });
 
   it("returns the identical response shape for an unregistered phone as for a registered one, and does not create an OtpCode row", async () => {
@@ -89,9 +94,26 @@ describe("sendOtp", () => {
 
     expect(result).toEqual({ success: true });
     expect(smsSender.sentMessages).toHaveLength(0); // no SMS sent
-    
+
     const otpRows = await prisma.otpCode.findMany({ where: { phone: "+15550002222" } });
     expect(otpRows).toHaveLength(0); // no OTP created
+  });
+
+  it("rejects a 4th OTP request for the same phone within 10 minutes", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: { schoolId: school.id, phone: "+15550003333", name: "Test User", role: "parent" },
+    });
+    const fakeSmsSender = new FakeSmsSender();
+
+    for (let i = 0; i < 3; i++) {
+      const result = await sendOtp("+15550003333", { prisma, smsSender: fakeSmsSender });
+      expect(result).toEqual({ success: true });
+    }
+
+    const fourth = await sendOtp("+15550003333", { prisma, smsSender: fakeSmsSender });
+    expect(fourth).toEqual({ success: false, error: "RATE_LIMITED" });
+    expect(fakeSmsSender.sentMessages).toHaveLength(3); // the 4th never sent
   });
 
   it("returns a clean 400 JSON error for a malformed request body instead of throwing", async () => {

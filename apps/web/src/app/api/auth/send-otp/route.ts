@@ -18,5 +18,8 @@ export async function POST(request: Request) {
     smsSender: new ConsoleSmsSender(),
     exposeCodeForTesting: process.env.EXPOSE_OTP_FOR_TESTING === "true",
   });
+  if (!result.success) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
   return NextResponse.json({ success: true, code: result.code });
 }
