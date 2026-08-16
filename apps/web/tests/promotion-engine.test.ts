@@ -568,6 +568,47 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
     expect(logEntries).toHaveLength(3);
   });
 
+  it("rejects confirming a run that is already confirmed", async () => {
+    const { school, runId } = await seedReadyRun();
+    const { confirmPromotionRun } = await import("../src/lib/promotion");
+
+    const first = await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+    expect(first).toMatchObject({ ok: true });
+
+    const second = await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+    expect(second).toMatchObject({ ok: false, error: "ALREADY_CONFIRMED" });
+  });
+
+  it("rejects updating mappings on a run that is already confirmed", async () => {
+    const { school, runId, gradeOne, gradeTwo } = await seedReadyRun();
+    const { confirmPromotionRun, updateMappings } = await import("../src/lib/promotion");
+
+    const confirmed = await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+    expect(confirmed).toMatchObject({ ok: true });
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: runId,
+      schoolId: school.id,
+      mappings: [{ fromClassId: gradeOne.id, toClassId: gradeTwo.id }],
+    });
+    expect(result).toMatchObject({ ok: false, error: "ALREADY_CONFIRMED" });
+  });
+
+  it("rejects setting student decisions on a run that is already confirmed", async () => {
+    const { school, runId, promotedStudent } = await seedReadyRun();
+    const { confirmPromotionRun, setStudentDecisions } = await import("../src/lib/promotion");
+
+    const confirmed = await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+    expect(confirmed).toMatchObject({ ok: true });
+
+    const result = await setStudentDecisions(prisma, {
+      promotionRunId: runId,
+      schoolId: school.id,
+      decisions: [{ studentId: promotedStudent.id, action: "retained" }],
+    });
+    expect(result).toMatchObject({ ok: false, error: "ALREADY_CONFIRMED" });
+  });
+
   it("rejects confirming when a student in a mapped class has no decision", async () => {
     const { startOrResumePromotionRun, updateMappings, confirmPromotionRun } = await import(
       "../src/lib/promotion"

@@ -32,6 +32,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       if (result.error === "NOT_FOUND") {
         return NextResponse.json({ error: "Promotion run not found" }, { status: 404 });
       }
+      if (result.error === "ALREADY_CONFIRMED") {
+        return NextResponse.json(
+          { error: "This promotion run has already been confirmed" },
+          { status: 409 }
+        );
+      }
       if (result.error === "STUDENT_NOT_IN_RUN") {
         return NextResponse.json(
           { error: "One or more students are not part of this promotion run" },

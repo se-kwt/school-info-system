@@ -17,6 +17,12 @@ export async function POST(_request: Request, { params }: { params: { id: string
       if (result.error === "NOT_FOUND") {
         return NextResponse.json({ error: "Promotion run not found" }, { status: 404 });
       }
+      if (result.error === "ALREADY_CONFIRMED") {
+        return NextResponse.json(
+          { error: "This promotion run has already been confirmed" },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
         { error: "All students must have a decision before confirming" },
         { status: 400 }

@@ -82,6 +82,7 @@ export async function startOrResumePromotionRun(
 export type UpdateMappingsResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "ALREADY_CONFIRMED" }
   | { ok: false; error: "INVALID_MAPPING" };
 
 export async function updateMappings(
@@ -97,6 +98,7 @@ export async function updateMappings(
     include: { mappings: true },
   });
   if (!run) return { ok: false, error: "NOT_FOUND" };
+  if (run.status === "confirmed") return { ok: false, error: "ALREADY_CONFIRMED" };
 
   const existingFromClassIds = new Set(run.mappings.map((mapping) => mapping.fromClassId));
   for (const mapping of params.mappings) {
@@ -194,6 +196,7 @@ export async function getRosterForReview(
 export type SetDecisionsResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "ALREADY_CONFIRMED" }
   | { ok: false; error: "STUDENT_NOT_IN_RUN" }
   | { ok: false; error: "MISSING_TARGET_CLASS" };
 
@@ -210,6 +213,7 @@ export async function setStudentDecisions(
     include: { mappings: true },
   });
   if (!run) return { ok: false, error: "NOT_FOUND" };
+  if (run.status === "confirmed") return { ok: false, error: "ALREADY_CONFIRMED" };
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
@@ -324,6 +328,7 @@ export async function getRunSummary(
 export type ConfirmPromotionRunResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "ALREADY_CONFIRMED" }
   | { ok: false; error: "UNDECIDED_STUDENTS" };
 
 export async function confirmPromotionRun(
@@ -334,6 +339,7 @@ export async function confirmPromotionRun(
     where: { id: params.promotionRunId, schoolId: params.schoolId },
   });
   if (!run) return { ok: false, error: "NOT_FOUND" };
+  if (run.status === "confirmed") return { ok: false, error: "ALREADY_CONFIRMED" };
 
   const rosterResult = await getRosterForReview(prisma, params);
   if (!rosterResult.ok) return rosterResult;
