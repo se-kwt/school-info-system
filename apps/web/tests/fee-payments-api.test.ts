@@ -378,4 +378,30 @@ describe("POST /api/fee-payments", () => {
     const body = await response.json();
     expect(body).toEqual({ amountPaid: 5000, status: "paid" });
   });
+
+  it("does not lose a payment when two POSTs race on the same student/fee", async () => {
+    const { school, student, feeStructure } = await seedSchoolWithFeeStructure();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550114444", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    function pay(amount: number) {
+      const request = new Request("http://localhost/api/fee-payments", {
+        method: "POST",
+        body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount }),
+        headers: { "content-type": "application/json" },
+      });
+      return postFeePayments(request);
+    }
+
+    const [r1, r2] = await Promise.all([pay(2000), pay(3000)]);
+
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+
+    const rows = await prisma.feePayment.findMany({ where: { studentId: student.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].amountPaid).toBe(5000); // both payments must be reflected, not just the last writer's
+  });
 });

@@ -71,58 +71,57 @@ export async function recordPayment(
     amount: number;
   }
 ): Promise<RecordPaymentResult> {
-  const feeStructure = await prisma.feeStructure.findFirst({
-    where: { id: params.feeStructureId, schoolId: params.schoolId },
-  });
-  if (!feeStructure) return { ok: false, error: "INVALID_FEE_STRUCTURE" };
+  return prisma.$transaction(
+    async (tx) => {
+      const feeStructure = await tx.feeStructure.findFirst({
+        where: { id: params.feeStructureId, schoolId: params.schoolId },
+      });
+      if (!feeStructure) return { ok: false, error: "INVALID_FEE_STRUCTURE" };
 
-  const enrollment = await prisma.enrollment.findFirst({
-    where: {
-      studentId: params.studentId,
-      classId: feeStructure.classId,
-      academicYearId: feeStructure.academicYearId,
-      status: "active",
-    },
-  });
-  if (!enrollment) return { ok: false, error: "STUDENT_MISMATCH" };
-  if (params.amount <= 0) return { ok: false, error: "INVALID_AMOUNT" };
+      const enrollment = await tx.enrollment.findFirst({
+        where: {
+          studentId: params.studentId,
+          classId: feeStructure.classId,
+          academicYearId: feeStructure.academicYearId,
+          status: "active",
+        },
+      });
+      if (!enrollment) return { ok: false, error: "STUDENT_MISMATCH" };
+      if (params.amount <= 0) return { ok: false, error: "INVALID_AMOUNT" };
 
-  const existing = await prisma.feePayment.findUnique({
-    where: {
-      studentId_feeStructureId: {
-        studentId: params.studentId,
-        feeStructureId: params.feeStructureId,
-      },
-    },
-  });
-  const existingAmountPaid = existing ? existing.amountPaid : 0;
-  const newAmountPaid = existingAmountPaid + params.amount;
+      const existing = await tx.feePayment.findUnique({
+        where: {
+          studentId_feeStructureId: { studentId: params.studentId, feeStructureId: params.feeStructureId },
+        },
+      });
+      const existingAmountPaid = existing ? existing.amountPaid : 0;
+      const newAmountPaid = existingAmountPaid + params.amount;
 
-  if (newAmountPaid > feeStructure.amount) return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
+      if (newAmountPaid > feeStructure.amount) return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
 
-  const status = computeFeeStatus(newAmountPaid, feeStructure.amount);
-  await prisma.feePayment.upsert({
-    where: {
-      studentId_feeStructureId: {
-        studentId: params.studentId,
-        feeStructureId: params.feeStructureId,
-      },
-    },
-    create: {
-      studentId: params.studentId,
-      feeStructureId: params.feeStructureId,
-      amountPaid: newAmountPaid,
-      paidDate: new Date(),
-      recordedById: params.recordedById,
-      status,
-    },
-    update: {
-      amountPaid: newAmountPaid,
-      paidDate: new Date(),
-      recordedById: params.recordedById,
-      status,
-    },
-  });
+      const status = computeFeeStatus(newAmountPaid, feeStructure.amount);
+      await tx.feePayment.upsert({
+        where: {
+          studentId_feeStructureId: { studentId: params.studentId, feeStructureId: params.feeStructureId },
+        },
+        create: {
+          studentId: params.studentId,
+          feeStructureId: params.feeStructureId,
+          amountPaid: newAmountPaid,
+          paidDate: new Date(),
+          recordedById: params.recordedById,
+          status,
+        },
+        update: {
+          amountPaid: newAmountPaid,
+          paidDate: new Date(),
+          recordedById: params.recordedById,
+          status,
+        },
+      });
 
-  return { ok: true, amountPaid: newAmountPaid, status };
+      return { ok: true, amountPaid: newAmountPaid, status };
+    },
+    { isolationLevel: "Serializable" }
+  );
 }

@@ -1,8 +1,36 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
-import { getFeeRoster, recordPayment } from "@/lib/fee-payments";
+import { getFeeRoster, recordPayment, type RecordPaymentResult } from "@/lib/fee-payments";
+
+/**
+ * `recordPayment` runs inside a Serializable transaction. Under real
+ * concurrent writes, Postgres can abort the losing transaction with a
+ * serialization failure (Prisma error code P2034) instead of silently
+ * corrupting data. That's the whole point of Serializable isolation, but it
+ * means a legitimate double-submit can throw instead of both requests
+ * cleanly succeeding. Retry once — the retry reads the other request's
+ * already-committed write and either succeeds or returns a normal
+ * business-rule error (e.g. EXCEEDS_AMOUNT_DUE), never a 500.
+ */
+function isTransactionConflict(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034";
+}
+
+async function recordPaymentWithRetry(
+  params: Parameters<typeof recordPayment>[1]
+): Promise<RecordPaymentResult> {
+  try {
+    return await recordPayment(prisma, params);
+  } catch (err) {
+    if (isTransactionConflict(err)) {
+      return await recordPayment(prisma, params);
+    }
+    throw err;
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -56,7 +84,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await recordPayment(prisma, {
+    const result = await recordPaymentWithRetry({
       feeStructureId,
       studentId,
       schoolId: claims.schoolId,
@@ -90,6 +118,12 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    if (isTransactionConflict(err)) {
+      return NextResponse.json(
+        { error: "This payment conflicted with another update. Please try again." },
+        { status: 409 }
+      );
     }
     throw err;
   }
