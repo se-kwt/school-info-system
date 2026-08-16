@@ -71,6 +71,9 @@ export async function recordPayment(
     amount: number;
   }
 ): Promise<RecordPaymentResult> {
+  // NOTE: early returns below still COMMIT the transaction (Prisma only rolls back on a thrown
+  // error) -- safe today because nothing has written yet at those points, but any future write
+  // added above an early-return branch must account for this.
   return prisma.$transaction(
     async (tx) => {
       const feeStructure = await tx.feeStructure.findFirst({
