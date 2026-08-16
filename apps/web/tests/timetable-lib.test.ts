@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
-import { listTimetableEntries, createTimetableEntry } from "../src/lib/timetable";
+import { listTimetableEntries, createTimetableEntry, editTimetableEntry } from "../src/lib/timetable";
+import { createActiveYear, createClass } from "./helpers/enrollment";
 
 describe("timetable lib", () => {
   let schoolId: number;
@@ -51,5 +52,30 @@ describe("timetable lib", () => {
       schoolId, academicYearId: yearId, classId, dayOfWeek: 1, periodId, subjectId, teacherUserId: unassigned.id,
     });
     expect(result).toEqual({ ok: false, error: "INVALID_TEACHER" });
+  });
+
+  it("rejects editTimetableEntry when the new subjectId doesn't belong to the entry's class's grade", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const gradeA = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade A" } });
+    const gradeB = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade B" } });
+    const classA = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, gradeId: gradeA.id, section: "A" });
+    const subjectInGradeB = await prisma.subject.create({ data: { gradeId: gradeB.id, name: "Foreign Subject" } });
+    const period = await prisma.period.create({ data: { schoolId: school.id, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" } });
+    const subjectInGradeA = await prisma.subject.create({ data: { gradeId: gradeA.id, name: "Native Subject" } });
+
+    const created = await createTimetableEntry(prisma, {
+      schoolId: school.id, academicYearId: year.id, classId: classA.id,
+      dayOfWeek: 1, periodId: period.id, subjectId: subjectInGradeA.id,
+    });
+    if (!created.ok) throw new Error("setup failed");
+
+    const result = await editTimetableEntry(prisma, {
+      entryId: created.id,
+      schoolId: school.id,
+      fields: { subjectId: subjectInGradeB.id },
+    });
+
+    expect(result).toMatchObject({ ok: false, error: "INVALID_SUBJECT" });
   });
 });

@@ -34,6 +34,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (result.error === "NOT_FOUND") {
         return NextResponse.json({ error: "Timetable entry not found" }, { status: 404 });
       }
+      if (result.error === "INVALID_SUBJECT") {
+        return NextResponse.json({ error: "This subject does not belong to the class's grade" }, { status: 400 });
+      }
       return NextResponse.json(
         { error: "The selected teacher is not assigned to teach this subject on this class" },
         { status: 400 }

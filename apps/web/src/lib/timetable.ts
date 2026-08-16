@@ -110,6 +110,7 @@ export async function createTimetableEntry(
 export type EditTimetableEntryResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "INVALID_TEACHER" };
 
 export async function editTimetableEntry(
@@ -120,7 +121,13 @@ export async function editTimetableEntry(
   if (!entry || entry.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
 
   const data: { subjectId?: number; teacherUserId?: number | null } = {};
-  if (params.fields.subjectId !== undefined) data.subjectId = params.fields.subjectId;
+  if (params.fields.subjectId !== undefined) {
+    const subject = await prisma.subject.findFirst({
+      where: { id: params.fields.subjectId, gradeId: entry.class.gradeId },
+    });
+    if (!subject) return { ok: false, error: "INVALID_SUBJECT" };
+    data.subjectId = params.fields.subjectId;
+  }
   if (params.fields.teacherUserId !== undefined) {
     if (params.fields.teacherUserId !== null) {
       const link = await prisma.classTeacher.findFirst({

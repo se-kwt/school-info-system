@@ -51,6 +51,26 @@ describe("classes lib", () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it("rejects editClass when the new gradeId belongs to a different school", async () => {
+    const schoolA = await prisma.school.create({ data: { name: "School A" } });
+    const schoolB = await prisma.school.create({ data: { name: "School B" } });
+    const yearA = await prisma.academicYear.create({
+      data: { schoolId: schoolA.id, name: "2026-27", startDate: new Date("2026-06-01"), endDate: new Date("2027-04-30"), status: "active" },
+    });
+    const gradeA = await prisma.grade.create({ data: { schoolId: schoolA.id, name: "Grade A" } });
+    const gradeB = await prisma.grade.create({ data: { schoolId: schoolB.id, name: "Grade B" } }); // different school
+    const classA = await createClass(prisma, schoolA.id, { gradeId: gradeA.id, section: "A", academicYearId: yearA.id });
+    if (!classA.ok) throw new Error("setup failed");
+
+    const result = await editClass(prisma, {
+      classId: classA.class.id,
+      schoolId: schoolA.id,
+      fields: { gradeId: gradeB.id },
+    });
+
+    expect(result).toMatchObject({ ok: false, error: "INVALID_GRADE" });
+  });
+
   it("blocks deleting a class with enrollment history", async () => {
     const created = await createClass(prisma, schoolId, { gradeId, section: "A", academicYearId: yearId });
     if (!created.ok) throw new Error("setup failed");

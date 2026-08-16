@@ -28,6 +28,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (result.error === "NOT_FOUND") {
         return NextResponse.json({ error: "Class not found" }, { status: 404 });
       }
+      if (result.error === "INVALID_GRADE") {
+        return NextResponse.json({ error: "The selected grade does not exist" }, { status: 400 });
+      }
+      if (result.error === "INVALID_YEAR") {
+        return NextResponse.json({ error: "The selected academic year does not exist" }, { status: 400 });
+      }
       return NextResponse.json({ error: "A class with this grade, section, and year already exists" }, { status: 409 });
     }
 

@@ -69,7 +69,12 @@ export async function createClass(
   }
 }
 
-export type EditClassResult = { ok: true } | { ok: false; error: "NOT_FOUND" } | { ok: false; error: "DUPLICATE" };
+export type EditClassResult =
+  | { ok: true }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "DUPLICATE" }
+  | { ok: false; error: "INVALID_GRADE" }
+  | { ok: false; error: "INVALID_YEAR" };
 
 export async function editClass(
   prisma: PrismaClient,
@@ -77,6 +82,15 @@ export async function editClass(
 ): Promise<EditClassResult> {
   const klass = await prisma.class.findFirst({ where: { id: params.classId, schoolId: params.schoolId } });
   if (!klass) return { ok: false, error: "NOT_FOUND" };
+
+  if (params.fields.gradeId !== undefined) {
+    const grade = await prisma.grade.findFirst({ where: { id: params.fields.gradeId, schoolId: params.schoolId } });
+    if (!grade) return { ok: false, error: "INVALID_GRADE" };
+  }
+  if (params.fields.academicYearId !== undefined) {
+    const year = await prisma.academicYear.findFirst({ where: { id: params.fields.academicYearId, schoolId: params.schoolId } });
+    if (!year) return { ok: false, error: "INVALID_YEAR" };
+  }
 
   const nextGradeId = params.fields.gradeId ?? klass.gradeId;
   const nextSection = params.fields.section ?? klass.section;
