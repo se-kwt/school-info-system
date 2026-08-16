@@ -44,8 +44,39 @@ export async function listStudents(
     where: { OR: [{ studentId: { in: studentIds } }, { siblingId: { in: studentIds } }] },
   });
 
+  // Sibling ids referenced by this page's students may fall on a different
+  // page (or be excluded from the current page's `where`/`skip`/`take`
+  // entirely), so fetch their summary data separately, unpaginated, rather
+  // than looking them up in the page-scoped `byId` map.
+  const referencedSiblingIds = new Set<number>();
+  for (const link of siblingLinks) {
+    if (byId.has(link.studentId)) referencedSiblingIds.add(link.siblingId);
+    if (byId.has(link.siblingId)) referencedSiblingIds.add(link.studentId);
+  }
+  const missingSiblingIds = [...referencedSiblingIds].filter((id) => !byId.has(id));
+
+  type StudentRow = (typeof students)[number];
+  const extraSiblingRows: StudentRow[] =
+    missingSiblingIds.length > 0
+      ? await prisma.student.findMany({
+          where: { id: { in: missingSiblingIds } },
+          include: {
+            parentLinks: { include: { parent: true } },
+            enrollments: {
+              where: activeYear ? { academicYearId: activeYear.id } : { id: -1 },
+              include: { class: { include: { grade: true } } },
+            },
+          },
+        })
+      : [];
+
+  const siblingSummaryById = new Map<number, StudentRow>(byId);
+  for (const row of extraSiblingRows) {
+    siblingSummaryById.set(row.id, row);
+  }
+
   function siblingSummary(id: number) {
-    const s = byId.get(id);
+    const s = siblingSummaryById.get(id);
     if (!s) return null;
     const enrollment = s.enrollments[0];
     return {

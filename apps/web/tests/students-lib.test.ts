@@ -522,4 +522,43 @@ describe("students.ts pagination", () => {
     const allStudents = await listStudents(prisma, school.id); // no options -- unchanged behavior
     expect(allStudents.length).toBeGreaterThanOrEqual(5);
   });
+
+  it("still resolves a sibling that falls on a different page", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 4", section: "A" });
+
+    // Create 5 students named so alphabetical (name asc) order is predictable:
+    // Alpha, Bravo, Charlie, Delta, Echo. Make Alpha and Echo siblings --
+    // with pageSize 2 they land on page 1 and page 3 respectively.
+    const names = ["Alpha", "Bravo", "Charlie", "Delta", "Echo"];
+    const created: { id: number; admissionNo: string }[] = [];
+    for (let i = 0; i < names.length; i++) {
+      const result = await createStudent(prisma, school.id, year.id, {
+        name: names[i],
+        dob: "2016-01-01",
+        classId: klass.id,
+        admissionNo: `SIB-${i}`,
+        parents: [{ relationship: "Mother", name: "A Parent", phone: `+1555001${1000 + i}` }],
+      });
+      if (!result.ok) throw new Error("create failed");
+      created.push({ id: result.student.id, admissionNo: result.student.admissionNo });
+    }
+
+    const alpha = created[0]; // page 1
+    const echo = created[4]; // page 3
+
+    await prisma.studentSibling.create({ data: { studentId: alpha.id, siblingId: echo.id } });
+
+    const firstPage = await listStudents(prisma, school.id, { page: 1, pageSize: 2 });
+    const alphaOnPage1 = firstPage.find((s) => s.admissionNo === alpha.admissionNo);
+    expect(alphaOnPage1).toBeDefined();
+    // Echo (on page 3) must still show up as Alpha's sibling, not be dropped.
+    expect(alphaOnPage1?.siblings.map((s) => s.admissionNo)).toEqual([echo.admissionNo]);
+
+    const thirdPage = await listStudents(prisma, school.id, { page: 3, pageSize: 2 });
+    const echoOnPage3 = thirdPage.find((s) => s.admissionNo === echo.admissionNo);
+    expect(echoOnPage3).toBeDefined();
+    expect(echoOnPage3?.siblings.map((s) => s.admissionNo)).toEqual([alpha.admissionNo]);
+  });
 });
