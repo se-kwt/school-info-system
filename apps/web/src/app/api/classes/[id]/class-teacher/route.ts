@@ -6,7 +6,7 @@ import { setClassTeacher } from "@/lib/school-setup/class-teachers";
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const classId = Number(params.id);
     if (Number.isNaN(classId)) {
       return NextResponse.json({ error: "Class not found" }, { status: 404 });

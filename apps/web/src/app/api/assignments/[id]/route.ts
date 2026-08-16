@@ -6,7 +6,7 @@ import { editAssignment } from "@/lib/assignments";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["teacher"]);
+    const claims = await requireApiRole(["teacher"]);
 
     const assignmentId = Number(params.id);
     if (Number.isNaN(assignmentId)) {

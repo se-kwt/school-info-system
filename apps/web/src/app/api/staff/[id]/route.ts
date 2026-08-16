@@ -7,7 +7,7 @@ import { deleteStaff, editStaff } from "@/lib/school-setup/staff";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const userId = Number(params.id);
     if (Number.isNaN(userId)) {
       return NextResponse.json({ error: "Staff member not found" }, { status: 404 });
@@ -67,7 +67,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const userId = Number(params.id);
     if (Number.isNaN(userId)) {
       return NextResponse.json({ error: "Staff member not found" }, { status: 404 });

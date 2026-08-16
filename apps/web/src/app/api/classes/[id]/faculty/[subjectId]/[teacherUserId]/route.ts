@@ -9,7 +9,7 @@ export async function DELETE(
   { params }: { params: { id: string; subjectId: string; teacherUserId: string } }
 ) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const classId = Number(params.id);
     const subjectId = Number(params.subjectId);
     const teacherUserId = Number(params.teacherUserId);

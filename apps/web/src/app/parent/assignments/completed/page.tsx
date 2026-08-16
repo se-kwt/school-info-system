@@ -11,7 +11,7 @@ export default async function ParentCompletedAssignmentsPage({
 }: {
   searchParams: { studentId?: string };
 }) {
-  const claims = requireParentRole();
+  const claims = await requireParentRole();
   const children = await getParentChildren(prisma, claims.userId);
 
   if (children.length === 0) {

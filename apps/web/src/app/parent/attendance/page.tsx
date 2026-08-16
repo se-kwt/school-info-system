@@ -12,7 +12,7 @@ export default async function ParentAttendancePage({
 }: {
   searchParams: { studentId?: string; month?: string };
 }) {
-  const claims = requireParentRole();
+  const claims = await requireParentRole();
   const children = await getParentChildren(prisma, claims.userId);
 
   if (children.length === 0) {

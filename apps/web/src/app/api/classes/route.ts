@@ -6,7 +6,7 @@ import { listClasses, createClass } from "@/lib/school-setup/classes";
 
 export async function GET(request: Request) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const { searchParams } = new URL(request.url);
     const includeArchived = searchParams.get("includeArchived") === "true";
     const academicYearIdParam = searchParams.get("academicYearId");
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
 
     let gradeId: number | undefined;
     let section: string | undefined;

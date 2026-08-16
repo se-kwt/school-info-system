@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PeriodsView } from "@/components/timetable/PeriodsView";
 
 export default async function PeriodsPage() {
-  const claims = requireDashboardRole(["admin"]);
+  const claims = await requireDashboardRole(["admin"]);
   const periods = await listPeriods(prisma, claims.schoolId);
 
   return (

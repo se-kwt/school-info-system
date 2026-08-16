@@ -6,7 +6,7 @@ import { getFeeRoster, recordPayment } from "@/lib/fee-payments";
 
 export async function GET(request: Request) {
   try {
-    const claims = requireApiRole(["admin", "accountant"]);
+    const claims = await requireApiRole(["admin", "accountant"]);
 
     const { searchParams } = new URL(request.url);
     const feeStructureIdParam = searchParams.get("feeStructureId");
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["admin", "accountant"]);
+    const claims = await requireApiRole(["admin", "accountant"]);
 
     let feeStructureId: number | undefined;
     let studentId: number | undefined;

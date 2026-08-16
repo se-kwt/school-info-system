@@ -11,7 +11,7 @@ import { RecentPaymentsTable } from "@/components/dashboard/RecentPaymentsTable"
 import { Users, CheckCircle2, Clock, Wallet, PiggyBank, Receipt } from "lucide-react";
 
 export default async function DashboardHomePage() {
-  const claims = requireDashboardRole(["teacher", "admin", "accountant"]);
+  const claims = await requireDashboardRole(["teacher", "admin", "accountant"]);
   const overview = await getDashboardOverview(prisma, claims);
 
   if (overview.role === "accountant") {

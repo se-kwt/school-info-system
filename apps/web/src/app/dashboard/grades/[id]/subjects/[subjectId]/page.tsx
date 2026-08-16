@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { SyllabusHistoryView } from "@/components/school-setup/SyllabusHistoryView";
 
 export default async function SubjectDetailPage({ params }: { params: { id: string; subjectId: string } }) {
-  const claims = requireDashboardRole(["admin"]);
+  const claims = await requireDashboardRole(["admin"]);
   const subjectId = Number(params.subjectId);
   if (Number.isNaN(subjectId)) notFound();
 

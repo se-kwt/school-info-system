@@ -7,7 +7,7 @@ import { resolveAcademicYear } from "@/lib/academic-years";
 
 export async function GET(request: Request) {
   try {
-    const claims = requireApiRole(["teacher", "admin"]);
+    const claims = await requireApiRole(["teacher", "admin"]);
 
     const { searchParams } = new URL(request.url);
     const classIdParam = searchParams.get("classId");
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["teacher"]);
+    const claims = await requireApiRole(["teacher"]);
 
     let classId: number | undefined;
     let subjectId: number | undefined;

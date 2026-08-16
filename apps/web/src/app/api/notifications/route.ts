@@ -5,7 +5,7 @@ import { AuthError } from "@/lib/auth/rbac";
 
 export async function GET() {
   try {
-    const claims = requireApiRole(["parent"]);
+    const claims = await requireApiRole(["parent"]);
 
     const notifications = await prisma.notification.findMany({
       where: { userId: claims.userId },

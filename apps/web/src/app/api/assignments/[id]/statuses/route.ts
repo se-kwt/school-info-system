@@ -6,7 +6,7 @@ import { getAssignmentStatuses, updateAssignmentStatuses } from "@/lib/assignmen
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["teacher", "admin"]);
+    const claims = await requireApiRole(["teacher", "admin"]);
 
     const assignmentId = Number(params.id);
     if (Number.isNaN(assignmentId)) {
@@ -38,7 +38,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["teacher"]);
+    const claims = await requireApiRole(["teacher"]);
 
     const assignmentId = Number(params.id);
     if (Number.isNaN(assignmentId)) {

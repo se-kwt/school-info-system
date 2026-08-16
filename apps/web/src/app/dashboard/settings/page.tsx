@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Settings } from "lucide-react";
 
 export default async function SettingsPage() {
-  const claims = requireDashboardRole(["teacher", "admin", "accountant"]);
+  const claims = await requireDashboardRole(["teacher", "admin", "accountant"]);
 
   if (claims.role !== "admin") {
     return <ComingSoon feature="Settings" icon={Settings} />;

@@ -4,7 +4,7 @@ import { requireDashboardRole } from "@/lib/auth/require-dashboard-role";
 import { prisma } from "@/lib/prisma";
 
 export default async function AcademicYearsPage() {
-  const claims = requireDashboardRole(["admin"]);
+  const claims = await requireDashboardRole(["admin"]);
   const years = await listAcademicYears(prisma, claims.schoolId);
 
   return (

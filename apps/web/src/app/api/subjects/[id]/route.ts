@@ -6,7 +6,7 @@ import { deleteSubject } from "@/lib/school-setup/subjects";
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const subjectId = Number(params.id);
     if (Number.isNaN(subjectId)) {
       return NextResponse.json({ error: "Subject not found" }, { status: 404 });

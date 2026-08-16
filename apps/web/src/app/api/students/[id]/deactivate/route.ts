@@ -7,7 +7,7 @@ import { deactivateStudent } from "@/lib/school-setup/students";
 
 export async function PATCH(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const studentId = Number(params.id);
     if (Number.isNaN(studentId)) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });

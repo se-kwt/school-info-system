@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { listClasses } from "@/lib/school-setup/classes";
 
 export default async function PromoteAcademicYearPage() {
-  const claims = requireDashboardRole(["admin"]);
+  const claims = await requireDashboardRole(["admin"]);
   const [years, classes] = await Promise.all([
     listAcademicYears(prisma, claims.schoolId),
     listClasses(prisma, claims.schoolId),

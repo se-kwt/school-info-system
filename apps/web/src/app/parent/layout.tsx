@@ -6,7 +6,7 @@ import { ProfileMenu } from "@/components/parent/ProfileMenu";
 import { SchoolLogo } from "@/components/SchoolLogo";
 
 export default async function ParentLayout({ children }: { children: React.ReactNode }) {
-  const claims = requireParentRole();
+  const claims = await requireParentRole();
   const user = await prisma.user.findUniqueOrThrow({ where: { id: claims.userId } });
   const school = await prisma.school.findUniqueOrThrow({ where: { id: claims.schoolId } });
 

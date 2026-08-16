@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { FacultyAssignmentView } from "@/components/school-setup/FacultyAssignmentView";
 
 export default async function ClassDetailPage({ params }: { params: { id: string } }) {
-  const claims = requireDashboardRole(["admin"]);
+  const claims = await requireDashboardRole(["admin"]);
   const classId = Number(params.id);
   if (Number.isNaN(classId)) notFound();
 

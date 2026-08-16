@@ -6,7 +6,7 @@ import { listPeriods, createPeriod } from "@/lib/periods";
 
 export async function GET() {
   try {
-    const claims = requireApiRole(["admin", "teacher"]);
+    const claims = await requireApiRole(["admin", "teacher"]);
     const periods = await listPeriods(prisma, claims.schoolId);
     return NextResponse.json(periods);
   } catch (err) {
@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
 
     let order: number | undefined;
     let label: string | undefined;

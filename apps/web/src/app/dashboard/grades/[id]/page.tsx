@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { GradeDetailView } from "@/components/school-setup/GradeDetailView";
 
 export default async function GradeDetailPage({ params }: { params: { id: string } }) {
-  const claims = requireDashboardRole(["admin"]);
+  const claims = await requireDashboardRole(["admin"]);
   const gradeId = Number(params.id);
   if (Number.isNaN(gradeId)) notFound();
 

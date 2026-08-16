@@ -7,7 +7,7 @@ import { setStudentDecisions } from "@/lib/promotion";
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const promotionRunId = Number(params.id);
     if (Number.isNaN(promotionRunId)) {
       return NextResponse.json({ error: "Promotion run not found" }, { status: 404 });

@@ -14,7 +14,7 @@ const MAX_SIZE_BYTES = 2 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
-    requireApiRole(["admin"]);
+    await requireApiRole(["admin"]);
 
     const formData = await request.formData();
     const file = formData.get("file");

@@ -6,7 +6,7 @@ import { createAcademicYear, listAcademicYears } from "@/lib/academic-years";
 
 export async function GET() {
   try {
-    const claims = requireApiRole(["admin", "teacher", "accountant"]);
+    const claims = await requireApiRole(["admin", "teacher", "accountant"]);
     const academicYears = await listAcademicYears(prisma, claims.schoolId);
     return NextResponse.json({ academicYears });
   } catch (err) {
@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
 
     let name: string | undefined;
     let startDate: string | undefined;

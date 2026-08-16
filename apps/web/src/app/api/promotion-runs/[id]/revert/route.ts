@@ -6,7 +6,7 @@ import { revertPromotionRun } from "@/lib/promotion";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const promotionRunId = Number(params.id);
     if (Number.isNaN(promotionRunId)) {
       return NextResponse.json({ error: "Promotion run not found" }, { status: 404 });

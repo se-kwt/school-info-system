@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { GradesView } from "@/components/school-setup/GradesView";
 
 export default async function GradesPage() {
-  const claims = requireDashboardRole(["admin"]);
+  const claims = await requireDashboardRole(["admin"]);
   const grades = await listGrades(prisma, claims.schoolId);
 
   return (

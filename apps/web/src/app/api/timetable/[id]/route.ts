@@ -6,7 +6,7 @@ import { editTimetableEntry, deleteTimetableEntry } from "@/lib/timetable";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
 
     const entryId = Number(params.id);
     if (Number.isNaN(entryId)) {
@@ -51,7 +51,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
 
     const entryId = Number(params.id);
     if (Number.isNaN(entryId)) {

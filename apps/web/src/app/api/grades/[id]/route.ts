@@ -6,7 +6,7 @@ import { editGrade, deleteGrade } from "@/lib/school-setup/grades";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const gradeId = Number(params.id);
     if (Number.isNaN(gradeId)) {
       return NextResponse.json({ error: "Grade not found" }, { status: 404 });
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const gradeId = Number(params.id);
     if (Number.isNaN(gradeId)) {
       return NextResponse.json({ error: "Grade not found" }, { status: 404 });

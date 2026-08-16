@@ -1,11 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { verifySessionCookie, SESSION_COOKIE_NAME } from "./session-cookie";
 import type { SessionClaims } from "./jwt";
 
 const STAFF_ROLES: SessionClaims["role"][] = ["teacher", "admin", "accountant"];
 
-export function requireDashboardRole(allowedRoles: SessionClaims["role"][]): SessionClaims {
+export async function requireDashboardRole(allowedRoles: SessionClaims["role"][]): Promise<SessionClaims> {
   const cookieValue = cookies().get(SESSION_COOKIE_NAME)?.value;
   const claims = verifySessionCookie(cookieValue);
 
@@ -18,6 +19,11 @@ export function requireDashboardRole(allowedRoles: SessionClaims["role"][]): Ses
 
   if (!allowedRoles.includes(claims.role)) {
     redirect("/dashboard");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: claims.userId }, select: { status: true } });
+  if (!user || user.status !== "active") {
+    redirect("/login");
   }
 
   return claims;

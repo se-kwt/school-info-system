@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/prisma";
 import { verifySessionCookie, SESSION_COOKIE_NAME } from "./session-cookie";
 import { AuthError } from "./rbac";
 import type { SessionClaims } from "./jwt";
 
-export function requireApiRole(allowedRoles: SessionClaims["role"][]): SessionClaims {
+export async function requireApiRole(allowedRoles: SessionClaims["role"][]): Promise<SessionClaims> {
   const cookieValue = cookies().get(SESSION_COOKIE_NAME)?.value;
   const claims = verifySessionCookie(cookieValue);
 
@@ -13,6 +14,11 @@ export function requireApiRole(allowedRoles: SessionClaims["role"][]): SessionCl
 
   if (!allowedRoles.includes(claims.role)) {
     throw new AuthError(403, "Role not permitted for this resource");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: claims.userId }, select: { status: true } });
+  if (!user || user.status !== "active") {
+    throw new AuthError(401, "Account is no longer active");
   }
 
   return claims;

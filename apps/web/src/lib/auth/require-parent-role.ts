@@ -1,13 +1,19 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { verifySessionCookie, SESSION_COOKIE_NAME } from "./session-cookie";
 import type { SessionClaims } from "./jwt";
 
-export function requireParentRole(): SessionClaims {
+export async function requireParentRole(): Promise<SessionClaims> {
   const cookieValue = cookies().get(SESSION_COOKIE_NAME)?.value;
   const claims = verifySessionCookie(cookieValue);
 
   if (!claims || claims.role !== "parent") {
+    redirect("/login");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: claims.userId }, select: { status: true } });
+  if (!user || user.status !== "active") {
     redirect("/login");
   }
 

@@ -7,7 +7,7 @@ import { AssignmentsView } from "@/components/assignments/AssignmentsView";
 import { getActiveAcademicYear } from "@/lib/academic-years";
 
 export default async function AssignmentsPage() {
-  const claims = requireDashboardRole(["teacher", "admin"]);
+  const claims = await requireDashboardRole(["teacher", "admin"]);
   const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
   const [classes, subjects] = await Promise.all([
     claims.role === "teacher"

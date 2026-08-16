@@ -6,7 +6,7 @@ import { setPeriodDayOverride, clearPeriodDayOverride } from "@/lib/periods";
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const periodId = Number(params.id);
     if (Number.isNaN(periodId)) {
       return NextResponse.json({ error: "Period not found" }, { status: 404 });
@@ -43,7 +43,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const periodId = Number(params.id);
     if (Number.isNaN(periodId)) {
       return NextResponse.json({ error: "Period not found" }, { status: 404 });

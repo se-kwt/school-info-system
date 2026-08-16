@@ -6,7 +6,7 @@ import { deleteClass, editClass } from "@/lib/school-setup/classes";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const classId = Number(params.id);
     if (Number.isNaN(classId)) {
       return NextResponse.json({ error: "Class not found" }, { status: 404 });
@@ -42,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const classId = Number(params.id);
     if (Number.isNaN(classId)) {
       return NextResponse.json({ error: "Class not found" }, { status: 404 });

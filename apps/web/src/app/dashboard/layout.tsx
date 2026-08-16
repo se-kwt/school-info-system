@@ -11,7 +11,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const claims = requireDashboardRole(["teacher", "admin", "accountant"]);
+  const claims = await requireDashboardRole(["teacher", "admin", "accountant"]);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: claims.userId } });
   const school = await prisma.school.findUniqueOrThrow({ where: { id: claims.schoolId } });
   const navItems = getNavItemsForRole(claims.role);

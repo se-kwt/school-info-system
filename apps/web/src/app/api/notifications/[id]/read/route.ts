@@ -5,7 +5,7 @@ import { AuthError } from "@/lib/auth/rbac";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["parent"]);
+    const claims = await requireApiRole(["parent"]);
 
     const notificationId = Number(params.id);
     if (Number.isNaN(notificationId)) {

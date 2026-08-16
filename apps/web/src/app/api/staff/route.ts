@@ -14,7 +14,7 @@ function isValidRole(value: unknown): value is StaffRole {
 
 export async function GET() {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const staff = await listStaff(prisma, claims.schoolId);
     return NextResponse.json(staff);
   } catch (err) {
@@ -27,7 +27,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
 
     let name: string | undefined;
     let phone: string | undefined;

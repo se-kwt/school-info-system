@@ -6,7 +6,7 @@ import { archiveClass } from "@/lib/school-setup/classes";
 
 export async function PATCH(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const classId = Number(params.id);
     if (Number.isNaN(classId)) {
       return NextResponse.json({ error: "Class not found" }, { status: 404 });

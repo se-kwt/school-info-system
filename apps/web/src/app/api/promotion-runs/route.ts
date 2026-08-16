@@ -6,7 +6,7 @@ import { startOrResumePromotionRun } from "@/lib/promotion";
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
 
     let toAcademicYearId: number | undefined;
     try {

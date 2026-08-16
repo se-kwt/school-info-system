@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { StudentsView } from "@/components/school-setup/StudentsView";
 
 export default async function StudentsPage() {
-  const claims = requireDashboardRole(["teacher", "admin"]);
+  const claims = await requireDashboardRole(["teacher", "admin"]);
   const isAdmin = claims.role === "admin";
   const [students, classes] = await Promise.all([
     listStudents(prisma, claims.schoolId),

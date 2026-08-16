@@ -6,7 +6,7 @@ import { listSyllabusVersions, createSyllabusVersion } from "@/lib/school-setup/
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin", "teacher"]);
+    const claims = await requireApiRole(["admin", "teacher"]);
     const subjectId = Number(params.id);
     if (Number.isNaN(subjectId)) {
       return NextResponse.json({ error: "Subject not found" }, { status: 404 });
@@ -27,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
     const subjectId = Number(params.id);
     if (Number.isNaN(subjectId)) {
       return NextResponse.json({ error: "Subject not found" }, { status: 404 });

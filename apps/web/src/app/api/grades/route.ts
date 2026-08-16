@@ -6,7 +6,7 @@ import { listGrades, createGrade } from "@/lib/school-setup/grades";
 
 export async function GET() {
   try {
-    const claims = requireApiRole(["admin", "teacher"]);
+    const claims = await requireApiRole(["admin", "teacher"]);
     const grades = await listGrades(prisma, claims.schoolId);
     return NextResponse.json(grades);
   } catch (err) {
@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const claims = requireApiRole(["admin"]);
+    const claims = await requireApiRole(["admin"]);
 
     let name: string | undefined;
     try {

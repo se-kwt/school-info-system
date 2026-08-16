@@ -6,7 +6,7 @@ import { AttendanceView } from "@/components/attendance/AttendanceView";
 import { getActiveAcademicYear } from "@/lib/academic-years";
 
 export default async function AttendancePage() {
-  const claims = requireDashboardRole(["teacher", "admin"]);
+  const claims = await requireDashboardRole(["teacher", "admin"]);
   const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
   const classes =
     claims.role === "teacher"

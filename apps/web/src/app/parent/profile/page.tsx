@@ -3,7 +3,7 @@ import { requireParentRole } from "@/lib/auth/require-parent-role";
 import { getParentChildrenWithClass } from "@/lib/parent/overview";
 
 export default async function ParentProfilePage() {
-  const claims = requireParentRole();
+  const claims = await requireParentRole();
   const user = await prisma.user.findUniqueOrThrow({ where: { id: claims.userId } });
   const school = await prisma.school.findUniqueOrThrow({ where: { id: claims.schoolId } });
   const children = await getParentChildrenWithClass(prisma, claims.userId);

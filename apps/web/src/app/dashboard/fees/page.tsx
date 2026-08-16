@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { FeesView } from "@/components/fees/FeesView";
 
 export default async function FeesPage() {
-  const claims = requireDashboardRole(["admin", "accountant"]);
+  const claims = await requireDashboardRole(["admin", "accountant"]);
   const classes = await listClasses(prisma, claims.schoolId);
 
   return (
