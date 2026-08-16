@@ -146,6 +146,138 @@ describe("getDashboardOverview", () => {
     expect(overview.todayAttendancePercent).toBe(100);
   });
 
+  it("computes per-class attendancePercent and attendanceTrend correctly across multiple classes", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+
+    // Second class ("Grade 5 B") with its own student, distinct attendance record.
+    const classB = await prisma.class.create({
+      data: {
+        schoolId: fixtures.school.id,
+        gradeId: fixtures.grade.id,
+        section: "B",
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+    const studentB = await prisma.student.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Second Student",
+        dob: new Date("2015-05-01"),
+        admissionNo: "GH-2026-020",
+      },
+    });
+    await prisma.enrollment.create({
+      data: {
+        studentId: studentB.id,
+        classId: classB.id,
+        academicYearId: fixtures.academicYear.id,
+        status: "active",
+        rollNumber: "GH-2026-020",
+      },
+    });
+
+    // Third class ("Grade 5 C") with its own student, distinct attendance record.
+    const classC = await prisma.class.create({
+      data: {
+        schoolId: fixtures.school.id,
+        gradeId: fixtures.grade.id,
+        section: "C",
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+    const studentC = await prisma.student.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Third Student",
+        dob: new Date("2015-06-01"),
+        admissionNo: "GH-2026-021",
+      },
+    });
+    await prisma.enrollment.create({
+      data: {
+        studentId: studentC.id,
+        classId: classC.id,
+        academicYearId: fixtures.academicYear.id,
+        status: "active",
+        rollNumber: "GH-2026-021",
+      },
+    });
+
+    const todayStart = getSchoolLocalTodayStart();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const daysAgo = (n: number) => new Date(todayStart.getTime() - n * dayMs);
+
+    // classA (fixtures.student): 3 present, 1 absent over the last 4 days -> 75%.
+    await prisma.attendance.createMany({
+      data: [
+        { studentId: fixtures.student.id, date: daysAgo(3), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, date: daysAgo(2), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, date: todayStart, status: "present", markedById: fixtures.teacher.id },
+      ],
+    });
+
+    // classB (studentB): 1 present, 1 absent -> 50%.
+    await prisma.attendance.createMany({
+      data: [
+        { studentId: studentB.id, date: daysAgo(2), status: "present", markedById: fixtures.teacher.id },
+        { studentId: studentB.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
+      ],
+    });
+
+    // classC (studentC): all absent -> 0%.
+    await prisma.attendance.createMany({
+      data: [
+        { studentId: studentC.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
+        { studentId: studentC.id, date: todayStart, status: "absent", markedById: fixtures.teacher.id },
+      ],
+    });
+
+    const claims: SessionClaims = {
+      userId: fixtures.admin.id,
+      role: "admin",
+      schoolId: fixtures.school.id,
+    };
+    const overview = await getDashboardOverview(prisma, claims);
+
+    if (overview.role === "accountant") throw new Error("unexpected role");
+
+    const byClassId = new Map(overview.classPerformance.map((c) => [c.classId, c]));
+    expect(byClassId.get(fixtures.classA.id)?.attendancePercent).toBe(75);
+    expect(byClassId.get(classB.id)?.attendancePercent).toBe(50);
+    expect(byClassId.get(classC.id)?.attendancePercent).toBe(0);
+
+    // classPerformance is sorted descending by attendancePercent.
+    expect(overview.classPerformance.map((c) => c.classId)).toEqual([
+      fixtures.classA.id,
+      classB.id,
+      classC.id,
+    ]);
+
+    // attendanceTrend covers only the top 3 classes (all 3 here) over the last 5 days,
+    // skipping (date, class) pairs with no records that day.
+    const dateStr = (n: number) => daysAgo(n).toISOString().slice(0, 10);
+    const trendKey = (point: { date: string; classId: number }) => `${point.date}:${point.classId}`;
+    const trendByKey = new Map(overview.attendanceTrend.map((p) => [trendKey(p), p]));
+
+    expect(trendByKey.get(`${dateStr(3)}:${fixtures.classA.id}`)?.percent).toBe(100);
+    expect(trendByKey.get(`${dateStr(2)}:${fixtures.classA.id}`)?.percent).toBe(100);
+    expect(trendByKey.get(`${dateStr(1)}:${fixtures.classA.id}`)?.percent).toBe(0);
+    expect(trendByKey.get(`${dateStr(0)}:${fixtures.classA.id}`)?.percent).toBe(100);
+
+    expect(trendByKey.get(`${dateStr(2)}:${classB.id}`)?.percent).toBe(100);
+    expect(trendByKey.get(`${dateStr(1)}:${classB.id}`)?.percent).toBe(0);
+    expect(trendByKey.has(`${dateStr(3)}:${classB.id}`)).toBe(false);
+
+    expect(trendByKey.get(`${dateStr(1)}:${classC.id}`)?.percent).toBe(0);
+    expect(trendByKey.get(`${dateStr(0)}:${classC.id}`)?.percent).toBe(0);
+
+    // Every trend className is "<gradeName> <section>".
+    for (const point of overview.attendanceTrend) {
+      expect(point.className).toMatch(/^Grade 5 [ABC]$/);
+    }
+  });
+
   it("returns a fees-only, school-wide overview for accountant", async () => {
     const fixtures = await createSeedFixtures(prisma);
     const feeStructure = await prisma.feeStructure.create({

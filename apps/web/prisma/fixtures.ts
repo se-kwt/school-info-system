@@ -73,5 +73,5 @@ export async function createSeedFixtures(prisma: PrismaClient) {
     },
   });
 
-  return { school, academicYear, classA, teacher, admin, accountant, parent, student };
+  return { school, academicYear, grade, classA, teacher, admin, accountant, parent, student };
 }

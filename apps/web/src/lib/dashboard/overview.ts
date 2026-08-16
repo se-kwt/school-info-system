@@ -177,43 +177,90 @@ async function getAcademicOverview(
         )._sum.amountPaid ?? 0);
 
   const thirtyDaysAgo = addDays(todayStart, -30);
-  const classPerformance: ClassPerformanceEntry[] = [];
-  for (const klass of classes) {
-    const records = await prisma.attendance.findMany({
-      where: {
-        date: { gte: thirtyDaysAgo, lt: todayEnd },
-        student: { enrollments: { some: { classId: klass.id, academicYearId, status: "active" } } },
+  const classIdSet = new Set(classes.map((k) => k.id));
+  const allAttendanceRecords = await prisma.attendance.findMany({
+    where: {
+      date: { gte: thirtyDaysAgo, lt: todayEnd },
+      student: {
+        enrollments: { some: { classId: { in: [...classIdSet] }, academicYearId, status: "active" } },
       },
-      select: { status: true },
-    });
-    classPerformance.push({
-      classId: klass.id,
-      name: klass.gradeName,
-      section: klass.section,
-      attendancePercent: attendancePercent(records),
-    });
+    },
+    select: {
+      status: true,
+      student: {
+        select: {
+          enrollments: {
+            where: { classId: { in: [...classIdSet] }, academicYearId, status: "active" },
+            select: { classId: true },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  const recordsByClassId = new Map<number, { status: string }[]>();
+  for (const record of allAttendanceRecords) {
+    const classId = record.student.enrollments[0]?.classId;
+    if (classId === undefined) continue;
+    const bucket = recordsByClassId.get(classId) ?? [];
+    bucket.push({ status: record.status });
+    recordsByClassId.set(classId, bucket);
   }
+
+  const classPerformance: ClassPerformanceEntry[] = classes.map((klass) => ({
+    classId: klass.id,
+    name: klass.gradeName,
+    section: klass.section,
+    attendancePercent: attendancePercent(recordsByClassId.get(klass.id) ?? []),
+  }));
   classPerformance.sort((a, b) => b.attendancePercent - a.attendancePercent);
   const topClasses = classPerformance.slice(0, 5);
   const trendClasses = topClasses.slice(0, 3);
 
+  const trendClassIds = trendClasses.map((c) => c.classId);
+  const trendStart = addDays(todayStart, -4);
+  const trendRecords = await prisma.attendance.findMany({
+    where: {
+      date: { gte: trendStart, lt: todayEnd },
+      student: {
+        enrollments: { some: { classId: { in: trendClassIds }, academicYearId, status: "active" } },
+      },
+    },
+    select: {
+      date: true,
+      status: true,
+      student: {
+        select: {
+          enrollments: {
+            where: { classId: { in: trendClassIds }, academicYearId, status: "active" },
+            select: { classId: true },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  const trendBuckets = new Map<string, { status: string }[]>(); // key: `${dateStr}:${classId}`
+  for (const record of trendRecords) {
+    const classId = record.student.enrollments[0]?.classId;
+    if (classId === undefined) continue;
+    const key = `${record.date.toISOString().slice(0, 10)}:${classId}`;
+    const bucket = trendBuckets.get(key) ?? [];
+    bucket.push({ status: record.status });
+    trendBuckets.set(key, bucket);
+  }
+
   const attendanceTrend: AttendanceTrendPoint[] = [];
   for (let i = 4; i >= 0; i--) {
     const day = addDays(todayStart, -i);
-    const dayEnd = addDays(day, 1);
+    const dateStr = day.toISOString().slice(0, 10);
     for (const klass of trendClasses) {
-      const records = await prisma.attendance.findMany({
-        where: {
-          date: { gte: day, lt: dayEnd },
-          student: {
-            enrollments: { some: { classId: klass.classId, academicYearId, status: "active" } },
-          },
-        },
-        select: { status: true },
-      });
+      const records = trendBuckets.get(`${dateStr}:${klass.classId}`) ?? [];
       if (records.length === 0) continue;
       attendanceTrend.push({
-        date: day.toISOString().slice(0, 10),
+        date: dateStr,
         classId: klass.classId,
         className: `${klass.name} ${klass.section}`,
         percent: attendancePercent(records),
