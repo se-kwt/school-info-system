@@ -1,9 +1,10 @@
 import type { AssignmentStatusValue, PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "./auth/jwt";
 import { getEnrolledStudents } from "./enrollment";
+import { getSchoolLocalTodayStart } from "./date-utils";
 
 function isOverdue(dueDate: Date): boolean {
-  const todayStart = new Date(new Date().toISOString().slice(0, 10));
+  const todayStart = getSchoolLocalTodayStart();
   return dueDate < todayStart;
 }
 
