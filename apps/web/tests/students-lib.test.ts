@@ -415,4 +415,35 @@ describe("students.ts sibling links", () => {
     expect(result).toMatchObject({ ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" });
   });
 
+  it("rejects editStudent when a parent phone belongs to a non-parent user in the same school", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+
+    const teacher = await prisma.user.create({
+      data: { schoolId: school.id, phone: "+15550007777", name: "A Teacher", role: "teacher" },
+    });
+
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Existing",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-200",
+    });
+
+    const result = await editStudent(prisma, {
+      studentId: student.id,
+      schoolId: school.id,
+      academicYearId: year.id,
+      fields: { parents: [{ relationship: "Father", name: teacher.name, phone: teacher.phone }] },
+    });
+
+    expect(result).toMatchObject({ ok: false, error: "PHONE_WRONG_ROLE" });
+
+    const unchangedTeacher = await prisma.user.findUnique({ where: { id: teacher.id } });
+    expect(unchangedTeacher).toMatchObject({ role: "teacher", name: "A Teacher" });
+  });
+
 });

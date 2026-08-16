@@ -221,6 +221,7 @@ export type EditStudentResult =
   | { ok: false; error: "DUPLICATE_ADMISSION_NO" }
   | { ok: false; error: "DUPLICATE_ROLL_NUMBER" }
   | { ok: false; error: "DUPLICATE_STUDENT_ID" }
+  | { ok: false; error: "PHONE_WRONG_ROLE" }
   | { ok: false; error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SIBLING" }
@@ -271,6 +272,9 @@ export async function editStudent(
   if (params.fields.parents !== undefined) {
     for (const parentInput of params.fields.parents) {
       const existingParent = await prisma.user.findUnique({ where: { phone: parentInput.phone } });
+      if (existingParent && existingParent.role !== "parent") {
+        return { ok: false, error: "PHONE_WRONG_ROLE" };
+      }
       if (existingParent && existingParent.schoolId !== params.schoolId) {
         return { ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" };
       }
