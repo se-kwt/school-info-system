@@ -1,6 +1,7 @@
 import type { AttendanceStatus, PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "./auth/jwt";
 import { getEnrolledStudents } from "./enrollment";
+import { getSchoolLocalToday } from "./date-utils";
 
 export interface RosterEntry {
   studentId: number;
@@ -105,7 +106,7 @@ export async function markAttendance(
   }
 ): Promise<MarkAttendanceResult> {
   if (params.role === "teacher") {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getSchoolLocalToday();
     if (params.date !== today) {
       return { ok: false, error: "DATE_LOCKED" };
     }

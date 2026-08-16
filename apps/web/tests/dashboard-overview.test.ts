@@ -3,6 +3,7 @@ import { prisma, resetDb } from "./helpers/db";
 import { createSeedFixtures } from "../prisma/fixtures";
 import { getDashboardOverview } from "../src/lib/dashboard/overview";
 import type { SessionClaims } from "../src/lib/auth/jwt";
+import { getSchoolLocalTodayStart } from "../src/lib/date-utils";
 
 describe("getDashboardOverview", () => {
   beforeEach(async () => {
@@ -122,7 +123,9 @@ describe("getDashboardOverview", () => {
 
   it("computes today's attendance percent once attendance is marked", async () => {
     const fixtures = await createSeedFixtures(prisma);
-    const today = new Date(new Date().toISOString().slice(0, 10));
+    // getDashboardOverview's "today" window is anchored to the school's local
+    // (IST) calendar date, not the server's UTC date -- see src/lib/date-utils.ts.
+    const today = getSchoolLocalTodayStart();
     await prisma.attendance.create({
       data: {
         studentId: fixtures.student.id,

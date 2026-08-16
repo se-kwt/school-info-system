@@ -3,6 +3,7 @@ import type { SessionClaims } from "@/lib/auth/jwt";
 import { getClassesForTeacher } from "@/lib/data/scoped-queries";
 import { listClasses } from "@/lib/school-setup/classes";
 import { getActiveAcademicYear } from "@/lib/academic-years";
+import { getSchoolLocalTodayStart } from "@/lib/date-utils";
 
 export interface ClassPerformanceEntry {
   classId: number;
@@ -88,7 +89,7 @@ export interface FeesOverview {
 export type DashboardOverview = AcademicOverview | FeesOverview;
 
 function startOfToday(): Date {
-  return new Date(new Date().toISOString().slice(0, 10));
+  return getSchoolLocalTodayStart();
 }
 
 function addDays(date: Date, days: number): Date {

@@ -13,8 +13,11 @@ import { prisma, resetDb } from "./helpers/db";
 import { createActiveYear, createClass, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getAttendance, POST as postAttendance } from "../src/app/api/attendance/route";
+import { getSchoolLocalToday } from "../src/lib/date-utils";
 
-const today = new Date().toISOString().slice(0, 10);
+// Attendance's teacher edit-window lock is anchored to the school's local
+// (IST) calendar date, not the server's UTC date -- see src/lib/date-utils.ts.
+const today = getSchoolLocalToday();
 
 describe("/api/attendance", () => {
   beforeEach(async () => {

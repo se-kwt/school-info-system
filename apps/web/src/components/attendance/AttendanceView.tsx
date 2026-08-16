@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { StudentAttendanceCard } from "./StudentAttendanceCard";
 import { AttendanceReviewPanel } from "./AttendanceReviewPanel";
 import { cycleAttendanceStatus, type AttendanceStatusValue } from "@/lib/attendance-status";
+import { getSchoolLocalToday } from "@/lib/date-utils";
 
 interface ClassOption {
   id: number;
@@ -25,7 +26,7 @@ const inputClass =
   "rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none";
 
 function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getSchoolLocalToday();
 }
 
 export function AttendanceView({
