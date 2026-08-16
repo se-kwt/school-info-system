@@ -58,7 +58,7 @@ describe("sendOtp", () => {
     }
   });
 
-  it("returns the identical response shape for an unregistered phone as for a registered one, and does not create an OtpCode row", async () => {
+  it("returns the identical response shape for an unregistered phone as for a registered one", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await prisma.user.create({
       data: { schoolId: school.id, phone: "+15550002222", name: "Registered", role: "parent" },
@@ -73,11 +73,14 @@ describe("sendOtp", () => {
     expect(unregisteredResult).toEqual({ success: true }); // identical shape -- no way to tell them apart
     expect(fakeSmsSender.sentMessages).toHaveLength(1); // only the registered phone actually got an SMS
 
+    // A row is created for rate-limiting purposes, but with a random,
+    // permanently-unusable hash/salt -- it can never authenticate anyone.
     const otpRows = await prisma.otpCode.findMany({ where: { phone: "+15550009999" } });
-    expect(otpRows).toHaveLength(0); // nothing generated/stored for the unregistered phone
+    expect(otpRows).toHaveLength(1);
+    expect(otpRows[0].codeHash).not.toBe("");
   });
 
-  it("treats a deactivated user's phone the same as an unregistered one — returns success without sending SMS or creating OtpCode", async () => {
+  it("treats a deactivated user's phone the same as an unregistered one — returns success without sending SMS, but still records a rate-limit row", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await prisma.user.create({
       data: {
@@ -96,7 +99,20 @@ describe("sendOtp", () => {
     expect(smsSender.sentMessages).toHaveLength(0); // no SMS sent
 
     const otpRows = await prisma.otpCode.findMany({ where: { phone: "+15550002222" } });
-    expect(otpRows).toHaveLength(0); // no OTP created
+    expect(otpRows).toHaveLength(1); // rate-limit row recorded, matching registered-phone behavior
+  });
+
+  it("rejects a 4th OTP request for the same UNREGISTERED phone within 10 minutes, matching registered-phone behavior", async () => {
+    const fakeSmsSender = new FakeSmsSender();
+
+    for (let i = 0; i < 3; i++) {
+      const result = await sendOtp("+15550009191", { prisma, smsSender: fakeSmsSender });
+      expect(result).toEqual({ success: true });
+    }
+
+    const fourth = await sendOtp("+15550009191", { prisma, smsSender: fakeSmsSender });
+    expect(fourth).toEqual({ success: false, error: "RATE_LIMITED" });
+    expect(fakeSmsSender.sentMessages).toHaveLength(0); // never a real registered account, no SMS ever sent
   });
 
   it("rejects a 4th OTP request for the same phone within 10 minutes", async () => {
