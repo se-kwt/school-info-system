@@ -16,6 +16,12 @@ export async function POST(request: Request) {
   }
   const result = await verifyOtp(phone, code, { prisma });
   if (!result.ok) {
+    if (result.error === "TOO_MANY_ATTEMPTS") {
+      return NextResponse.json(
+        { error: "Too many incorrect attempts. Request a new code." },
+        { status: 429 }
+      );
+    }
     return NextResponse.json({ error: result.error }, { status: 401 });
   }
   return NextResponse.json({ token: result.token });

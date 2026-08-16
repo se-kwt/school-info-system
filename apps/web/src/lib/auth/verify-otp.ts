@@ -2,9 +2,11 @@ import type { PrismaClient } from "@prisma/client";
 import { verifyOtpCode } from "./otp";
 import { signSessionToken, type SessionClaims } from "./jwt";
 
+const MAX_OTP_ATTEMPTS = 5;
+
 export type VerifyOtpResult =
   | { ok: true; token: string; role: SessionClaims["role"] }
-  | { ok: false; error: "INVALID_CODE" | "EXPIRED" | "NOT_FOUND" };
+  | { ok: false; error: "INVALID_CODE" | "EXPIRED" | "NOT_FOUND" | "TOO_MANY_ATTEMPTS" };
 
 export async function verifyOtp(
   phone: string,
@@ -22,6 +24,10 @@ export async function verifyOtp(
 
   if (otpRecord.expiresAt < new Date()) {
     return { ok: false, error: "EXPIRED" };
+  }
+
+  if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
+    return { ok: false, error: "TOO_MANY_ATTEMPTS" };
   }
 
   const isValid = verifyOtpCode(code, otpRecord.codeHash, otpRecord.salt);

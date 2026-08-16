@@ -3,6 +3,7 @@ import { prisma, resetDb } from "./helpers/db";
 import { sendOtp } from "../src/lib/auth/send-otp";
 import { verifyOtp } from "../src/lib/auth/verify-otp";
 import { verifySessionToken } from "../src/lib/auth/jwt";
+import { hashOtpCode } from "../src/lib/auth/otp";
 import type { SmsSender } from "../src/lib/auth/sms-sender";
 import { POST as verifyOtpRoute } from "../src/app/api/auth/verify-otp/route";
 
@@ -130,6 +131,28 @@ describe("verifyOtp", () => {
 
     const result = await verifyOtp("+15550006666", code, { prisma });
     expect(result).toEqual({ ok: false, error: "NOT_FOUND" });
+  });
+
+  it("rejects verification after 5 wrong attempts even with the correct code on the 6th try", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const user = await prisma.user.create({
+      data: { schoolId: school.id, phone: "+15550001234", name: "Test Parent", role: "parent" },
+    });
+    const { hash, salt } = hashOtpCode("123456");
+    const record = await prisma.otpCode.create({
+      data: { phone: user.phone, codeHash: hash, salt, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
+    });
+
+    for (let i = 0; i < 5; i++) {
+      const result = await verifyOtp(user.phone, "000000", { prisma });
+      expect(result).toMatchObject({ ok: false, error: "INVALID_CODE" });
+    }
+
+    const sixthAttempt = await verifyOtp(user.phone, "123456", { prisma });
+    expect(sixthAttempt).toMatchObject({ ok: false, error: "TOO_MANY_ATTEMPTS" });
+
+    const finalRecord = await prisma.otpCode.findUnique({ where: { id: record.id } });
+    expect(finalRecord?.usedAt).toBeNull();
   });
 
   it("returns a clean 400 JSON error for a malformed request body instead of throwing", async () => {
