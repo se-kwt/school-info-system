@@ -446,4 +446,44 @@ describe("students.ts sibling links", () => {
     expect(unchangedTeacher).toMatchObject({ role: "teacher", name: "A Teacher" });
   });
 
+  it("rejects createStudent when a parent phone is malformed", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+
+    const result = await createStudent(prisma, school.id, year.id, {
+      name: "New Student",
+      dob: "2016-01-01",
+      classId: klass.id,
+      admissionNo: "SCH-INVALID-PHONE",
+      parents: [{ relationship: "Mother", name: "A Parent", phone: "not-a-phone" }],
+    });
+
+    expect(result).toMatchObject({ ok: false, error: "INVALID_PHONE" });
+  });
+
+  it("rejects editStudent when a parent phone is malformed", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Existing",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-201",
+    });
+
+    const result = await editStudent(prisma, {
+      studentId: student.id,
+      schoolId: school.id,
+      academicYearId: year.id,
+      fields: { parents: [{ relationship: "Father", name: "Bad Phone Parent", phone: "not-a-phone" }] },
+    });
+
+    expect(result).toMatchObject({ ok: false, error: "INVALID_PHONE" });
+  });
+
 });

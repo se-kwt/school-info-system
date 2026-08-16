@@ -41,6 +41,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (result.error === "DUPLICATE_PHONE") {
         return NextResponse.json({ error: "This phone number is already registered" }, { status: 409 });
       }
+      if (result.error === "INVALID_PHONE") {
+        return NextResponse.json({ error: "This phone number is not valid" }, { status: 400 });
+      }
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
       }

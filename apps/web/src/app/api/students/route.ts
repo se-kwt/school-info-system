@@ -105,6 +105,9 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+      if (result.error === "INVALID_PHONE") {
+        return NextResponse.json({ error: "One of the parent phone numbers is not valid" }, { status: 400 });
+      }
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
       }

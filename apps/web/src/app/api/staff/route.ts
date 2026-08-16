@@ -70,6 +70,9 @@ export async function POST(request: Request) {
       if (result.error === "INVALID_SUBJECT") {
         return NextResponse.json({ error: "This subject does not belong to the class's grade" }, { status: 400 });
       }
+      if (result.error === "INVALID_PHONE") {
+        return NextResponse.json({ error: "This phone number is not valid" }, { status: 400 });
+      }
       return NextResponse.json({ error: "This phone number is already registered" }, { status: 409 });
     }
 

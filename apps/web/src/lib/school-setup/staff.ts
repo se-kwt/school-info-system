@@ -1,5 +1,6 @@
 import type { PrismaClient, Role } from "@prisma/client";
 import { isUniqueConstraintViolation } from "./prisma-errors";
+import { isValidPhone, normalizePhone } from "../phone";
 
 type StaffRole = Exclude<Role, "parent">;
 
@@ -44,6 +45,7 @@ export async function listStaff(prisma: PrismaClient, schoolId: number): Promise
 export type CreateStaffResult =
   | { ok: true; staff: { id: number; name: string; phone: string; role: Role } }
   | { ok: false; error: "DUPLICATE_PHONE" }
+  | { ok: false; error: "INVALID_PHONE" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SUBJECT" };
 
@@ -53,7 +55,10 @@ export async function createStaff(
   academicYearId: number,
   input: { name: string; phone: string; role: Role; classId?: number; subjectId?: number }
 ): Promise<CreateStaffResult> {
-  const existing = await prisma.user.findUnique({ where: { phone: input.phone } });
+  if (!isValidPhone(input.phone)) return { ok: false, error: "INVALID_PHONE" };
+  const phone = normalizePhone(input.phone);
+
+  const existing = await prisma.user.findUnique({ where: { phone } });
   if (existing) return { ok: false, error: "DUPLICATE_PHONE" };
 
   let targetClass = null;
@@ -69,7 +74,7 @@ export async function createStaff(
   try {
     const staff = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
-        data: { schoolId, name: input.name, phone: input.phone, role: input.role },
+        data: { schoolId, name: input.name, phone, role: input.role },
       });
 
       if (input.role === "teacher" && input.classId && input.subjectId) {
@@ -97,6 +102,7 @@ export type EditStaffResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "DUPLICATE_PHONE" }
+  | { ok: false; error: "INVALID_PHONE" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "ROLE_CLASS_MISMATCH" }
@@ -121,9 +127,14 @@ export async function editStaff(
   const user = await prisma.user.findFirst({ where: { id: params.userId, schoolId: params.schoolId } });
   if (!user) return { ok: false, error: "NOT_FOUND" };
 
-  if (params.fields.phone && params.fields.phone !== user.phone) {
-    const existing = await prisma.user.findUnique({ where: { phone: params.fields.phone } });
-    if (existing) return { ok: false, error: "DUPLICATE_PHONE" };
+  let normalizedPhone: string | undefined;
+  if (params.fields.phone !== undefined) {
+    if (!isValidPhone(params.fields.phone)) return { ok: false, error: "INVALID_PHONE" };
+    normalizedPhone = normalizePhone(params.fields.phone);
+    if (normalizedPhone !== user.phone) {
+      const existing = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+      if (existing) return { ok: false, error: "DUPLICATE_PHONE" };
+    }
   }
 
   const nextRole = params.fields.role ?? user.role;
@@ -143,7 +154,7 @@ export async function editStaff(
   await prisma.$transaction(async (tx) => {
     const data: { name?: string; phone?: string; role?: Role } = {};
     if (params.fields.name !== undefined) data.name = params.fields.name;
-    if (params.fields.phone !== undefined) data.phone = params.fields.phone;
+    if (normalizedPhone !== undefined) data.phone = normalizedPhone;
     if (params.fields.role !== undefined) data.role = params.fields.role;
     if (Object.keys(data).length > 0) {
       await tx.user.update({ where: { id: params.userId }, data });

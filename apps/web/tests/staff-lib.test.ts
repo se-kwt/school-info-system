@@ -42,4 +42,27 @@ describe("staff lib subject assignment", () => {
     });
     expect(result).toEqual({ ok: false, error: "INVALID_SUBJECT" });
   });
+
+  it("rejects createStaff when the phone is malformed", async () => {
+    const result = await createStaff(prisma, schoolId, yearId, {
+      name: "Bad Phone", phone: "not-a-phone", role: "admin",
+    });
+    expect(result).toEqual({ ok: false, error: "INVALID_PHONE" });
+  });
+
+  it("rejects editStaff when the new phone is malformed", async () => {
+    const created = await createStaff(prisma, schoolId, yearId, {
+      name: "Admin One", phone: "+10000000011", role: "admin",
+    });
+    expect(created.ok).toBe(true);
+    const staffId = created.ok ? created.staff.id : -1;
+
+    const result = await editStaff(prisma, {
+      userId: staffId,
+      schoolId,
+      academicYearId: yearId,
+      fields: { phone: "not-a-phone" },
+    });
+    expect(result).toEqual({ ok: false, error: "INVALID_PHONE" });
+  });
 });

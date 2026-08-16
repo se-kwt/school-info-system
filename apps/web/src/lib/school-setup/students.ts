@@ -1,5 +1,6 @@
 import type { PrismaClient, StudentStatus } from "@prisma/client";
 import { isUniqueConstraintViolation, uniqueConstraintTarget } from "./prisma-errors";
+import { isValidPhone, normalizePhone } from "../phone";
 
 export interface StudentSummary {
   id: number;
@@ -94,6 +95,7 @@ export type CreateStudentResult =
   | { ok: false; error: "DUPLICATE_STUDENT_ID" }
   | { ok: false; error: "PHONE_WRONG_ROLE" }
   | { ok: false; error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" }
+  | { ok: false; error: "INVALID_PHONE" }
   | { ok: false; error: "PARENT_REQUIRED" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SIBLING" };
@@ -134,7 +136,9 @@ export async function createStudent(
   if (input.parents.length === 0) return { ok: false, error: "PARENT_REQUIRED" };
 
   for (const parentInput of input.parents) {
-    const existingParent = await prisma.user.findUnique({ where: { phone: parentInput.phone } });
+    if (!isValidPhone(parentInput.phone)) return { ok: false, error: "INVALID_PHONE" };
+    const phone = normalizePhone(parentInput.phone);
+    const existingParent = await prisma.user.findUnique({ where: { phone } });
     if (existingParent && existingParent.role !== "parent") return { ok: false, error: "PHONE_WRONG_ROLE" };
     if (existingParent && existingParent.schoolId !== schoolId) return { ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" };
   }
@@ -175,13 +179,14 @@ export async function createStudent(
       });
 
       for (const parentInput of input.parents) {
-        const existingParent = await tx.user.findUnique({ where: { phone: parentInput.phone } });
+        const phone = normalizePhone(parentInput.phone);
+        const existingParent = await tx.user.findUnique({ where: { phone } });
         const parent =
           existingParent ??
           (await tx.user.create({
             data: {
               schoolId,
-              phone: parentInput.phone,
+              phone,
               name: parentInput.name,
               email: parentInput.email ?? null,
               role: "parent",
@@ -223,6 +228,7 @@ export type EditStudentResult =
   | { ok: false; error: "DUPLICATE_STUDENT_ID" }
   | { ok: false; error: "PHONE_WRONG_ROLE" }
   | { ok: false; error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" }
+  | { ok: false; error: "INVALID_PHONE" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SIBLING" }
   | { ok: false; error: "NO_ACTIVE_ENROLLMENT" };
@@ -271,7 +277,9 @@ export async function editStudent(
 
   if (params.fields.parents !== undefined) {
     for (const parentInput of params.fields.parents) {
-      const existingParent = await prisma.user.findUnique({ where: { phone: parentInput.phone } });
+      if (!isValidPhone(parentInput.phone)) return { ok: false, error: "INVALID_PHONE" };
+      const phone = normalizePhone(parentInput.phone);
+      const existingParent = await prisma.user.findUnique({ where: { phone } });
       if (existingParent && existingParent.role !== "parent") {
         return { ok: false, error: "PHONE_WRONG_ROLE" };
       }
@@ -350,7 +358,7 @@ export async function editStudent(
           where: { studentId: params.studentId },
           include: { parent: true },
         });
-        const newPhones = new Set(params.fields.parents.map((p) => p.phone));
+        const newPhones = new Set(params.fields.parents.map((p) => normalizePhone(p.phone)));
 
         for (const link of existingLinks) {
           if (!newPhones.has(link.parent.phone)) {
@@ -359,12 +367,13 @@ export async function editStudent(
         }
 
         for (const parentInput of params.fields.parents) {
-          let parent = await tx.user.findUnique({ where: { phone: parentInput.phone } });
+          const phone = normalizePhone(parentInput.phone);
+          let parent = await tx.user.findUnique({ where: { phone } });
           if (!parent) {
             parent = await tx.user.create({
               data: {
                 schoolId: params.schoolId,
-                phone: parentInput.phone,
+                phone,
                 name: parentInput.name,
                 email: parentInput.email ?? null,
                 role: "parent",
