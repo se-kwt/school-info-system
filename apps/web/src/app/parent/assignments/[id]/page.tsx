@@ -16,13 +16,14 @@ function isImageAttachment(url: string): boolean {
   return /\.(png|jpe?g|webp)$/i.test(url);
 }
 
-export default async function ParentAssignmentDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { studentId?: string };
-}) {
+export default async function ParentAssignmentDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ studentId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const claims = await requireParentRole();
   const children = await getParentChildren(prisma, claims.userId);
 

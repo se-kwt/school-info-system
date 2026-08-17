@@ -7,11 +7,12 @@ import { getParentAttendanceMonth, getParentAttendanceYearSummary } from "@/lib/
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import { MonthCalendar } from "@/components/parent/MonthCalendar";
 
-export default async function ParentAttendancePage({
-  searchParams,
-}: {
-  searchParams: { studentId?: string; month?: string };
-}) {
+export default async function ParentAttendancePage(
+  props: {
+    searchParams: Promise<{ studentId?: string; month?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const claims = await requireParentRole();
   const children = await getParentChildren(prisma, claims.userId);
 

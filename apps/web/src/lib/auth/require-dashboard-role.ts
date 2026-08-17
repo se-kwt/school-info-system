@@ -7,7 +7,8 @@ import type { SessionClaims } from "./jwt";
 const STAFF_ROLES: SessionClaims["role"][] = ["teacher", "admin", "accountant"];
 
 export async function requireDashboardRole(allowedRoles: SessionClaims["role"][]): Promise<SessionClaims> {
-  const cookieValue = cookies().get(SESSION_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   const claims = verifySessionCookie(cookieValue);
 
   // A session with no staff role at all (e.g. "parent") can never reach any

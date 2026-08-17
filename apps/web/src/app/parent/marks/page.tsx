@@ -7,11 +7,12 @@ import { getParentMarksHistory } from "@/lib/parent/marks-history";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import { ExamBreakdown } from "@/components/parent/ExamBreakdown";
 
-export default async function ParentMarksPage({
-  searchParams,
-}: {
-  searchParams: { studentId?: string };
-}) {
+export default async function ParentMarksPage(
+  props: {
+    searchParams: Promise<{ studentId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const claims = await requireParentRole();
   const children = await getParentChildren(prisma, claims.userId);
 

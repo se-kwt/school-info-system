@@ -5,7 +5,8 @@ import { AuthError } from "@/lib/auth/rbac";
 import { getActiveAcademicYear } from "@/lib/academic-years";
 import { deactivateStudent } from "@/lib/school-setup/students";
 
-export async function PATCH(_request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
     const studentId = Number(params.id);

@@ -209,7 +209,7 @@ describe("/api/staff/[id]", () => {
       body: JSON.stringify({ name: "Renamed Teacher", role: "accountant" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStaff(request, { params: { id: String(teacher.id) } });
+    const response = await patchStaff(request, { params: Promise.resolve({ id: String(teacher.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.user.findUnique({ where: { id: teacher.id } });
@@ -229,7 +229,7 @@ describe("/api/staff/[id]", () => {
       body: JSON.stringify({ classId: klass.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStaff(request, { params: { id: String(teacher.id) } });
+    const response = await patchStaff(request, { params: Promise.resolve({ id: String(teacher.id) }) });
     expect(response.status).toBe(200);
 
     const assignment = await prisma.classTeacher.findFirst({
@@ -254,7 +254,7 @@ describe("/api/staff/[id]", () => {
       body: JSON.stringify({ role: "accountant" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStaff(request, { params: { id: String(teacher.id) } });
+    const response = await patchStaff(request, { params: Promise.resolve({ id: String(teacher.id) }) });
     expect(response.status).toBe(200);
 
     const assignment = await prisma.classTeacher.findFirst({ where: { teacherUserId: teacher.id } });
@@ -274,7 +274,7 @@ describe("/api/staff/[id]", () => {
       body: JSON.stringify({ role: "accountant", classId: klass.id, subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStaff(request, { params: { id: String(teacher.id) } });
+    const response = await patchStaff(request, { params: Promise.resolve({ id: String(teacher.id) }) });
     expect(response.status).toBe(400);
   });
 
@@ -284,7 +284,7 @@ describe("/api/staff/[id]", () => {
     loginAs(admin.id, school.id);
 
     const request = new Request(`http://localhost/api/staff/${teacher.id}`, { method: "DELETE" });
-    const response = await deleteStaffRoute(request, { params: { id: String(teacher.id) } });
+    const response = await deleteStaffRoute(request, { params: Promise.resolve({ id: String(teacher.id) }) });
     expect(response.status).toBe(200);
 
     const found = await prisma.user.findUnique({ where: { id: teacher.id } });
@@ -313,7 +313,7 @@ describe("/api/staff/[id]", () => {
     loginAs(admin.id, school.id);
 
     const request = new Request(`http://localhost/api/staff/${teacher.id}`, { method: "DELETE" });
-    const response = await deleteStaffRoute(request, { params: { id: String(teacher.id) } });
+    const response = await deleteStaffRoute(request, { params: Promise.resolve({ id: String(teacher.id) }) });
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.deletable).toBe(false);
@@ -325,7 +325,7 @@ describe("/api/staff/[id]", () => {
     loginAs(admin.id, school.id);
 
     const request = new Request(`http://localhost/api/staff/${admin.id}`, { method: "DELETE" });
-    const response = await deleteStaffRoute(request, { params: { id: String(admin.id) } });
+    const response = await deleteStaffRoute(request, { params: Promise.resolve({ id: String(admin.id) }) });
     expect(response.status).toBe(403);
   });
 
@@ -341,7 +341,7 @@ describe("/api/staff/[id]", () => {
     loginAs(admin.id, school.id);
 
     const request = new Request(`http://localhost/api/staff/${teacher.id}/deactivate`, { method: "PATCH" });
-    const response = await deactivateStaffRoute(request, { params: { id: String(teacher.id) } });
+    const response = await deactivateStaffRoute(request, { params: Promise.resolve({ id: String(teacher.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.user.findUnique({ where: { id: teacher.id } });
@@ -356,7 +356,7 @@ describe("/api/staff/[id]", () => {
     loginAs(admin.id, school.id);
 
     const request = new Request(`http://localhost/api/staff/${admin.id}/deactivate`, { method: "PATCH" });
-    const response = await deactivateStaffRoute(request, { params: { id: String(admin.id) } });
+    const response = await deactivateStaffRoute(request, { params: Promise.resolve({ id: String(admin.id) }) });
     expect(response.status).toBe(403);
   });
 
@@ -367,11 +367,11 @@ describe("/api/staff/[id]", () => {
 
     await deactivateStaffRoute(
       new Request(`http://localhost/api/staff/${teacher.id}/deactivate`, { method: "PATCH" }),
-      { params: { id: String(teacher.id) } }
+      { params: Promise.resolve({ id: String(teacher.id) }) }
     );
 
     const request = new Request(`http://localhost/api/staff/${teacher.id}/activate`, { method: "PATCH" });
-    const response = await activateStaffRoute(request, { params: { id: String(teacher.id) } });
+    const response = await activateStaffRoute(request, { params: Promise.resolve({ id: String(teacher.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.user.findUnique({ where: { id: teacher.id } });
@@ -388,7 +388,7 @@ describe("/api/staff/[id]", () => {
     });
 
     const request = new Request(`http://localhost/api/staff/${otherStaff.id}/activate`, { method: "PATCH" });
-    const response = await activateStaffRoute(request, { params: { id: String(otherStaff.id) } });
+    const response = await activateStaffRoute(request, { params: Promise.resolve({ id: String(otherStaff.id) }) });
     expect(response.status).toBe(404);
   });
 });

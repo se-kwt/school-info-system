@@ -74,7 +74,7 @@ describe("/api/notifications", () => {
     loginAsParent(parent.id, school.id);
 
     const readResponse = await markRead(new Request("http://localhost/api/notifications/1/read", { method: "POST" }), {
-      params: { id: String(notification.id) },
+      params: Promise.resolve({ id: String(notification.id) }),
     });
     expect(readResponse.status).toBe(200);
 
@@ -98,7 +98,7 @@ describe("/api/notifications", () => {
     loginAsParent(parent.id, school.id);
 
     const response = await markRead(new Request("http://localhost/api/notifications/1/read", { method: "POST" }), {
-      params: { id: String(notification.id) },
+      params: Promise.resolve({ id: String(notification.id) }),
     });
     expect(response.status).toBe(404);
   });

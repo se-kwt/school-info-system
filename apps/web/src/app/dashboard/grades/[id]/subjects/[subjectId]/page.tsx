@@ -4,7 +4,8 @@ import { listSyllabusVersions } from "@/lib/school-setup/subjects";
 import { prisma } from "@/lib/prisma";
 import { SyllabusHistoryView } from "@/components/school-setup/SyllabusHistoryView";
 
-export default async function SubjectDetailPage({ params }: { params: { id: string; subjectId: string } }) {
+export default async function SubjectDetailPage(props: { params: Promise<{ id: string; subjectId: string }> }) {
+  const params = await props.params;
   const claims = await requireDashboardRole(["admin"]);
   const subjectId = Number(params.subjectId);
   if (Number.isNaN(subjectId)) notFound();

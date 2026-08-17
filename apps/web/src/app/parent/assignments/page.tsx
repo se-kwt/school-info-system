@@ -6,11 +6,12 @@ import { resolveActiveChild } from "@/lib/parent/resolve-child";
 import { getParentAssignmentHistory } from "@/lib/parent/assignments-history";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 
-export default async function ParentAssignmentsPage({
-  searchParams,
-}: {
-  searchParams: { studentId?: string };
-}) {
+export default async function ParentAssignmentsPage(
+  props: {
+    searchParams: Promise<{ studentId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const claims = await requireParentRole();
   const children = await getParentChildren(prisma, claims.userId);
 

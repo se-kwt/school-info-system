@@ -12,11 +12,12 @@ const STATUS_CLASS: Record<"paid" | "partial" | "unpaid", string> = {
   unpaid: "text-red-600",
 };
 
-export default async function ParentFeesPage({
-  searchParams,
-}: {
-  searchParams: { studentId?: string };
-}) {
+export default async function ParentFeesPage(
+  props: {
+    searchParams: Promise<{ studentId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const claims = await requireParentRole();
   const children = await getParentChildren(prisma, claims.userId);
 

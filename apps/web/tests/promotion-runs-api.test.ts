@@ -131,11 +131,11 @@ describe("/api/promotion-runs", () => {
       body: JSON.stringify({ mappings: [{ fromClassId: gradeOne.id, toClassId: gradeTwo.id }] }),
       headers: { "content-type": "application/json" },
     });
-    expect((await putMappings(mappingsRequest, { params: { id: String(runId) } })).status).toBe(200);
+    expect((await putMappings(mappingsRequest, { params: Promise.resolve({ id: String(runId) }) })).status).toBe(200);
 
     const rosterResponse = await getRoster(
       new Request(`http://localhost/api/promotion-runs/${runId}/roster`),
-      { params: { id: String(runId) } }
+      { params: Promise.resolve({ id: String(runId) }) }
     );
     expect(rosterResponse.status).toBe(200);
     const rosterBody = await rosterResponse.json();
@@ -150,11 +150,11 @@ describe("/api/promotion-runs", () => {
       body: JSON.stringify({ decisions: [{ studentId: student.id, action: "retained" }] }),
       headers: { "content-type": "application/json" },
     });
-    expect((await putDecisions(decisionsRequest, { params: { id: String(runId) } })).status).toBe(200);
+    expect((await putDecisions(decisionsRequest, { params: Promise.resolve({ id: String(runId) }) })).status).toBe(200);
 
     const summaryResponse = await getSummary(
       new Request(`http://localhost/api/promotion-runs/${runId}/summary`),
-      { params: { id: String(runId) } }
+      { params: Promise.resolve({ id: String(runId) }) }
     );
     const summaryBody = await summaryResponse.json();
     expect(summaryBody.counts.retained).toBe(1);
@@ -162,7 +162,7 @@ describe("/api/promotion-runs", () => {
 
     const confirmResponse = await postConfirm(
       new Request(`http://localhost/api/promotion-runs/${runId}/confirm`, { method: "POST" }),
-      { params: { id: String(runId) } }
+      { params: Promise.resolve({ id: String(runId) }) }
     );
     expect(confirmResponse.status).toBe(200);
 
@@ -171,7 +171,7 @@ describe("/api/promotion-runs", () => {
 
     const revertResponse = await postRevert(
       new Request(`http://localhost/api/promotion-runs/${runId}/revert`, { method: "POST" }),
-      { params: { id: String(runId) } }
+      { params: Promise.resolve({ id: String(runId) }) }
     );
     expect(revertResponse.status).toBe(200);
 

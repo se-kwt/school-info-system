@@ -7,11 +7,12 @@ import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import { StudentInfoBanner } from "@/components/parent/StudentInfoBanner";
 import { AttendanceCard, AssignmentsCard, MarksCard, FeesCard } from "@/components/parent/SummaryCards";
 
-export default async function ParentPage({
-  searchParams,
-}: {
-  searchParams: { studentId?: string };
-}) {
+export default async function ParentPage(
+  props: {
+    searchParams: Promise<{ studentId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const claims = await requireParentRole();
   const children = await getParentChildrenWithClass(prisma, claims.userId);
 

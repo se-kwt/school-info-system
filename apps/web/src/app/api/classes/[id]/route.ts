@@ -4,7 +4,8 @@ import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { deleteClass, editClass } from "@/lib/school-setup/classes";
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
     const classId = Number(params.id);
@@ -46,7 +47,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
     const classId = Number(params.id);

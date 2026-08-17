@@ -4,7 +4,8 @@ import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { setPeriodDayOverride, clearPeriodDayOverride } from "@/lib/periods";
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
     const periodId = Number(params.id);
@@ -41,7 +42,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
     const periodId = Number(params.id);

@@ -158,7 +158,7 @@ describe("/api/classes/[id]", () => {
       body: JSON.stringify({ section: "B" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchClass(request, { params: { id: String(klass.id) } });
+    const response = await patchClass(request, { params: Promise.resolve({ id: String(klass.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.class.findUnique({ where: { id: klass.id } });
@@ -178,7 +178,7 @@ describe("/api/classes/[id]", () => {
       body: JSON.stringify({ section: "B" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchClass(request, { params: { id: String(klass.id) } });
+    const response = await patchClass(request, { params: Promise.resolve({ id: String(klass.id) }) });
     expect(response.status).toBe(409);
   });
 
@@ -189,7 +189,7 @@ describe("/api/classes/[id]", () => {
     const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}`, { method: "DELETE" });
-    const response = await deleteClassRoute(request, { params: { id: String(klass.id) } });
+    const response = await deleteClassRoute(request, { params: Promise.resolve({ id: String(klass.id) }) });
     expect(response.status).toBe(200);
 
     const found = await prisma.class.findUnique({ where: { id: klass.id } });
@@ -211,7 +211,7 @@ describe("/api/classes/[id]", () => {
     });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}`, { method: "DELETE" });
-    const response = await deleteClassRoute(request, { params: { id: String(klass.id) } });
+    const response = await deleteClassRoute(request, { params: Promise.resolve({ id: String(klass.id) }) });
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.deletable).toBe(false);
@@ -227,7 +227,7 @@ describe("/api/classes/[id]", () => {
     const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}/archive`, { method: "PATCH" });
-    const response = await archiveClassRoute(request, { params: { id: String(klass.id) } });
+    const response = await archiveClassRoute(request, { params: Promise.resolve({ id: String(klass.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.class.findUnique({ where: { id: klass.id } });
@@ -242,7 +242,7 @@ describe("/api/classes/[id]", () => {
     await prisma.class.update({ where: { id: klass.id }, data: { archived: true } });
 
     const request = new Request(`http://localhost/api/classes/${klass.id}/unarchive`, { method: "PATCH" });
-    const response = await unarchiveClassRoute(request, { params: { id: String(klass.id) } });
+    const response = await unarchiveClassRoute(request, { params: Promise.resolve({ id: String(klass.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.class.findUnique({ where: { id: klass.id } });
@@ -260,7 +260,7 @@ describe("/api/classes/[id]", () => {
     const request = new Request(`http://localhost/api/classes/${otherClass.id}/unarchive`, {
       method: "PATCH",
     });
-    const response = await unarchiveClassRoute(request, { params: { id: String(otherClass.id) } });
+    const response = await unarchiveClassRoute(request, { params: Promise.resolve({ id: String(otherClass.id) }) });
     expect(response.status).toBe(404);
   });
 
@@ -277,19 +277,19 @@ describe("/api/classes/[id]", () => {
         body: JSON.stringify({ section: "Z" }),
         headers: { "content-type": "application/json" },
       }),
-      { params: { id: String(otherClass.id) } }
+      { params: Promise.resolve({ id: String(otherClass.id) }) }
     );
     expect(patchResponse.status).toBe(404);
 
     const deleteResponse = await deleteClassRoute(
       new Request(`http://localhost/api/classes/${otherClass.id}`, { method: "DELETE" }),
-      { params: { id: String(otherClass.id) } }
+      { params: Promise.resolve({ id: String(otherClass.id) }) }
     );
     expect(deleteResponse.status).toBe(404);
 
     const archiveResponse = await archiveClassRoute(
       new Request(`http://localhost/api/classes/${otherClass.id}/archive`, { method: "PATCH" }),
-      { params: { id: String(otherClass.id) } }
+      { params: Promise.resolve({ id: String(otherClass.id) }) }
     );
     expect(archiveResponse.status).toBe(404);
   });

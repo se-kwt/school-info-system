@@ -4,7 +4,8 @@ import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { deleteSubject } from "@/lib/school-setup/subjects";
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
     const subjectId = Number(params.id);

@@ -294,7 +294,7 @@ describe("/api/students/[id]", () => {
       body: JSON.stringify({ name: "Updated Name", admissionNo: "SCH-EDIT-1B" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStudent(request, { params: { id: String(student.id) } });
+    const response = await patchStudent(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.student.findUnique({ where: { id: student.id } });
@@ -321,7 +321,7 @@ describe("/api/students/[id]", () => {
       body: JSON.stringify({ classId: gradeB.id }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStudent(request, { params: { id: String(student.id) } });
+    const response = await patchStudent(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(200);
 
     const enrollment = await prisma.enrollment.findUnique({
@@ -357,7 +357,7 @@ describe("/api/students/[id]", () => {
       body: JSON.stringify({ admissionNo: "SCH-TAKEN" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStudent(request, { params: { id: String(student.id) } });
+    const response = await patchStudent(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(409);
   });
 
@@ -376,7 +376,7 @@ describe("/api/students/[id]", () => {
     });
 
     const request = new Request(`http://localhost/api/students/${student.id}`, { method: "DELETE" });
-    const response = await deleteStudentRoute(request, { params: { id: String(student.id) } });
+    const response = await deleteStudentRoute(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(200);
 
     const found = await prisma.student.findUnique({ where: { id: student.id } });
@@ -404,7 +404,7 @@ describe("/api/students/[id]", () => {
     });
 
     const request = new Request(`http://localhost/api/students/${student.id}`, { method: "DELETE" });
-    const response = await deleteStudentRoute(request, { params: { id: String(student.id) } });
+    const response = await deleteStudentRoute(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.deletable).toBe(false);
@@ -425,7 +425,7 @@ describe("/api/students/[id]", () => {
     });
 
     const request = new Request(`http://localhost/api/students/${student.id}/deactivate`, { method: "PATCH" });
-    const response = await deactivateStudentRoute(request, { params: { id: String(student.id) } });
+    const response = await deactivateStudentRoute(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(200);
 
     const updatedStudent = await prisma.student.findUnique({ where: { id: student.id } });
@@ -452,11 +452,11 @@ describe("/api/students/[id]", () => {
 
     await deactivateStudentRoute(
       new Request(`http://localhost/api/students/${student.id}/deactivate`, { method: "PATCH" }),
-      { params: { id: String(student.id) } }
+      { params: Promise.resolve({ id: String(student.id) }) }
     );
 
     const request = new Request(`http://localhost/api/students/${student.id}/activate`, { method: "PATCH" });
-    const response = await activateStudentRoute(request, { params: { id: String(student.id) } });
+    const response = await activateStudentRoute(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(200);
 
     const updatedStudent = await prisma.student.findUnique({ where: { id: student.id } });
@@ -487,7 +487,7 @@ describe("/api/students/[id]", () => {
       body: JSON.stringify({ name: "Hijack" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStudent(request, { params: { id: String(otherStudent.id) } });
+    const response = await patchStudent(request, { params: Promise.resolve({ id: String(otherStudent.id) }) });
     expect(response.status).toBe(404);
   });
 
@@ -510,7 +510,7 @@ describe("/api/students/[id]", () => {
       body: JSON.stringify({ name: student.name, admissionNo: student.admissionNo, rollNumber: "3", photoUrl: "/uploads/students/y.png" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStudent(request, { params: { id: String(student.id) } });
+    const response = await patchStudent(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(200);
 
     const updatedStudent = await prisma.student.findUnique({ where: { id: student.id } });
@@ -552,7 +552,7 @@ describe("/api/students/[id]", () => {
       body: JSON.stringify({ name: student.name, admissionNo: student.admissionNo, rollNumber: "9" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchStudent(request, { params: { id: String(student.id) } });
+    const response = await patchStudent(request, { params: Promise.resolve({ id: String(student.id) }) });
     expect(response.status).toBe(409);
   });
 });

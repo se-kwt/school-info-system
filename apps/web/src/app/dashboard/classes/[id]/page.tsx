@@ -6,7 +6,8 @@ import { listStaff } from "@/lib/school-setup/staff";
 import { prisma } from "@/lib/prisma";
 import { FacultyAssignmentView } from "@/components/school-setup/FacultyAssignmentView";
 
-export default async function ClassDetailPage({ params }: { params: { id: string } }) {
+export default async function ClassDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await requireDashboardRole(["admin"]);
   const classId = Number(params.id);
   if (Number.isNaN(classId)) notFound();

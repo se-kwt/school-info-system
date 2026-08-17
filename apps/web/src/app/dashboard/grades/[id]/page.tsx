@@ -4,7 +4,8 @@ import { listSubjects } from "@/lib/school-setup/subjects";
 import { prisma } from "@/lib/prisma";
 import { GradeDetailView } from "@/components/school-setup/GradeDetailView";
 
-export default async function GradeDetailPage({ params }: { params: { id: string } }) {
+export default async function GradeDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await requireDashboardRole(["admin"]);
   const gradeId = Number(params.id);
   if (Number.isNaN(gradeId)) notFound();

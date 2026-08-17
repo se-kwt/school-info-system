@@ -418,7 +418,7 @@ describe("/api/assignments/[id]", () => {
       body: JSON.stringify({ title: "Chapter 3 worksheet (revised)", dueDate: "2026-08-05" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    const response = await patchAssignment(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.assignment.findUnique({ where: { id: assignment.id } });
@@ -438,7 +438,7 @@ describe("/api/assignments/[id]", () => {
       }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    const response = await patchAssignment(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.assignment.findUnique({ where: { id: assignment.id } });
@@ -469,7 +469,7 @@ describe("/api/assignments/[id]", () => {
       body: JSON.stringify({ title: "Hijacked title" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    const response = await patchAssignment(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(403);
   });
 
@@ -482,7 +482,7 @@ describe("/api/assignments/[id]", () => {
       body: JSON.stringify({ title: "Doesn't matter" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchAssignment(request, { params: { id: "999999" } });
+    const response = await patchAssignment(request, { params: Promise.resolve({ id: "999999" }) });
     expect(response.status).toBe(404);
   });
 
@@ -495,7 +495,7 @@ describe("/api/assignments/[id]", () => {
       body: JSON.stringify({}),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    const response = await patchAssignment(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(400);
   });
 
@@ -511,7 +511,7 @@ describe("/api/assignments/[id]", () => {
       body: JSON.stringify({ title: "Doesn't matter" }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchAssignment(request, { params: { id: String(assignment.id) } });
+    const response = await patchAssignment(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(403);
   });
 });
@@ -577,7 +577,7 @@ describe("/api/assignments/[id]/statuses", () => {
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`);
-    const response = await getStatuses(request, { params: { id: String(assignment.id) } });
+    const response = await getStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.statuses).toEqual([
@@ -625,7 +625,7 @@ describe("/api/assignments/[id]/statuses", () => {
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`);
-    const response = await getStatuses(request, { params: { id: String(assignment.id) } });
+    const response = await getStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     const body = await response.json();
     expect(body.statuses[0].status).toBe("overdue");
   });
@@ -635,7 +635,7 @@ describe("/api/assignments/[id]/statuses", () => {
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request("http://localhost/api/assignments/999999/statuses");
-    const response = await getStatuses(request, { params: { id: "999999" } });
+    const response = await getStatuses(request, { params: Promise.resolve({ id: "999999" }) });
     expect(response.status).toBe(404);
   });
 
@@ -647,7 +647,7 @@ describe("/api/assignments/[id]/statuses", () => {
     loginAs(otherTeacher.id, "teacher", school.id);
 
     const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`);
-    const response = await getStatuses(request, { params: { id: String(assignment.id) } });
+    const response = await getStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(403);
   });
 
@@ -659,7 +659,7 @@ describe("/api/assignments/[id]/statuses", () => {
     loginAs(admin.id, "admin", school.id);
 
     const request = new Request(`http://localhost/api/assignments/${assignment.id}/statuses`);
-    const response = await getStatuses(request, { params: { id: String(assignment.id) } });
+    const response = await getStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.statuses[0].studentId).toBe(student.id);
@@ -675,7 +675,7 @@ describe("/api/assignments/[id]/statuses", () => {
         body: JSON.stringify({ entries: [{ studentId: student.id, status }] }),
         headers: { "content-type": "application/json" },
       });
-      return postStatuses(request, { params: { id: String(assignment.id) } });
+      return postStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     }
 
     await save("submitted");
@@ -710,7 +710,7 @@ describe("/api/assignments/[id]/statuses", () => {
       body: JSON.stringify({ entries: [{ studentId: otherStudent.id, status: "submitted" }] }),
       headers: { "content-type": "application/json" },
     });
-    const response = await postStatuses(request, { params: { id: String(assignment.id) } });
+    const response = await postStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(400);
 
     const rows = await prisma.assignmentStatus.findMany({ where: { studentId: otherStudent.id } });
@@ -726,7 +726,7 @@ describe("/api/assignments/[id]/statuses", () => {
       body: JSON.stringify({ entries: [{ studentId: student.id, status: "overdue" }] }),
       headers: { "content-type": "application/json" },
     });
-    const response = await postStatuses(request, { params: { id: String(assignment.id) } });
+    const response = await postStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(400);
   });
 
@@ -742,7 +742,7 @@ describe("/api/assignments/[id]/statuses", () => {
       body: JSON.stringify({ entries: [{ studentId: student.id, status: "submitted" }] }),
       headers: { "content-type": "application/json" },
     });
-    const response = await postStatuses(request, { params: { id: String(assignment.id) } });
+    const response = await postStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(403);
   });
 
@@ -758,7 +758,7 @@ describe("/api/assignments/[id]/statuses", () => {
       body: JSON.stringify({ entries: [{ studentId: student.id, status: "submitted" }] }),
       headers: { "content-type": "application/json" },
     });
-    const response = await postStatuses(request, { params: { id: String(assignment.id) } });
+    const response = await postStatuses(request, { params: Promise.resolve({ id: String(assignment.id) }) });
     expect(response.status).toBe(403);
   });
 });

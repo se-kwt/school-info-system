@@ -4,7 +4,8 @@ import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { activateStaff } from "@/lib/school-setup/staff";
 
-export async function PATCH(_request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
     const userId = Number(params.id);

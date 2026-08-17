@@ -6,8 +6,9 @@ import { unassignTeacherFromSubject } from "@/lib/school-setup/class-teachers";
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string; subjectId: string; teacherUserId: string } }
+  props: { params: Promise<{ id: string; subjectId: string; teacherUserId: string }> }
 ) {
+  const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
     const classId = Number(params.id);

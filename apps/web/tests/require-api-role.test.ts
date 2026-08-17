@@ -5,7 +5,7 @@ const { cookieStore } = vi.hoisted(() => ({
 }));
 
 vi.mock("next/headers", () => ({
-  cookies: () => cookieStore,
+  cookies: () => Promise.resolve(cookieStore),
 }));
 
 import { describe, it, expect, beforeEach } from "vitest";

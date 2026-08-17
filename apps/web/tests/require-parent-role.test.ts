@@ -9,7 +9,7 @@ const { cookieStore, redirectMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("next/headers", () => ({
-  cookies: () => cookieStore,
+  cookies: () => Promise.resolve(cookieStore),
 }));
 
 vi.mock("next/navigation", () => ({

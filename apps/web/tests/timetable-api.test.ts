@@ -392,7 +392,7 @@ describe("/api/timetable/[id]", () => {
       body: JSON.stringify({ subjectId: scienceSubject.id }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    const response = await patchTimetable(request, { params: Promise.resolve({ id: String(entry.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
@@ -411,7 +411,7 @@ describe("/api/timetable/[id]", () => {
       body: JSON.stringify({ teacherUserId: null }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    const response = await patchTimetable(request, { params: Promise.resolve({ id: String(entry.id) }) });
     expect(response.status).toBe(200);
 
     const updated = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
@@ -430,7 +430,7 @@ describe("/api/timetable/[id]", () => {
       body: JSON.stringify({ subjectId: subject.id }),
       headers: { "content-type": "application/json" },
     });
-    await patchTimetable(request, { params: { id: String(entry.id) } });
+    await patchTimetable(request, { params: Promise.resolve({ id: String(entry.id) }) });
 
     const updated = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
     expect(updated?.teacherUserId).toBe(teacher.id);
@@ -448,7 +448,7 @@ describe("/api/timetable/[id]", () => {
       body: JSON.stringify({ teacherUserId: 999999 }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    const response = await patchTimetable(request, { params: Promise.resolve({ id: String(entry.id) }) });
     expect(response.status).toBe(400);
   });
 
@@ -464,7 +464,7 @@ describe("/api/timetable/[id]", () => {
       body: JSON.stringify({ subjectId: 999999 }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchTimetable(request, { params: { id: "999999" } });
+    const response = await patchTimetable(request, { params: Promise.resolve({ id: "999999" }) });
     expect(response.status).toBe(404);
   });
 
@@ -480,7 +480,7 @@ describe("/api/timetable/[id]", () => {
       body: JSON.stringify({}),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    const response = await patchTimetable(request, { params: Promise.resolve({ id: String(entry.id) }) });
     expect(response.status).toBe(400);
   });
 
@@ -493,7 +493,7 @@ describe("/api/timetable/[id]", () => {
       body: JSON.stringify({ subjectId: 1 }),
       headers: { "content-type": "application/json" },
     });
-    const response = await patchTimetable(request, { params: { id: String(entry.id) } });
+    const response = await patchTimetable(request, { params: Promise.resolve({ id: String(entry.id) }) });
     expect(response.status).toBe(403);
   });
 
@@ -505,7 +505,7 @@ describe("/api/timetable/[id]", () => {
     loginAs(admin.id, "admin", school.id);
 
     const request = new Request(`http://localhost/api/timetable/${entry.id}`, { method: "DELETE" });
-    const response = await deleteTimetable(request, { params: { id: String(entry.id) } });
+    const response = await deleteTimetable(request, { params: Promise.resolve({ id: String(entry.id) }) });
     expect(response.status).toBe(200);
 
     const found = await prisma.timetableEntry.findUnique({ where: { id: entry.id } });
@@ -520,7 +520,7 @@ describe("/api/timetable/[id]", () => {
     loginAs(admin.id, "admin", school.id);
 
     const request = new Request("http://localhost/api/timetable/999999", { method: "DELETE" });
-    const response = await deleteTimetable(request, { params: { id: "999999" } });
+    const response = await deleteTimetable(request, { params: Promise.resolve({ id: "999999" }) });
     expect(response.status).toBe(404);
   });
 
@@ -529,7 +529,7 @@ describe("/api/timetable/[id]", () => {
     loginAs(teacher.id, "teacher", school.id);
 
     const request = new Request(`http://localhost/api/timetable/${entry.id}`, { method: "DELETE" });
-    const response = await deleteTimetable(request, { params: { id: String(entry.id) } });
+    const response = await deleteTimetable(request, { params: Promise.resolve({ id: String(entry.id) }) });
     expect(response.status).toBe(403);
   });
 });
