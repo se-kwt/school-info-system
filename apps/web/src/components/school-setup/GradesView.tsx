@@ -1,63 +1,100 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { Layers } from "lucide-react";
+import { Modal } from "./Modal";
+import { PageHeader } from "./PageHeader";
+import { GridToolbar } from "./GridToolbar";
+import { EntityCard } from "./EntityCard";
+import { Pagination } from "./Pagination";
 
-interface GradeRow {
+export interface GradeRow {
   id: number;
   name: string;
   subjectCount: number;
   classCount: number;
+  subjectNames: string[];
 }
 
-export function GradesView({ initialGrades }: { initialGrades: GradeRow[] }) {
+interface AcademicYearOption {
+  id: number;
+  name: string;
+}
+
+type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
+
+const PAGE_SIZE = 8;
+
+export function GradesView({
+  initialGrades,
+  academicYears,
+}: {
+  initialGrades: GradeRow[];
+  academicYears: AcademicYearOption[];
+}) {
   const [grades, setGrades] = useState(initialGrades);
+  const [search, setSearch] = useState("");
+  const [yearFilter, setYearFilter] = useState("all");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [page, setPage] = useState(1);
+  const [modalState, setModalState] = useState<ModalState>(null);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editName, setEditName] = useState("");
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
 
-  async function refresh() {
-    const response = await fetch("/api/grades");
+  async function refresh(academicYearId: string) {
+    const query = academicYearId !== "all" ? `?academicYearId=${academicYearId}` : "";
+    const response = await fetch(`/api/grades${query}`);
     setGrades(await response.json());
   }
 
-  async function handleCreate() {
+  function openCreate() {
+    setModalState({ mode: "create" });
+    setName("");
     setError(null);
-    const response = await fetch("/api/grades", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (response.status === 201) {
-      setName("");
-      await refresh();
-      return;
-    }
-    setError((await response.json()).error);
   }
 
-  function startEdit(grade: GradeRow) {
-    setEditingId(grade.id);
-    setEditName(grade.name);
+  function openEdit(grade: GradeRow) {
+    setModalState({ mode: "edit", id: grade.id });
+    setName(grade.name);
     setError(null);
-    setDeleteBlockedId(null);
   }
 
-  async function handleSaveEdit(id: number) {
+  function closeModal() {
+    setModalState(null);
     setError(null);
-    const response = await fetch(`/api/grades/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: editName }),
-    });
-    if (!response.ok) {
+  }
+
+  async function handleSave() {
+    setError(null);
+    if (modalState?.mode === "create") {
+      const response = await fetch("/api/grades", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (response.status === 201) {
+        closeModal();
+        await refresh(yearFilter);
+        return;
+      }
       setError((await response.json()).error);
       return;
     }
-    setEditingId(null);
-    await refresh();
+    if (modalState?.mode === "edit") {
+      const response = await fetch(`/api/grades/${modalState.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (response.ok) {
+        closeModal();
+        await refresh(yearFilter);
+        return;
+      }
+      setError((await response.json()).error);
+    }
   }
 
   async function handleDelete(id: number) {
@@ -65,7 +102,7 @@ export function GradesView({ initialGrades }: { initialGrades: GradeRow[] }) {
     const response = await fetch(`/api/grades/${id}`, { method: "DELETE" });
     if (response.ok) {
       setDeleteBlockedId(null);
-      await refresh();
+      await refresh(yearFilter);
       return;
     }
     const body = await response.json();
@@ -76,37 +113,102 @@ export function GradesView({ initialGrades }: { initialGrades: GradeRow[] }) {
     setError(body.error);
   }
 
+  async function handleYearFilterChange(value: string) {
+    setYearFilter(value);
+    setPage(1);
+    await refresh(value);
+  }
+
+  const filteredGrades = useMemo(
+    () => grades.filter((grade) => grade.name.toLowerCase().includes(search.toLowerCase())),
+    [grades, search]
+  );
+  const pageGrades = filteredGrades.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const editingGrade = modalState?.mode === "edit" ? grades.find((grade) => grade.id === modalState.id) : undefined;
+
   return (
-    <div className="mt-4">
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          type="text"
-          aria-label="Grade name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          className="rounded border border-gray-300 px-3 py-2"
-          placeholder="e.g. Grade 1"
-        />
-        <button type="button" onClick={handleCreate} className="rounded bg-blue-600 px-3 py-2 text-white">
-          Create Grade
-        </button>
-      </div>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        icon={Layers}
+        title="Grades"
+        subtitle="Manage and organize all grades in your school"
+        action={
+          <button
+            type="button"
+            onClick={openCreate}
+            className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
+          >
+            + Create Grade
+          </button>
+        }
+      />
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      <GridToolbar
+        searchValue={search}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        searchLabel="Search grades..."
+        filterValue={yearFilter}
+        onFilterChange={handleYearFilterChange}
+        filterOptions={[
+          { value: "all", label: "All Years" },
+          ...academicYears.map((year) => ({ value: String(year.id), label: year.name })),
+        ]}
+        view={view}
+        onViewChange={setView}
+      />
 
-      <table className="mt-6 w-full text-left text-sm">
-        <thead>
-          <tr>
-            <th className="border-b border-gray-200 pb-2">Name</th>
-            <th className="border-b border-gray-200 pb-2">Subjects</th>
-            <th className="border-b border-gray-200 pb-2">Classes</th>
-            <th className="border-b border-gray-200 pb-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {grades.map((grade) => (
-            <Fragment key={grade.id}>
-              <tr>
+      {pageGrades.length === 0 && <p className="py-8 text-center text-sm text-neutral-400">No grades found</p>}
+
+      {pageGrades.length > 0 && view === "grid" && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {pageGrades.map((grade) => (
+            <EntityCard
+              key={grade.id}
+              icon={Layers}
+              href={`/dashboard/grades/${grade.id}`}
+              title={grade.name}
+              subtitle={`${grade.subjectCount} Subjects • ${grade.classCount} Classes`}
+              tagLine={grade.subjectNames.length > 0 ? grade.subjectNames.join(", ") : "No subjects yet"}
+              footerBadge={`Classes ${grade.classCount}`}
+              onEdit={() => openEdit(grade)}
+              menuItems={[{ label: "Delete", destructive: true, onClick: () => handleDelete(grade.id) }]}
+              blockedMessage={
+                deleteBlockedId === grade.id
+                  ? `${grade.name} has subjects or classes and cannot be deleted.`
+                  : undefined
+              }
+              blockedActions={
+                deleteBlockedId === grade.id ? (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteBlockedId(null)}
+                    className="rounded border border-amber-300 px-2 py-1 text-[11px]"
+                  >
+                    Cancel
+                  </button>
+                ) : undefined
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      {pageGrades.length > 0 && view === "list" && (
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr>
+              <th className="border-b border-gray-200 pb-2">Name</th>
+              <th className="border-b border-gray-200 pb-2">Subjects</th>
+              <th className="border-b border-gray-200 pb-2">Classes</th>
+              <th className="border-b border-gray-200 pb-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageGrades.map((grade) => (
+              <tr key={grade.id}>
                 <td className="border-b border-gray-100 py-2">
                   <Link href={`/dashboard/grades/${grade.id}`} className="text-blue-600 underline">
                     {grade.name}
@@ -115,7 +217,7 @@ export function GradesView({ initialGrades }: { initialGrades: GradeRow[] }) {
                 <td className="border-b border-gray-100 py-2">{grade.subjectCount}</td>
                 <td className="border-b border-gray-100 py-2">{grade.classCount}</td>
                 <td className="border-b border-gray-100 py-2">
-                  <button type="button" onClick={() => startEdit(grade)} className="mr-3 text-blue-600 underline">
+                  <button type="button" onClick={() => openEdit(grade)} className="mr-3 text-blue-600 underline">
                     Edit
                   </button>
                   <button type="button" onClick={() => handleDelete(grade.id)} className="text-red-600 underline">
@@ -123,55 +225,38 @@ export function GradesView({ initialGrades }: { initialGrades: GradeRow[] }) {
                   </button>
                 </td>
               </tr>
-              {editingId === grade.id && (
-                <tr>
-                  <td colSpan={4} className="border-b border-gray-100 bg-gray-50 py-2">
-                    <div className="flex flex-wrap items-center gap-2 px-2">
-                      <input
-                        type="text"
-                        aria-label={`Edit name for ${grade.name}`}
-                        value={editName}
-                        onChange={(event) => setEditName(event.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleSaveEdit(grade.id)}
-                        className="rounded bg-blue-600 px-2 py-1 text-white"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(null)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {deleteBlockedId === grade.id && (
-                <tr>
-                  <td colSpan={4} className="border-b border-gray-100 bg-amber-50 py-2">
-                    <div className="flex flex-wrap items-center gap-2 px-2 text-sm">
-                      <span>{grade.name} has subjects or classes and cannot be deleted.</span>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteBlockedId(null)}
-                        className="rounded border border-gray-300 px-2 py-1"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <Pagination page={page} pageSize={PAGE_SIZE} total={filteredGrades.length} onPageChange={setPage} itemLabel="grades" />
+
+      {modalState && (
+        <Modal onClose={closeModal}>
+          <h2 className="text-sm font-bold text-neutral-800">
+            {modalState.mode === "create" ? "Create Grade" : editingGrade?.name}
+          </h2>
+          <input
+            type="text"
+            aria-label="Grade name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            placeholder="e.g. Grade 1"
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
+            >
+              Save
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
