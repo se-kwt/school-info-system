@@ -16,7 +16,42 @@ describe("grades lib", () => {
     expect(created.ok).toBe(true);
 
     const grades = await listGrades(prisma, schoolId);
-    expect(grades).toEqual([{ id: expect.any(Number), name: "Grade 1", subjectCount: 0, classCount: 0 }]);
+    expect(grades).toEqual([
+      { id: expect.any(Number), name: "Grade 1", subjectCount: 0, classCount: 0, subjectNames: [] },
+    ]);
+  });
+
+  it("includes subject names in listGrades", async () => {
+    const created = await createGrade(prisma, schoolId, { name: "Grade 1" });
+    if (!created.ok) throw new Error("setup failed");
+    await prisma.subject.create({ data: { gradeId: created.grade.id, name: "Science" } });
+    await prisma.subject.create({ data: { gradeId: created.grade.id, name: "Art" } });
+
+    const grades = await listGrades(prisma, schoolId);
+    expect(grades[0].subjectNames).toEqual(["Art", "Science"]);
+  });
+
+  it("scopes classCount to the given academic year", async () => {
+    const created = await createGrade(prisma, schoolId, { name: "Grade 1" });
+    if (!created.ok) throw new Error("setup failed");
+    const yearA = await prisma.academicYear.create({
+      data: { schoolId, name: "2025-26", startDate: new Date("2025-06-01"), endDate: new Date("2026-04-30"), status: "archived" },
+    });
+    const yearB = await prisma.academicYear.create({
+      data: { schoolId, name: "2026-27", startDate: new Date("2026-06-01"), endDate: new Date("2027-04-30"), status: "active" },
+    });
+    await prisma.class.create({ data: { schoolId, section: "A", gradeId: created.grade.id, academicYearId: yearA.id } });
+    await prisma.class.create({ data: { schoolId, section: "A", gradeId: created.grade.id, academicYearId: yearB.id } });
+    await prisma.class.create({ data: { schoolId, section: "B", gradeId: created.grade.id, academicYearId: yearB.id } });
+
+    const allTime = await listGrades(prisma, schoolId);
+    expect(allTime[0].classCount).toBe(3);
+
+    const scopedToB = await listGrades(prisma, schoolId, { academicYearId: yearB.id });
+    expect(scopedToB[0].classCount).toBe(2);
+
+    const scopedToA = await listGrades(prisma, schoolId, { academicYearId: yearA.id });
+    expect(scopedToA[0].classCount).toBe(1);
   });
 
   it("rejects duplicate grade names within a school", async () => {
