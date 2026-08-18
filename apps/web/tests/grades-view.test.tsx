@@ -75,4 +75,46 @@ describe("GradesView", () => {
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Grade 1" })).toBeInTheDocument();
   });
+
+  it("surfaces a non-blocked delete failure as a visible top-level error", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "Something went wrong deleting the grade" }), { status: 500 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<GradesView initialGrades={grades} academicYears={academicYears} />);
+    const grade1Card = screen.getByRole("link", { name: "Grade 1" }).closest("div")!.parentElement!;
+    await userEvent.click(within(grade1Card).getByRole("button", { name: "Actions for Grade 1" }));
+    await userEvent.click(within(grade1Card).getByText("Delete"));
+
+    expect(await screen.findByText("Something went wrong deleting the grade")).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("clamps to a valid page after deleting the last item on the final page", async () => {
+    const manyGrades = Array.from({ length: 9 }, (_, index) => ({
+      id: index + 1,
+      name: `Grade ${index + 1}`,
+      subjectCount: 0,
+      classCount: 0,
+      subjectNames: [],
+    }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(manyGrades.slice(0, 8)), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<GradesView initialGrades={manyGrades} academicYears={academicYears} />);
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByRole("link", { name: "Grade 9" })).toBeInTheDocument();
+
+    const grade9Card = screen.getByRole("link", { name: "Grade 9" }).closest("div")!.parentElement!;
+    await userEvent.click(within(grade9Card).getByRole("button", { name: "Actions for Grade 9" }));
+    await userEvent.click(within(grade9Card).getByText("Delete"));
+
+    expect(await screen.findByRole("link", { name: "Grade 1" })).toBeInTheDocument();
+    expect(screen.queryByText("No grades found")).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
 });

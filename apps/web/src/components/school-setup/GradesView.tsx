@@ -123,7 +123,9 @@ export function GradesView({
     () => grades.filter((grade) => grade.name.toLowerCase().includes(search.toLowerCase())),
     [grades, search]
   );
-  const pageGrades = filteredGrades.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filteredGrades.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageGrades = filteredGrades.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const editingGrade = modalState?.mode === "edit" ? grades.find((grade) => grade.id === modalState.id) : undefined;
 
   return (
@@ -159,6 +161,8 @@ export function GradesView({
         view={view}
         onViewChange={setView}
       />
+
+      {error && !modalState && <p className="text-sm text-red-600">{error}</p>}
 
       {pageGrades.length === 0 && <p className="py-8 text-center text-sm text-neutral-400">No grades found</p>}
 
@@ -217,12 +221,29 @@ export function GradesView({
                 <td className="border-b border-gray-100 py-2">{grade.subjectCount}</td>
                 <td className="border-b border-gray-100 py-2">{grade.classCount}</td>
                 <td className="border-b border-gray-100 py-2">
-                  <button type="button" onClick={() => openEdit(grade)} className="mr-3 text-blue-600 underline">
-                    Edit
-                  </button>
-                  <button type="button" onClick={() => handleDelete(grade.id)} className="text-red-600 underline">
-                    Delete
-                  </button>
+                  {deleteBlockedId === grade.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-amber-700">
+                        {grade.name} has subjects or classes and cannot be deleted.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteBlockedId(null)}
+                        className="rounded border border-amber-300 px-2 py-1 text-[11px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => openEdit(grade)} className="mr-3 text-blue-600 underline">
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => handleDelete(grade.id)} className="text-red-600 underline">
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
@@ -230,7 +251,7 @@ export function GradesView({
         </table>
       )}
 
-      <Pagination page={page} pageSize={PAGE_SIZE} total={filteredGrades.length} onPageChange={setPage} itemLabel="grades" />
+      <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filteredGrades.length} onPageChange={setPage} itemLabel="grades" />
 
       {modalState && (
         <Modal onClose={closeModal}>

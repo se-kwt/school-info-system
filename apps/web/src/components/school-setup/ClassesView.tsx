@@ -160,7 +160,9 @@ export function ClassesView({
       ),
     [classes, search]
   );
-  const pageClasses = filteredClasses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filteredClasses.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageClasses = filteredClasses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="flex flex-col gap-4">
@@ -195,6 +197,8 @@ export function ClassesView({
         view={view}
         onViewChange={setView}
       />
+
+      {error && !modalState && <p className="text-sm text-red-600">{error}</p>}
 
       {pageClasses.length === 0 && <p className="py-8 text-center text-sm text-neutral-400">No classes found</p>}
 
@@ -275,12 +279,36 @@ export function ClassesView({
                   )}
                 </td>
                 <td className="border-b border-gray-100 py-2">
-                  <button type="button" onClick={() => openEdit(klass)} className="mr-3 text-blue-600 underline">
-                    Edit
-                  </button>
-                  <button type="button" onClick={() => handleDelete(klass.id)} className="text-red-600 underline">
-                    Delete
-                  </button>
+                  {deleteBlockedId === klass.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-amber-700">
+                        {klass.gradeName} {klass.section} has history and cannot be permanently deleted.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleArchive(klass.id)}
+                        className="rounded bg-amber-600 px-2 py-1 text-[11px] text-white"
+                      >
+                        Archive instead
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteBlockedId(null)}
+                        className="rounded border border-amber-300 px-2 py-1 text-[11px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => openEdit(klass)} className="mr-3 text-blue-600 underline">
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => handleDelete(klass.id)} className="text-red-600 underline">
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
@@ -288,7 +316,7 @@ export function ClassesView({
         </table>
       )}
 
-      <Pagination page={page} pageSize={PAGE_SIZE} total={filteredClasses.length} onPageChange={setPage} itemLabel="classes" />
+      <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filteredClasses.length} onPageChange={setPage} itemLabel="classes" />
 
       {modalState && (
         <Modal onClose={closeModal}>
