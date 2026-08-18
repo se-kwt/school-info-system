@@ -96,9 +96,13 @@ Styling conventions to follow (matching existing components like `KpiCard.tsx`/`
 ### Modals
 - Create: name input, reuses existing `handleCreate`/error handling, now rendered inside `Modal`.
 - Edit: name input pre-filled, reuses existing `handleSaveEdit`.
-- Delete: confirm modal; on `deletable: false` response, swaps to the existing "has subjects or
+- Delete: fires immediately from the kebab menu, no confirm step — matches the original table's
+  one-click delete behavior; server-side guards already block deleting anything with real history.
+  On `deletable: false` response, swaps that card's footer for the existing "has subjects or
   classes and cannot be deleted" message with a Cancel button (no archive option for grades —
-  none exists today).
+  none exists today). (Amended post-implementation: the design originally called for a confirm
+  modal here; the implementation matched the original page's behavior instead, and this was
+  confirmed as the intended behavior during final review rather than adding a confirm step.)
 
 ## Classes page
 
@@ -126,9 +130,10 @@ None required — `listClasses` and `GET /api/classes` already accept `academicY
 - Create: Grade select + Section input + Academic Year select, reuses existing `handleCreate`.
 - Edit: Section input pre-filled (grade/year are not currently editable via the existing
   `handleSaveEdit` path — preserved as-is), reuses existing logic.
-- Delete: confirm modal; on `deletable: false`, swaps to the existing "has history and cannot be
-  permanently deleted" message with `Archive instead` + `Cancel` buttons, reusing existing
-  `handleArchive`.
+- Delete: fires immediately from the kebab menu, no confirm step (see the equivalent note under
+  Grades above). On `deletable: false`, swaps that card's footer for the existing "has history and
+  cannot be permanently deleted" message with `Archive instead` + `Cancel` buttons, reusing
+  existing `handleArchive`.
 
 ## Pagination
 
