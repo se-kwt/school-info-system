@@ -4,10 +4,14 @@ import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { listGrades, createGrade } from "@/lib/school-setup/grades";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const claims = await requireApiRole(["admin", "teacher"]);
-    const grades = await listGrades(prisma, claims.schoolId);
+    const { searchParams } = new URL(request.url);
+    const academicYearIdParam = searchParams.get("academicYearId");
+    const grades = await listGrades(prisma, claims.schoolId, {
+      academicYearId: academicYearIdParam ? Number(academicYearIdParam) : undefined,
+    });
     return NextResponse.json(grades);
   } catch (err) {
     if (err instanceof AuthError) {

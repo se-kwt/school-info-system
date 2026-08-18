@@ -15,7 +15,6 @@ export default async function ClassesPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold text-gray-800">Classes</h1>
       <ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />
     </div>
   );
