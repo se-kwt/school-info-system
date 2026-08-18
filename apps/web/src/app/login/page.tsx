@@ -77,9 +77,20 @@ export default function LoginPage() {
   const testOtpToast = testOtp && (
     <div
       role="status"
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg"
+      className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg"
     >
-      Test OTP: <span className="font-bold tracking-wide">{testOtp}</span>
+      <span>
+        Test OTP: <span className="font-bold tracking-wide">{testOtp}</span>
+      </span>
+      {step === "otp" && (
+        <button
+          type="button"
+          onClick={() => setCode(testOtp)}
+          className="rounded bg-white/10 px-2 py-1 text-xs font-medium text-white hover:bg-white/20"
+        >
+          Fill code
+        </button>
+      )}
     </div>
   );
 
