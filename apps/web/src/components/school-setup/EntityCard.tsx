@@ -20,7 +20,7 @@ export function EntityCard({
   subtitle: string;
   tagLine?: string;
   footerBadge?: string;
-  onEdit: () => void;
+  onEdit?: () => void;
   menuItems: KebabMenuItem[];
   blockedMessage?: string;
   blockedActions?: React.ReactNode;
@@ -47,18 +47,22 @@ export function EntityCard({
           <div className="mt-1.5 flex gap-2">{blockedActions}</div>
         </div>
       ) : (
-        <div className="flex items-center justify-between">
-          {footerBadge ? (
-            <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-600">
-              {footerBadge}
-            </span>
-          ) : (
-            <span />
-          )}
-          <button type="button" onClick={onEdit} className="text-xs font-semibold text-indigo-600 hover:underline">
-            Edit
-          </button>
-        </div>
+        (footerBadge || onEdit) && (
+          <div className="flex items-center justify-between">
+            {footerBadge ? (
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-600">
+                {footerBadge}
+              </span>
+            ) : (
+              <span />
+            )}
+            {onEdit && (
+              <button type="button" onClick={onEdit} className="text-xs font-semibold text-indigo-600 hover:underline">
+                Edit
+              </button>
+            )}
+          </div>
+        )
       )}
     </div>
   );

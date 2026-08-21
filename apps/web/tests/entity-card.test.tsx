@@ -63,4 +63,17 @@ describe("EntityCard", () => {
     expect(screen.queryByText("Classes 2")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
+
+  it("omits the Edit button and footer row when onEdit and footerBadge are both absent", () => {
+    render(
+      <EntityCard
+        icon={Layers}
+        href="/dashboard/grades/1/subjects/1"
+        title="Mathematics"
+        subtitle="2 syllabus versions"
+        menuItems={[]}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  });
 });
