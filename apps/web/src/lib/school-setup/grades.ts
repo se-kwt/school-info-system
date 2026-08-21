@@ -6,12 +6,25 @@ export interface GradeSummary {
   name: string;
   subjectCount: number;
   classCount: number;
+  subjectNames: string[];
 }
 
-export async function listGrades(prisma: PrismaClient, schoolId: number): Promise<GradeSummary[]> {
+export async function listGrades(
+  prisma: PrismaClient,
+  schoolId: number,
+  options?: { academicYearId?: number }
+): Promise<GradeSummary[]> {
   const grades = await prisma.grade.findMany({
     where: { schoolId },
-    include: { _count: { select: { subjects: true, classes: true } } },
+    include: {
+      _count: {
+        select: {
+          subjects: true,
+          classes: options?.academicYearId ? { where: { academicYearId: options.academicYearId } } : true,
+        },
+      },
+      subjects: { select: { name: true }, orderBy: { name: "asc" } },
+    },
     orderBy: { name: "asc" },
   });
   return grades.map((grade) => ({
@@ -19,6 +32,7 @@ export async function listGrades(prisma: PrismaClient, schoolId: number): Promis
     name: grade.name,
     subjectCount: grade._count.subjects,
     classCount: grade._count.classes,
+    subjectNames: grade.subjects.map((subject) => subject.name),
   }));
 }
 

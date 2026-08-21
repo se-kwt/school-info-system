@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard/grades" }));
+
 import { Sidebar } from "../src/components/dashboard/Sidebar";
 
 const navItems = [{ href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" as const }];
@@ -78,5 +81,41 @@ describe("Sidebar", () => {
     );
     expect(await screen.findByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+  });
+
+  it("marks the nav item matching the current pathname as active", () => {
+    render(
+      <Sidebar
+        navItems={[
+          { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" as const },
+          { href: "/dashboard/grades", label: "Grades", icon: "Layers" as const },
+        ]}
+        workspaceItems={workspaceItems}
+        pinnedClasses={[]}
+        userName="Jane Admin"
+        userInitials="JA"
+        userRole="admin"
+        schoolName="Test School"
+        schoolLogoUrl={null}
+      />
+    );
+    expect(screen.getByRole("link", { name: "Grades" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not mark a nav item active when the pathname doesn't match", () => {
+    render(
+      <Sidebar
+        navItems={[{ href: "/dashboard/classes", label: "Classes", icon: "Building2" as const }]}
+        workspaceItems={workspaceItems}
+        pinnedClasses={[]}
+        userName="Jane Admin"
+        userInitials="JA"
+        userRole="admin"
+        schoolName="Test School"
+        schoolLogoUrl={null}
+      />
+    );
+    expect(screen.getByRole("link", { name: "Classes" })).not.toHaveAttribute("aria-current");
   });
 });

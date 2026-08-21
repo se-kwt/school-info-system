@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -73,6 +74,21 @@ export function Sidebar({
   schoolLogoUrl: string | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+
+  // Among all nav hrefs, the "active" one is the longest href that either
+  // exactly matches the current pathname or is a parent route of it. Using
+  // the longest match (rather than any match) avoids a shorter parent route
+  // like "/dashboard" being marked active alongside a more specific child
+  // route like "/dashboard/grades".
+  const allHrefs = [...navItems, ...workspaceItems].map((item) => item.href);
+  const activeHref = allHrefs
+    .filter((href) => pathname === href || (pathname?.startsWith(`${href}/`) ?? false))
+    .sort((a, b) => b.length - a.length)[0];
+
+  function isActive(href: string): boolean {
+    return href === activeHref;
+  }
 
   useEffect(() => {
     setCollapsed(localStorage.getItem(STORAGE_KEY) === "true");
@@ -84,8 +100,13 @@ export function Sidebar({
     localStorage.setItem(STORAGE_KEY, String(next));
   }
 
-  const navLinkClass =
-    "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-500 transition-all hover:bg-[#EAECF0]/30 hover:text-neutral-800";
+  function navLinkClass(active: boolean): string {
+    return `flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+      active
+        ? "bg-indigo-50 text-indigo-700"
+        : "text-neutral-500 hover:bg-[#EAECF0]/30 hover:text-neutral-800"
+    }`;
+  }
 
   return (
     <aside
@@ -127,8 +148,13 @@ export function Sidebar({
               const Icon = ICON_MAP[item.icon];
               return (
                 <li key={item.href}>
-                  <Link href={item.href} className={navLinkClass} title={collapsed ? item.label : undefined}>
-                    <Icon className="h-4 w-4 shrink-0 text-neutral-400" />
+                  <Link
+                    href={item.href}
+                    className={navLinkClass(isActive(item.href))}
+                    title={collapsed ? item.label : undefined}
+                    aria-current={isActive(item.href) ? "page" : undefined}
+                  >
+                    <Icon className={`h-4 w-4 shrink-0 ${isActive(item.href) ? "text-indigo-600" : "text-neutral-400"}`} />
                     {!collapsed && <span>{item.label}</span>}
                   </Link>
                 </li>
@@ -148,8 +174,13 @@ export function Sidebar({
               const Icon = ICON_MAP[item.icon];
               return (
                 <li key={item.href}>
-                  <Link href={item.href} className={navLinkClass} title={collapsed ? item.label : undefined}>
-                    <Icon className="h-4 w-4 shrink-0 text-neutral-400" />
+                  <Link
+                    href={item.href}
+                    className={navLinkClass(isActive(item.href))}
+                    title={collapsed ? item.label : undefined}
+                    aria-current={isActive(item.href) ? "page" : undefined}
+                  >
+                    <Icon className={`h-4 w-4 shrink-0 ${isActive(item.href) ? "text-indigo-600" : "text-neutral-400"}`} />
                     {!collapsed && <span>{item.label}</span>}
                   </Link>
                 </li>
@@ -170,7 +201,7 @@ export function Sidebar({
                 <li key={klass.id}>
                   <Link
                     href="/dashboard/classes"
-                    className={navLinkClass}
+                    className={navLinkClass(false)}
                     title={collapsed ? `${klass.gradeName} ${klass.section}` : undefined}
                   >
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-[10px] font-bold text-indigo-600">

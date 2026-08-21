@@ -18,7 +18,6 @@ export default async function GradeDetailPage(props: { params: Promise<{ id: str
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold text-gray-800">{grade.name}</h1>
       <GradeDetailView gradeId={gradeId} gradeName={grade.name} initialSubjects={subjects} />
     </div>
   );
