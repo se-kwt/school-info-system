@@ -5,6 +5,7 @@ export interface SubjectSummary {
   id: number;
   name: string;
   gradeId: number;
+  versionCount: number;
 }
 
 export type ListSubjectsResult = { ok: true; subjects: SubjectSummary[] } | { ok: false; error: "INVALID_GRADE" };
@@ -16,8 +17,15 @@ export async function listSubjects(
   const grade = await prisma.grade.findFirst({ where: { id: params.gradeId, schoolId: params.schoolId } });
   if (!grade) return { ok: false, error: "INVALID_GRADE" };
 
-  const subjects = await prisma.subject.findMany({ where: { gradeId: params.gradeId }, orderBy: { name: "asc" } });
-  return { ok: true, subjects: subjects.map((s) => ({ id: s.id, name: s.name, gradeId: s.gradeId })) };
+  const subjects = await prisma.subject.findMany({
+    where: { gradeId: params.gradeId },
+    orderBy: { name: "asc" },
+    include: { _count: { select: { versions: true } } },
+  });
+  return {
+    ok: true,
+    subjects: subjects.map((s) => ({ id: s.id, name: s.name, gradeId: s.gradeId, versionCount: s._count.versions })),
+  };
 }
 
 export type CreateSubjectResult =
@@ -39,7 +47,7 @@ export async function createSubject(
     const created = await prisma.subject.create({
       data: { gradeId: params.gradeId, name: params.name },
     });
-    return { ok: true, subject: { id: created.id, name: created.name, gradeId: created.gradeId } };
+    return { ok: true, subject: { id: created.id, name: created.name, gradeId: created.gradeId, versionCount: 0 } };
   } catch (err) {
     if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE" };
     throw err;
