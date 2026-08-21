@@ -65,7 +65,7 @@ describe("EntityCard", () => {
   });
 
   it("omits the Edit button and footer row when onEdit and footerBadge are both absent", () => {
-    render(
+    const { container } = render(
       <EntityCard
         icon={Layers}
         href="/dashboard/grades/1/subjects/1"
@@ -74,6 +74,23 @@ describe("EntityCard", () => {
         menuItems={[]}
       />
     );
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    // Verify the footer row div itself is not rendered
+    expect(container.querySelector("div.flex.items-center.justify-between")).not.toBeInTheDocument();
+  });
+
+  it("renders footer badge without Edit button when footerBadge is present but onEdit is absent", () => {
+    render(
+      <EntityCard
+        icon={Layers}
+        href="/dashboard/grades/1/subjects/1"
+        title="Mathematics"
+        subtitle="2 syllabus versions"
+        footerBadge="Classes 2"
+        menuItems={[]}
+      />
+    );
+    expect(screen.getByText("Classes 2")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 });
