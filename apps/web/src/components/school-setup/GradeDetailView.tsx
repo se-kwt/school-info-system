@@ -1,12 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, BookOpen } from "lucide-react";
+import { Modal } from "./Modal";
+import { PageHeader } from "./PageHeader";
+import { GridToolbar } from "./GridToolbar";
+import { EntityCard } from "./EntityCard";
+import { Pagination } from "./Pagination";
 
-interface SubjectRow {
+export interface SubjectRow {
   id: number;
   name: string;
   gradeId: number;
+  versionCount: number;
+}
+
+type ModalState = { mode: "create" } | null;
+
+const PAGE_SIZE = 8;
+
+function versionLabel(count: number): string {
+  return `${count} syllabus version${count === 1 ? "" : "s"}`;
 }
 
 export function GradeDetailView({
@@ -19,6 +34,10 @@ export function GradeDetailView({
   initialSubjects: SubjectRow[];
 }) {
   const [subjects, setSubjects] = useState(initialSubjects);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [page, setPage] = useState(1);
+  const [modalState, setModalState] = useState<ModalState>(null);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
@@ -26,6 +45,17 @@ export function GradeDetailView({
   async function refresh() {
     const response = await fetch(`/api/grades/${gradeId}/subjects`);
     setSubjects(await response.json());
+  }
+
+  function openCreate() {
+    setModalState({ mode: "create" });
+    setName("");
+    setError(null);
+  }
+
+  function closeModal() {
+    setModalState(null);
+    setError(null);
   }
 
   async function handleCreate() {
@@ -36,7 +66,7 @@ export function GradeDetailView({
       body: JSON.stringify({ name }),
     });
     if (response.status === 201) {
-      setName("");
+      closeModal();
       await refresh();
       return;
     }
@@ -59,53 +89,161 @@ export function GradeDetailView({
     setError(body.error);
   }
 
+  const filteredSubjects = useMemo(
+    () => subjects.filter((subject) => subject.name.toLowerCase().includes(search.toLowerCase())),
+    [subjects, search]
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredSubjects.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageSubjects = filteredSubjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
-    <div className="mt-4">
-      <p className="text-sm text-gray-500">Subjects for {gradeName}</p>
+    <div className="flex flex-col gap-4">
+      <Link
+        href="/dashboard/grades"
+        className="flex w-fit items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-700"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> Grades
+      </Link>
 
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-        <input
-          type="text"
-          aria-label="Subject name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          className="rounded border border-gray-300 px-3 py-2"
-          placeholder="e.g. Mathematics"
-        />
-        <button type="button" onClick={handleCreate} className="rounded bg-blue-600 px-3 py-2 text-white">
-          Add Subject
-        </button>
-      </div>
+      <PageHeader
+        icon={BookOpen}
+        title={gradeName}
+        subtitle={`${subjects.length} Subject${subjects.length === 1 ? "" : "s"}`}
+        action={
+          <button
+            type="button"
+            onClick={openCreate}
+            className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
+          >
+            + Add Subject
+          </button>
+        }
+      />
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      <GridToolbar
+        searchValue={search}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        searchLabel="Search subjects..."
+        view={view}
+        onViewChange={(value) => {
+          setView(value);
+          setPage(1);
+        }}
+      />
 
-      <table className="mt-6 w-full text-left text-sm">
-        <thead>
-          <tr>
-            <th className="border-b border-gray-200 pb-2">Name</th>
-            <th className="border-b border-gray-200 pb-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {subjects.map((subject) => (
-            <tr key={subject.id}>
-              <td className="border-b border-gray-100 py-2">
-                <Link href={`/dashboard/grades/${gradeId}/subjects/${subject.id}`} className="text-blue-600 underline">
-                  {subject.name}
-                </Link>
-              </td>
-              <td className="border-b border-gray-100 py-2">
-                <button type="button" onClick={() => handleDelete(subject.id)} className="text-red-600 underline">
-                  Delete
-                </button>
-                {deleteBlockedId === subject.id && (
-                  <span className="ml-3 text-xs text-amber-600">Has syllabus or scheduling history.</span>
-                )}
-              </td>
-            </tr>
+      {error && !modalState && <p className="text-sm text-red-600">{error}</p>}
+
+      {pageSubjects.length === 0 && <p className="py-8 text-center text-sm text-neutral-400">No subjects found</p>}
+
+      {pageSubjects.length > 0 && view === "grid" && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {pageSubjects.map((subject) => (
+            <EntityCard
+              key={subject.id}
+              icon={BookOpen}
+              href={`/dashboard/grades/${gradeId}/subjects/${subject.id}`}
+              title={subject.name}
+              subtitle={versionLabel(subject.versionCount)}
+              menuItems={[{ label: "Delete", destructive: true, onClick: () => handleDelete(subject.id) }]}
+              blockedMessage={
+                deleteBlockedId === subject.id
+                  ? "Has syllabus or scheduling history and cannot be deleted."
+                  : undefined
+              }
+              blockedActions={
+                deleteBlockedId === subject.id ? (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteBlockedId(null)}
+                    className="rounded border border-amber-300 px-2 py-1 text-[11px]"
+                  >
+                    Cancel
+                  </button>
+                ) : undefined
+              }
+            />
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
+
+      {pageSubjects.length > 0 && view === "list" && (
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr>
+              <th className="border-b border-gray-200 pb-2">Name</th>
+              <th className="border-b border-gray-200 pb-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageSubjects.map((subject) => (
+              <tr key={subject.id}>
+                <td className="border-b border-gray-100 py-2">
+                  <Link
+                    href={`/dashboard/grades/${gradeId}/subjects/${subject.id}`}
+                    className="text-blue-600 underline"
+                  >
+                    {subject.name}
+                  </Link>
+                </td>
+                <td className="border-b border-gray-100 py-2">
+                  {deleteBlockedId === subject.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-amber-700">Has syllabus or scheduling history.</span>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteBlockedId(null)}
+                        className="rounded border border-amber-300 px-2 py-1 text-[11px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => handleDelete(subject.id)} className="text-red-600 underline">
+                      Delete
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <Pagination
+        page={currentPage}
+        pageSize={PAGE_SIZE}
+        total={filteredSubjects.length}
+        onPageChange={setPage}
+        itemLabel="subjects"
+      />
+
+      {modalState && (
+        <Modal onClose={closeModal}>
+          <h2 className="text-sm font-bold text-neutral-800">Add Subject</h2>
+          <input
+            type="text"
+            aria-label="Subject name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            placeholder="e.g. Mathematics"
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleCreate}
+              className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
+            >
+              Save
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
