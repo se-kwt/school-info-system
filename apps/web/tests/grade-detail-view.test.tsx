@@ -52,7 +52,13 @@ describe("GradeDetailView", () => {
 
   it("shows the delete-blocked banner in place of the footer on a deletable:false response", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: "Has syllabus or scheduling history", deletable: false }), { status: 400 })
+      new Response(
+        JSON.stringify({
+          error: "This subject has syllabus, faculty, or scheduling history and cannot be deleted",
+          deletable: false,
+        }),
+        { status: 400 }
+      )
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -62,7 +68,7 @@ describe("GradeDetailView", () => {
     await userEvent.click(within(mathCard).getByText("Delete"));
 
     expect(
-      await within(mathCard).findByText("Has syllabus or scheduling history and cannot be deleted.")
+      await within(mathCard).findByText("This subject has syllabus, faculty, or scheduling history and cannot be deleted")
     ).toBeInTheDocument();
     vi.unstubAllGlobals();
   });

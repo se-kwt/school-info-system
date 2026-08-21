@@ -41,6 +41,7 @@ export function GradeDetailView({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
+  const [deleteBlockedMessage, setDeleteBlockedMessage] = useState<string | null>(null);
 
   async function refresh() {
     const response = await fetch(`/api/grades/${gradeId}/subjects`);
@@ -78,12 +79,14 @@ export function GradeDetailView({
     const response = await fetch(`/api/subjects/${id}`, { method: "DELETE" });
     if (response.ok) {
       setDeleteBlockedId(null);
+      setDeleteBlockedMessage(null);
       await refresh();
       return;
     }
     const body = await response.json();
     if (body.deletable === false) {
       setDeleteBlockedId(id);
+      setDeleteBlockedMessage(body.error);
       return;
     }
     setError(body.error);
@@ -129,10 +132,7 @@ export function GradeDetailView({
         }}
         searchLabel="Search subjects..."
         view={view}
-        onViewChange={(value) => {
-          setView(value);
-          setPage(1);
-        }}
+        onViewChange={setView}
       />
 
       {error && !modalState && <p className="text-sm text-red-600">{error}</p>}
@@ -149,16 +149,15 @@ export function GradeDetailView({
               title={subject.name}
               subtitle={versionLabel(subject.versionCount)}
               menuItems={[{ label: "Delete", destructive: true, onClick: () => handleDelete(subject.id) }]}
-              blockedMessage={
-                deleteBlockedId === subject.id
-                  ? "Has syllabus or scheduling history and cannot be deleted."
-                  : undefined
-              }
+              blockedMessage={deleteBlockedId === subject.id ? (deleteBlockedMessage ?? undefined) : undefined}
               blockedActions={
                 deleteBlockedId === subject.id ? (
                   <button
                     type="button"
-                    onClick={() => setDeleteBlockedId(null)}
+                    onClick={() => {
+                      setDeleteBlockedId(null);
+                      setDeleteBlockedMessage(null);
+                    }}
                     className="rounded border border-amber-300 px-2 py-1 text-[11px]"
                   >
                     Cancel
@@ -192,10 +191,13 @@ export function GradeDetailView({
                 <td className="border-b border-gray-100 py-2">
                   {deleteBlockedId === subject.id ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-amber-700">Has syllabus or scheduling history.</span>
+                      <span className="text-xs text-amber-700">{deleteBlockedMessage}</span>
                       <button
                         type="button"
-                        onClick={() => setDeleteBlockedId(null)}
+                        onClick={() => {
+                          setDeleteBlockedId(null);
+                          setDeleteBlockedMessage(null);
+                        }}
                         className="rounded border border-amber-300 px-2 py-1 text-[11px]"
                       >
                         Cancel

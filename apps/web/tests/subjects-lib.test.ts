@@ -81,9 +81,21 @@ describe("subjects lib", () => {
       createdById: adminId,
     });
 
-    const result = await listSubjects(prisma, { gradeId, schoolId });
-    if (!result.ok) throw new Error("expected ok");
-    expect(result.subjects[0].versionCount).toBe(1);
+    const afterOne = await listSubjects(prisma, { gradeId, schoolId });
+    if (!afterOne.ok) throw new Error("expected ok");
+    expect(afterOne.subjects[0].versionCount).toBe(1);
+
+    await createSyllabusVersion(prisma, {
+      subjectId: created.subject.id,
+      schoolId,
+      title: "v2",
+      content: "Numbers and shapes",
+      createdById: adminId,
+    });
+
+    const afterTwo = await listSubjects(prisma, { gradeId, schoolId });
+    if (!afterTwo.ok) throw new Error("expected ok");
+    expect(afterTwo.subjects[0].versionCount).toBe(2);
   });
 
   it("blocks deleting a subject that has syllabus history", async () => {
