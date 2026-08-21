@@ -15,9 +15,9 @@ export function GridToolbar({
   searchValue: string;
   onSearchChange: (value: string) => void;
   searchLabel: string;
-  filterValue: string;
-  onFilterChange: (value: string) => void;
-  filterOptions: { value: string; label: string }[];
+  filterValue?: string;
+  onFilterChange?: (value: string) => void;
+  filterOptions?: { value: string; label: string }[];
   view: "grid" | "list";
   onViewChange: (view: "grid" | "list") => void;
 }) {
@@ -35,18 +35,20 @@ export function GridToolbar({
             className="w-full rounded-lg border border-neutral-200 py-2 pl-9 pr-3 text-sm"
           />
         </div>
-        <select
-          aria-label="Filter by academic year"
-          value={filterValue}
-          onChange={(event) => onFilterChange(event.target.value)}
-          className="rounded-lg border border-neutral-200 px-3 py-2 text-sm"
-        >
-          {filterOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        {filterOptions && (
+          <select
+            aria-label="Filter by academic year"
+            value={filterValue}
+            onChange={(event) => onFilterChange?.(event.target.value)}
+            className="rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+          >
+            {filterOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="flex items-center gap-1 rounded-lg border border-neutral-200 p-1">
         <button

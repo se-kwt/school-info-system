@@ -83,4 +83,18 @@ describe("GridToolbar", () => {
     expect(screen.getByRole("button", { name: "List view" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Grid view" })).toHaveAttribute("aria-pressed", "false");
   });
+
+  it("omits the filter select when filterOptions is not provided", () => {
+    render(
+      <GridToolbar
+        searchValue=""
+        onSearchChange={vi.fn()}
+        searchLabel="Search subjects..."
+        view="grid"
+        onViewChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByLabelText("Filter by academic year")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Search subjects...")).toBeInTheDocument();
+  });
 });
