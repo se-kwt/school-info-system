@@ -109,4 +109,68 @@ describe("timetable lib", () => {
     });
     expect(clashingBooking).toMatchObject({ ok: false, error: "TEACHER_ALREADY_BOOKED" });
   });
+
+  it("rejects a period belonging to another school", async () => {
+    const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const foreignPeriod = await prisma.period.create({
+      data: {
+        schoolId: otherSchool.id,
+        order: 1,
+        label: "Foreign Period 1",
+        startTime: "09:00",
+        endTime: "09:45",
+      },
+    });
+
+    const result = await createTimetableEntry(prisma, {
+      schoolId,
+      academicYearId: yearId,
+      classId,
+      dayOfWeek: 1,
+      periodId: foreignPeriod.id,
+      subjectId,
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_PERIOD" });
+
+    const written = await prisma.timetableEntry.count({ where: { periodId: foreignPeriod.id } });
+    expect(written).toBe(0);
+  });
+
+  it("rejects scheduling a lesson into a break period", async () => {
+    const breakPeriod = await prisma.period.create({
+      data: {
+        schoolId,
+        order: 99,
+        label: "Lunch",
+        isBreak: true,
+        startTime: "12:00",
+        endTime: "12:45",
+      },
+    });
+
+    const result = await createTimetableEntry(prisma, {
+      schoolId,
+      academicYearId: yearId,
+      classId,
+      dayOfWeek: 1,
+      periodId: breakPeriod.id,
+      subjectId,
+    });
+
+    expect(result).toEqual({ ok: false, error: "BREAK_PERIOD" });
+  });
+
+  it("still accepts a teaching period belonging to this school", async () => {
+    const result = await createTimetableEntry(prisma, {
+      schoolId,
+      academicYearId: yearId,
+      classId,
+      dayOfWeek: 1,
+      periodId,
+      subjectId,
+    });
+
+    expect(result.ok).toBe(true);
+  });
 });

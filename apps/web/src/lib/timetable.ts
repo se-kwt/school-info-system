@@ -59,6 +59,8 @@ export type CreateTimetableEntryResult =
   | { ok: true; id: number }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_DAY" }
+  | { ok: false; error: "INVALID_PERIOD" }
+  | { ok: false; error: "BREAK_PERIOD" }
   | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "INVALID_TEACHER" }
   | { ok: false; error: "TEACHER_ALREADY_BOOKED" }
@@ -79,6 +81,12 @@ export async function createTimetableEntry(
   const klass = await prisma.class.findFirst({ where: { id: params.classId, schoolId: params.schoolId } });
   if (!klass) return { ok: false, error: "INVALID_CLASS" };
   if (params.dayOfWeek < 1 || params.dayOfWeek > 6) return { ok: false, error: "INVALID_DAY" };
+
+  const period = await prisma.period.findFirst({
+    where: { id: params.periodId, schoolId: params.schoolId },
+  });
+  if (!period) return { ok: false, error: "INVALID_PERIOD" };
+  if (period.isBreak) return { ok: false, error: "BREAK_PERIOD" };
 
   const subject = await prisma.subject.findFirst({ where: { id: params.subjectId, gradeId: klass.gradeId } });
   if (!subject) return { ok: false, error: "INVALID_SUBJECT" };

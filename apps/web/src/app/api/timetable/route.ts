@@ -92,6 +92,12 @@ export async function POST(request: Request) {
       if (result.error === "INVALID_DAY") {
         return NextResponse.json({ error: "dayOfWeek must be between 1 and 6" }, { status: 400 });
       }
+      if (result.error === "INVALID_PERIOD") {
+        return NextResponse.json({ error: "Period not found" }, { status: 400 });
+      }
+      if (result.error === "BREAK_PERIOD") {
+        return NextResponse.json({ error: "Cannot schedule a lesson during a break" }, { status: 400 });
+      }
       if (result.error === "INVALID_SUBJECT") {
         return NextResponse.json({ error: "This subject does not belong to the class's grade" }, { status: 400 });
       }
