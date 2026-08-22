@@ -188,7 +188,9 @@ export async function createStudent(
     if (siblingCount !== input.siblingStudentIds.length) return { ok: false, error: "INVALID_SIBLING" };
   }
 
-  const targetClass = await prisma.class.findFirst({ where: { id: input.classId, schoolId } });
+  const targetClass = await prisma.class.findFirst({
+    where: { id: input.classId, schoolId, academicYearId },
+  });
   if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
 
   try {
@@ -338,7 +340,11 @@ export async function editStudent(
 
     if (params.fields.classId !== undefined) {
       const targetClass = await prisma.class.findFirst({
-        where: { id: params.fields.classId, schoolId: params.schoolId },
+        where: {
+          id: params.fields.classId,
+          schoolId: params.schoolId,
+          academicYearId: params.academicYearId,
+        },
       });
       if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
     }

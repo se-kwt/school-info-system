@@ -488,6 +488,96 @@ describe("students.ts sibling links", () => {
 
 });
 
+describe("students.ts year scope on class validation", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  it("refuses to create a student against a class from a different academic year", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const activeYear = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 3" } });
+    const activeClass = await createClass(prisma, { schoolId: school.id, academicYearId: activeYear.id, name: "Grade 3", section: "A", gradeId: grade.id });
+
+    const staleYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2025-26",
+        startDate: new Date("2025-04-01"),
+        endDate: new Date("2026-03-31"),
+        status: "archived",
+      },
+    });
+    const staleClass = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: grade.id, section: "A", academicYearId: staleYear.id },
+    });
+
+    const result = await createStudent(prisma, school.id, activeYear.id, {
+      name: "Ghost Student",
+      dob: "2015-01-01",
+      classId: staleClass.id,
+      admissionNo: "GHOST-001",
+      parents: [{ relationship: "Guardian", name: "Parent", phone: "+10000000042" }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_CLASS" });
+
+    const orphan = await prisma.student.findUnique({ where: { admissionNo: "GHOST-001" } });
+    expect(orphan).toBeNull();
+    const enrollments = await prisma.enrollment.count({ where: { classId: staleClass.id } });
+    expect(enrollments).toBe(0);
+  });
+
+  it("refuses to move a student into a class from a different academic year", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const activeYear = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 3" } });
+    const activeClass = await createClass(prisma, { schoolId: school.id, academicYearId: activeYear.id, name: "Grade 3", section: "A", gradeId: grade.id });
+
+    const staleYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2025-26",
+        startDate: new Date("2025-04-01"),
+        endDate: new Date("2026-03-31"),
+        status: "archived",
+      },
+    });
+    const staleClass = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: grade.id, section: "A", academicYearId: staleYear.id },
+    });
+
+    const created = await createStudent(prisma, school.id, activeYear.id, {
+      name: "Real Student",
+      dob: "2015-01-01",
+      classId: activeClass.id,
+      admissionNo: "REAL-001",
+      parents: [{ relationship: "Guardian", name: "Parent", phone: "+10000000043" }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const result = await editStudent(prisma, {
+      studentId: created.student.id,
+      schoolId: school.id,
+      academicYearId: activeYear.id,
+      fields: { classId: staleClass.id },
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_CLASS" });
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { studentId_academicYearId: { studentId: created.student.id, academicYearId: activeYear.id } },
+    });
+    expect(enrollment?.classId).toBe(activeClass.id);
+  });
+});
+
 describe("students.ts pagination", () => {
   beforeEach(async () => {
     await resetDb();
