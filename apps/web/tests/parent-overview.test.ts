@@ -231,13 +231,13 @@ describe("getParentOverview", () => {
       data: { gradeId: fixtures.classA.gradeId, name: "Science" },
     });
     await prisma.mark.create({
-      data: { examId: olderExam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 80, maxMarks: 100, grade: "B" },
+      data: { examId: olderExam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, academicYearId: fixtures.academicYear.id, marksObtained: 80, maxMarks: 100, grade: "B", enteredById: fixtures.teacher.id },
     });
     await prisma.mark.create({
-      data: { examId: newerExam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 91, maxMarks: 100, grade: "A" },
+      data: { examId: newerExam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, academicYearId: fixtures.academicYear.id, marksObtained: 91, maxMarks: 100, grade: "A", enteredById: fixtures.teacher.id },
     });
     await prisma.mark.create({
-      data: { examId: newerExam.id, studentId: fixtures.student.id, subjectId: scienceSubject.id, marksObtained: 85, maxMarks: 100, grade: "B" },
+      data: { examId: newerExam.id, studentId: fixtures.student.id, subjectId: scienceSubject.id, academicYearId: fixtures.academicYear.id, marksObtained: 85, maxMarks: 100, grade: "B", enteredById: fixtures.teacher.id },
     });
 
     const overview = await getParentOverview(prisma, {
@@ -278,7 +278,7 @@ describe("getParentOverview", () => {
       where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
     });
     await prisma.mark.create({
-      data: { examId: exam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 80, maxMarks: 100, grade: "B" },
+      data: { examId: exam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, academicYearId: fixtures.academicYear.id, marksObtained: 80, maxMarks: 100, grade: "B", enteredById: fixtures.teacher.id },
     });
 
     const overview = await getParentOverview(prisma, {
@@ -306,7 +306,7 @@ describe("getParentOverview", () => {
       where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
     });
     await prisma.mark.create({
-      data: { examId: exam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 80, maxMarks: 100, grade: "B" },
+      data: { examId: exam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, academicYearId: fixtures.academicYear.id, marksObtained: 80, maxMarks: 100, grade: "B", enteredById: fixtures.teacher.id },
     });
 
     const beforePublish = await getParentOverview(prisma, {

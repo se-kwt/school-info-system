@@ -180,6 +180,7 @@ model User {
   timetableEntries    TimetableEntry[]
   promotionRunsRun    PromotionRun[]
   syllabusVersions    SyllabusVersion[]
+  marksEntered        Mark[]           @relation("MarksEnteredBy")
 
   @@index([schoolId])
 }
@@ -351,20 +352,29 @@ model Exam {
 }
 
 model Mark {
-  id            Int     @id @default(autoincrement())
-  exam          Exam    @relation(fields: [examId], references: [id])
-  examId        Int
-  student       Student @relation(fields: [studentId], references: [id])
-  studentId     Int
-  subject       Subject @relation(fields: [subjectId], references: [id])
-  subjectId     Int
-  marksObtained Float
-  maxMarks      Float
-  grade         String
+  id             Int          @id @default(autoincrement())
+  exam           Exam         @relation(fields: [examId], references: [id])
+  examId         Int
+  student        Student      @relation(fields: [studentId], references: [id])
+  studentId      Int
+  subject        Subject      @relation(fields: [subjectId], references: [id])
+  subjectId      Int
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  academicYearId Int
+  marksObtained  Float
+  maxMarks       Float
+  grade          String
+  gradePoint     Float?
+  isAbsent       Boolean      @default(false)
+  remarks        String?
+  enteredBy      User         @relation("MarksEnteredBy", fields: [enteredById], references: [id])
+  enteredById    Int
+  enteredAt      DateTime     @default(now())
 
   @@unique([examId, studentId, subjectId])
   @@index([studentId])
   @@index([subjectId])
+  @@index([academicYearId])
 }
 
 model TimetableEntry {
@@ -476,6 +486,7 @@ model AcademicYear {
   runsTo           PromotionRun[]   @relation("ToYear")
   classes          Class[]
   attendances      Attendance[]
+  marks            Mark[]
 
   @@unique([schoolId, name])
 }

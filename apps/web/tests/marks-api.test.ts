@@ -76,15 +76,17 @@ describe("GET /api/marks", () => {
   });
 
   it("returns the subject-wise breakdown with computed grade", async () => {
-    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
+    const { school, year, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     await prisma.mark.create({
       data: {
         examId: exam.id,
         studentId: student.id,
         subjectId: subject.id,
+        academicYearId: year.id,
         marksObtained: 95,
         maxMarks: 100,
         grade: "A",
+        enteredById: teacher.id,
       },
     });
     loginAs(teacher.id, "teacher", school.id);
@@ -93,7 +95,13 @@ describe("GET /api/marks", () => {
     const response = await getMarks(request);
     const body = await response.json();
     expect(body.subjects).toEqual([{ id: subject.id, name: "Math" }]);
-    expect(body.students[0].marks[subject.id]).toEqual({ marksObtained: 95, maxMarks: 100, grade: "A" });
+    expect(body.students[0].marks[subject.id]).toEqual({
+      marksObtained: 95,
+      maxMarks: 100,
+      grade: "A",
+      isAbsent: false,
+      remarks: null,
+    });
   });
 
   it("rejects a teacher viewing a class they don't teach with 403", async () => {

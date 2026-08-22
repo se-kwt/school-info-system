@@ -6,6 +6,8 @@ export interface MarkCell {
   marksObtained: number;
   maxMarks: number;
   grade: string;
+  isAbsent: boolean;
+  remarks: string | null;
 }
 
 export interface SubjectOption {
@@ -59,7 +61,7 @@ export async function getMarksForClassExam(
     for (const subject of subjects) {
       const mark = marks.find((m) => m.studentId === student.id && m.subjectId === subject.id);
       marksBySubject[subject.id] = mark
-        ? { marksObtained: mark.marksObtained, maxMarks: mark.maxMarks, grade: mark.grade }
+        ? { marksObtained: mark.marksObtained, maxMarks: mark.maxMarks, grade: mark.grade, isAbsent: mark.isAbsent, remarks: mark.remarks }
         : null;
     }
     return { studentId: student.id, name: student.name, marks: marksBySubject };
@@ -94,7 +96,7 @@ export async function enterMarks(
     teacherUserId: number;
     schoolId: number;
     academicYearId: number;
-    entries: { studentId: number; marksObtained: number }[];
+    entries: { studentId: number; marksObtained: number; isAbsent?: boolean; remarks?: string }[];
   }
 ): Promise<EnterMarksResult> {
   const exam = await prisma.exam.findFirst({
@@ -112,7 +114,9 @@ export async function enterMarks(
   const allEnrolled = params.entries.every((e) => enrolledIds.has(e.studentId));
   if (!allEnrolled) return { ok: false, error: "STUDENT_MISMATCH" };
 
-  const allValid = params.entries.every((e) => e.marksObtained >= 0 && e.marksObtained <= exam.maxMarks);
+  const allValid = params.entries.every(
+    (e) => e.isAbsent || (e.marksObtained >= 0 && e.marksObtained <= exam.maxMarks)
+  );
   if (!allValid) return { ok: false, error: "INVALID_MARKS_RANGE" };
 
   await prisma.$transaction(
@@ -123,14 +127,23 @@ export async function enterMarks(
           examId: params.examId,
           studentId: entry.studentId,
           subjectId: params.subjectId,
-          marksObtained: entry.marksObtained,
+          academicYearId: params.academicYearId,
+          marksObtained: entry.isAbsent ? 0 : entry.marksObtained,
           maxMarks: exam.maxMarks,
-          grade: computeGrade(entry.marksObtained, exam.maxMarks),
+          grade: entry.isAbsent ? "AB" : computeGrade(entry.marksObtained, exam.maxMarks),
+          isAbsent: entry.isAbsent ?? false,
+          remarks: entry.remarks ?? null,
+          enteredById: params.teacherUserId,
+          enteredAt: new Date(),
         },
         update: {
-          marksObtained: entry.marksObtained,
+          marksObtained: entry.isAbsent ? 0 : entry.marksObtained,
           maxMarks: exam.maxMarks,
-          grade: computeGrade(entry.marksObtained, exam.maxMarks),
+          grade: entry.isAbsent ? "AB" : computeGrade(entry.marksObtained, exam.maxMarks),
+          isAbsent: entry.isAbsent ?? false,
+          remarks: entry.remarks ?? null,
+          enteredById: params.teacherUserId,
+          enteredAt: new Date(),
         },
       })
     )

@@ -26,6 +26,8 @@ interface MarkCell {
   marksObtained: number;
   maxMarks: number;
   grade: string;
+  isAbsent: boolean;
+  remarks: string | null;
 }
 
 interface SubjectOption {
@@ -315,7 +317,7 @@ export function MarksView({
                   const cell = student.marks[subject.id];
                   return (
                     <td key={subject.id} className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
-                      {cell ? `${cell.marksObtained}/${cell.maxMarks} (${cell.grade})` : "—"}
+                      {cell ? (cell.isAbsent ? "AB" : `${cell.marksObtained}/${cell.maxMarks} (${cell.grade})`) : "—"}
                     </td>
                   );
                 })}

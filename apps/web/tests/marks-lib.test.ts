@@ -49,7 +49,13 @@ describe("marks lib subjectId", () => {
     const marks = await getMarksForClassExam(prisma, { classId, examId, schoolId, academicYearId: yearId, role: "admin", userId: 0 });
     if (!marks.ok) throw new Error("expected ok");
     expect(marks.subjects).toEqual([{ id: subjectId, name: "Mathematics" }]);
-    expect(marks.students[0].marks[subjectId]).toEqual({ marksObtained: 90, maxMarks: 100, grade: "A" });
+    expect(marks.students[0].marks[subjectId]).toEqual({
+      marksObtained: 90,
+      maxMarks: 100,
+      grade: "A",
+      isAbsent: false,
+      remarks: null,
+    });
   });
 
   it("rejects a teacher not assigned to that subject on the class", async () => {
@@ -195,6 +201,63 @@ describe("marks lib subjectId", () => {
       userId: teacherId,
     });
     if (!marks.ok) throw new Error("expected ok");
-    expect(marks.students[0].marks[subjectId]).toEqual({ marksObtained: 90, maxMarks: 100, grade: "A" });
+    expect(marks.students[0].marks[subjectId]).toEqual({
+      marksObtained: 90,
+      maxMarks: 100,
+      grade: "A",
+      isAbsent: false,
+      remarks: null,
+    });
+  });
+
+  it("records an absent student distinctly from an unentered one", async () => {
+    const result = await enterMarks(prisma, {
+      classId,
+      examId,
+      subjectId,
+      teacherUserId: teacherId,
+      schoolId,
+      academicYearId: yearId,
+      entries: [{ studentId, marksObtained: 0, isAbsent: true }],
+    });
+
+    expect(result).toEqual({ ok: true });
+
+    const mark = await prisma.mark.findFirstOrThrow({ where: { examId, studentId } });
+    expect(mark.isAbsent).toBe(true);
+    expect(mark.grade).toBe("AB");
+  });
+
+  it("stamps the entering teacher and the year onto each mark", async () => {
+    await enterMarks(prisma, {
+      classId,
+      examId,
+      subjectId,
+      teacherUserId: teacherId,
+      schoolId,
+      academicYearId: yearId,
+      entries: [{ studentId, marksObtained: 80 }],
+    });
+
+    const mark = await prisma.mark.findFirstOrThrow({ where: { examId, studentId } });
+    expect(mark.enteredById).toBe(teacherId);
+    expect(mark.academicYearId).toBe(yearId);
+    expect(mark.enteredAt).toBeInstanceOf(Date);
+  });
+
+  it("updates enteredById when a different teacher corrects a mark", async () => {
+    const second = await prisma.user.create({
+      data: { schoolId, phone: "+10000000055", role: "teacher", name: "Second Teacher" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId, subjectId, teacherUserId: second.id, academicYearId: yearId },
+    });
+
+    await enterMarks(prisma, { classId, examId, subjectId, teacherUserId: teacherId, schoolId, academicYearId: yearId, entries: [{ studentId, marksObtained: 80 }] });
+    await enterMarks(prisma, { classId, examId, subjectId, teacherUserId: second.id, schoolId, academicYearId: yearId, entries: [{ studentId, marksObtained: 85 }] });
+
+    const mark = await prisma.mark.findFirstOrThrow({ where: { examId, studentId } });
+    expect(mark.marksObtained).toBe(85);
+    expect(mark.enteredById).toBe(second.id);
   });
 });
