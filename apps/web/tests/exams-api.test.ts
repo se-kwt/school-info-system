@@ -40,7 +40,7 @@ describe("/api/exams", () => {
 
     const postRequest = new Request("http://localhost/api/exams", {
       method: "POST",
-      body: JSON.stringify({ name: "Mid-term", term: "Term 1", examDate: "2026-09-01" }),
+      body: JSON.stringify({ name: "Mid-term", term: "Term 1", examDate: "2026-09-01", maxMarks: 100, passMarks: 40 }),
       headers: { "content-type": "application/json" },
     });
     const postResponse = await postExams(postRequest);
@@ -76,6 +76,8 @@ describe("/api/exams", () => {
         name: "Old Midterm",
         term: "Term 1",
         examDate: new Date("2024-09-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     await prisma.exam.create({
@@ -85,6 +87,8 @@ describe("/api/exams", () => {
         name: "Current Midterm",
         term: "Term 1",
         examDate: new Date("2026-09-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     const admin = await prisma.user.create({
@@ -128,6 +132,40 @@ describe("/api/exams", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a non-positive maxMarks with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
+    const admin = await prisma.user.create({
+      data: { phone: "+15550068888", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/exams", {
+      method: "POST",
+      body: JSON.stringify({ name: "Mid-term", term: "Term 1", examDate: "2026-09-01", maxMarks: 0, passMarks: 0 }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postExams(request);
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a passMarks that exceeds maxMarks with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
+    const admin = await prisma.user.create({
+      data: { phone: "+15550069999", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/exams", {
+      method: "POST",
+      body: JSON.stringify({ name: "Mid-term", term: "Term 1", examDate: "2026-09-01", maxMarks: 50, passMarks: 80 }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postExams(request);
+    expect(response.status).toBe(400);
+  });
+
   it("rejects a teacher attempting to POST with 403", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const teacher = await prisma.user.create({
@@ -137,7 +175,7 @@ describe("/api/exams", () => {
 
     const request = new Request("http://localhost/api/exams", {
       method: "POST",
-      body: JSON.stringify({ name: "Mid-term", term: "Term 1", examDate: "2026-09-01" }),
+      body: JSON.stringify({ name: "Mid-term", term: "Term 1", examDate: "2026-09-01", maxMarks: 100, passMarks: 40 }),
       headers: { "content-type": "application/json" },
     });
     const response = await postExams(request);
@@ -157,6 +195,8 @@ describe("/api/exams", () => {
         name: "Final",
         term: "Term 2",
         examDate: new Date("2026-12-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     loginAs(teacher.id, "teacher", school.id);
@@ -180,6 +220,8 @@ describe("/api/exams", () => {
         name: "Other Exam",
         term: "Term 1",
         examDate: new Date("2026-09-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     const admin = await prisma.user.create({

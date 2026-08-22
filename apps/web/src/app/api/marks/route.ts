@@ -61,17 +61,16 @@ export async function POST(request: Request) {
     let classId: number | undefined;
     let examId: number | undefined;
     let subjectId: number | undefined;
-    let maxMarks: number | undefined;
     let entries: Array<{ studentId: number; marksObtained: number }> | undefined;
     try {
-      ({ classId, examId, subjectId, maxMarks, entries } = await request.json());
+      ({ classId, examId, subjectId, entries } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!classId || !examId || !subjectId || !maxMarks || !entries || entries.length === 0) {
+    if (!classId || !examId || !subjectId || !entries || entries.length === 0) {
       return NextResponse.json(
-        { error: "classId, examId, subjectId, maxMarks, and entries are required" },
+        { error: "classId, examId, subjectId, and entries are required" },
         { status: 400 }
       );
     }
@@ -91,7 +90,6 @@ export async function POST(request: Request) {
       classId,
       examId,
       subjectId,
-      maxMarks,
       teacherUserId: claims.userId,
       schoolId: claims.schoolId,
       academicYearId: yearResult.academicYear.id,

@@ -336,6 +336,9 @@ model Exam {
   name           String
   term           String
   examDate       DateTime
+  maxMarks       Float
+  passMarks      Float
+  weightage      Float        @default(1)
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
 
@@ -343,6 +346,7 @@ model Exam {
 
   @@index([schoolId])
   @@index([academicYearId])
+  @@index([examDate])
 }
 
 model Mark {

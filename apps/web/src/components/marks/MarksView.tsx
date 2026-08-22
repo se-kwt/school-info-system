@@ -60,11 +60,12 @@ export function MarksView({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [entrySubjectId, setEntrySubjectId] = useState("");
-  const [maxMarks, setMaxMarks] = useState("");
   const [marksEdits, setMarksEdits] = useState<Record<number, string>>({});
   const [newExamName, setNewExamName] = useState("");
   const [newExamTerm, setNewExamTerm] = useState("");
   const [newExamDate, setNewExamDate] = useState("");
+  const [newExamMaxMarks, setNewExamMaxMarks] = useState("");
+  const [newExamPassMarks, setNewExamPassMarks] = useState("");
 
   const availableSubjects = teacherSubjects
     .filter((ts) => ts.classId === Number(classId))
@@ -104,8 +105,6 @@ export function MarksView({
       map[student.studentId] = cell ? String(cell.marksObtained) : "";
     }
     setMarksEdits(map);
-    const anyCell = students.map((s) => s.marks[Number(entrySubjectId)]).find((c) => c);
-    setMaxMarks(anyCell ? String(anyCell.maxMarks) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entrySubjectId, students]);
 
@@ -115,7 +114,13 @@ export function MarksView({
     const response = await fetch("/api/exams", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: newExamName, term: newExamTerm, examDate: newExamDate }),
+      body: JSON.stringify({
+        name: newExamName,
+        term: newExamTerm,
+        examDate: newExamDate,
+        maxMarks: Number(newExamMaxMarks),
+        passMarks: Number(newExamPassMarks),
+      }),
     });
 
     if (response.ok) {
@@ -124,6 +129,8 @@ export function MarksView({
       setNewExamName("");
       setNewExamTerm("");
       setNewExamDate("");
+      setNewExamMaxMarks("");
+      setNewExamPassMarks("");
       const listResponse = await fetch("/api/exams");
       if (listResponse.ok) {
         const body = await listResponse.json();
@@ -146,7 +153,6 @@ export function MarksView({
         classId: Number(classId),
         examId: Number(examId),
         subjectId: Number(entrySubjectId),
-        maxMarks: Number(maxMarks),
         entries: students.map((student) => ({
           studentId: student.studentId,
           marksObtained: Number(marksEdits[student.studentId] ?? 0),
@@ -216,6 +222,22 @@ export function MarksView({
               onChange={(event) => setNewExamDate(event.target.value)}
               className={inputClass}
             />
+            <input
+              type="number"
+              aria-label="New exam max marks"
+              placeholder="Max Marks"
+              value={newExamMaxMarks}
+              onChange={(event) => setNewExamMaxMarks(event.target.value)}
+              className={inputClass}
+            />
+            <input
+              type="number"
+              aria-label="New exam pass marks"
+              placeholder="Pass Marks"
+              value={newExamPassMarks}
+              onChange={(event) => setNewExamPassMarks(event.target.value)}
+              className={inputClass}
+            />
             <button
               type="button"
               onClick={handleCreateExam}
@@ -278,14 +300,6 @@ export function MarksView({
                 </option>
               ))}
             </select>
-            <input
-              type="number"
-              aria-label="Max Marks"
-              placeholder="Max Marks"
-              value={maxMarks}
-              onChange={(event) => setMaxMarks(event.target.value)}
-              className={inputClass}
-            />
           </div>
           <table className="mt-4 w-full text-left text-xs">
             <thead>

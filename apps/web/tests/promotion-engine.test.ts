@@ -1094,6 +1094,8 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
         name: "Unit Test",
         term: "Term 1",
         examDate: new Date("2027-09-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
 

@@ -26,12 +26,29 @@ export async function listExams(
   }));
 }
 
+export type CreateExamResult =
+  | { ok: true; id: number }
+  | { ok: false; error: "INVALID_MAX_MARKS" }
+  | { ok: false; error: "INVALID_PASS_MARKS" };
+
 export async function createExam(
   prisma: PrismaClient,
   schoolId: number,
   academicYearId: number,
-  input: { name: string; term: string; examDate: string }
-): Promise<{ id: number }> {
+  input: {
+    name: string;
+    term: string;
+    examDate: string;
+    maxMarks: number;
+    passMarks: number;
+    weightage?: number;
+  }
+): Promise<CreateExamResult> {
+  if (input.maxMarks <= 0) return { ok: false, error: "INVALID_MAX_MARKS" };
+  if (input.passMarks < 0 || input.passMarks > input.maxMarks) {
+    return { ok: false, error: "INVALID_PASS_MARKS" };
+  }
+
   const created = await prisma.exam.create({
     data: {
       schoolId,
@@ -39,7 +56,10 @@ export async function createExam(
       name: input.name,
       term: input.term,
       examDate: new Date(input.examDate),
+      maxMarks: input.maxMarks,
+      passMarks: input.passMarks,
+      weightage: input.weightage ?? 1,
     },
   });
-  return { id: created.id };
+  return { ok: true, id: created.id };
 }

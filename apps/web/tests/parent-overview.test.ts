@@ -206,6 +206,8 @@ describe("getParentOverview", () => {
         term: "Term 1",
         examDate: new Date("2026-08-01"),
         academicYearId: fixtures.academicYear.id,
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     const newerExam = await prisma.exam.create({
@@ -215,6 +217,8 @@ describe("getParentOverview", () => {
         term: "Term 2",
         examDate: new Date("2026-12-01"),
         academicYearId: fixtures.academicYear.id,
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     const mathSubject = await prisma.subject.findFirstOrThrow({

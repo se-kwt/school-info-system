@@ -30,7 +30,9 @@ describe("marks lib subjectId", () => {
     const klass = await prisma.class.create({ data: { schoolId, section: "A", gradeId: grade.id, academicYearId: year.id } });
     classId = klass.id;
     await prisma.classTeacher.create({ data: { classId, subjectId, teacherUserId: teacherId, academicYearId: yearId } });
-    const exam = await prisma.exam.create({ data: { schoolId, academicYearId: yearId, name: "Midterm", term: "T1", examDate: new Date() } });
+    const exam = await prisma.exam.create({
+      data: { schoolId, academicYearId: yearId, name: "Midterm", term: "T1", examDate: new Date(), maxMarks: 100, passMarks: 40 },
+    });
     examId = exam.id;
     const student = await prisma.student.create({ data: { schoolId, name: "Student One", dob: new Date("2015-01-01"), admissionNo: "A1" } });
     studentId = student.id;
@@ -39,7 +41,7 @@ describe("marks lib subjectId", () => {
 
   it("enters marks with a subjectId and reads them back keyed by subjectId", async () => {
     const result = await enterMarks(prisma, {
-      classId, examId, subjectId, maxMarks: 100, teacherUserId: teacherId, schoolId, academicYearId: yearId,
+      classId, examId, subjectId, teacherUserId: teacherId, schoolId, academicYearId: yearId,
       entries: [{ studentId, marksObtained: 90 }],
     });
     expect(result).toEqual({ ok: true });
@@ -53,7 +55,7 @@ describe("marks lib subjectId", () => {
   it("rejects a teacher not assigned to that subject on the class", async () => {
     const otherTeacher = await prisma.user.create({ data: { schoolId, phone: "+10000000002", role: "teacher", name: "Teacher Two" } });
     const result = await enterMarks(prisma, {
-      classId, examId, subjectId, maxMarks: 100, teacherUserId: otherTeacher.id, schoolId, academicYearId: yearId,
+      classId, examId, subjectId, teacherUserId: otherTeacher.id, schoolId, academicYearId: yearId,
       entries: [{ studentId, marksObtained: 90 }],
     });
     expect(result).toEqual({ ok: false, error: "NOT_ASSIGNED" });
@@ -63,7 +65,14 @@ describe("marks lib subjectId", () => {
     const staleYear = await prisma.academicYear.create({
       data: { schoolId, name: "2024-25", startDate: new Date("2024-04-01"), endDate: new Date("2025-03-31"), status: "archived" },
     });
-    const stale = await createExam(prisma, schoolId, staleYear.id, { name: "Old Midterm", term: "Term 1", examDate: "2024-09-01" });
+    const stale = await createExam(prisma, schoolId, staleYear.id, {
+      name: "Old Midterm",
+      term: "Term 1",
+      examDate: "2024-09-01",
+      maxMarks: 100,
+      passMarks: 40,
+    });
+    if (!stale.ok) throw new Error("expected ok");
 
     const result = await getMarksForClassExam(prisma, {
       classId,
@@ -81,13 +90,19 @@ describe("marks lib subjectId", () => {
     const staleYear = await prisma.academicYear.create({
       data: { schoolId, name: "2024-25", startDate: new Date("2024-04-01"), endDate: new Date("2025-03-31"), status: "archived" },
     });
-    const stale = await createExam(prisma, schoolId, staleYear.id, { name: "Old Midterm", term: "Term 1", examDate: "2024-09-01" });
+    const stale = await createExam(prisma, schoolId, staleYear.id, {
+      name: "Old Midterm",
+      term: "Term 1",
+      examDate: "2024-09-01",
+      maxMarks: 100,
+      passMarks: 40,
+    });
+    if (!stale.ok) throw new Error("expected ok");
 
     const result = await enterMarks(prisma, {
       classId,
       examId: stale.id,
       subjectId,
-      maxMarks: 100,
       teacherUserId: teacherId,
       schoolId,
       academicYearId: yearId,
@@ -96,5 +111,68 @@ describe("marks lib subjectId", () => {
 
     expect(result).toEqual({ ok: false, error: "INVALID_EXAM" });
     expect(await prisma.mark.count({ where: { examId: stale.id } })).toBe(0);
+  });
+
+  it("takes maxMarks from the exam, not the caller", async () => {
+    const exam = await createExam(prisma, schoolId, yearId, {
+      name: "Midterm",
+      term: "Term 1",
+      examDate: "2026-09-01",
+      maxMarks: 50,
+      passMarks: 20,
+    });
+    if (!exam.ok) throw new Error("expected ok");
+
+    const result = await enterMarks(prisma, {
+      classId,
+      examId: exam.id,
+      subjectId,
+      teacherUserId: teacherId,
+      schoolId,
+      academicYearId: yearId,
+      entries: [{ studentId, marksObtained: 40 }],
+    });
+
+    expect(result).toEqual({ ok: true });
+
+    const mark = await prisma.mark.findFirstOrThrow({ where: { examId: exam.id, studentId } });
+    expect(mark.maxMarks).toBe(50);
+    // 40/50 = 80%, which is the "B" bracket (>=75) under computeGrade's thresholds.
+    expect(mark.grade).toBe("B");
+  });
+
+  it("rejects marks above the exam's maximum", async () => {
+    const exam = await createExam(prisma, schoolId, yearId, {
+      name: "Midterm",
+      term: "Term 1",
+      examDate: "2026-09-01",
+      maxMarks: 50,
+      passMarks: 20,
+    });
+    if (!exam.ok) throw new Error("expected ok");
+
+    const result = await enterMarks(prisma, {
+      classId,
+      examId: exam.id,
+      subjectId,
+      teacherUserId: teacherId,
+      schoolId,
+      academicYearId: yearId,
+      entries: [{ studentId, marksObtained: 80 }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_MARKS_RANGE" });
+  });
+
+  it("rejects an exam whose pass mark exceeds its maximum", async () => {
+    await expect(
+      createExam(prisma, schoolId, yearId, {
+        name: "Broken",
+        term: "Term 1",
+        examDate: "2026-09-01",
+        maxMarks: 50,
+        passMarks: 80,
+      })
+    ).resolves.toEqual({ ok: false, error: "INVALID_PASS_MARKS" });
   });
 });

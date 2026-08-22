@@ -29,15 +29,18 @@ export async function POST(request: Request) {
     let name: string | undefined;
     let term: string | undefined;
     let examDate: string | undefined;
+    let maxMarks: number | undefined;
+    let passMarks: number | undefined;
+    let weightage: number | undefined;
     try {
-      ({ name, term, examDate } = await request.json());
+      ({ name, term, examDate, maxMarks, passMarks, weightage } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!name || !term || !examDate) {
+    if (!name || !term || !examDate || !maxMarks || passMarks === undefined || passMarks === null) {
       return NextResponse.json(
-        { error: "name, term, and examDate are required" },
+        { error: "name, term, examDate, maxMarks, and passMarks are required" },
         { status: 400 }
       );
     }
@@ -51,7 +54,21 @@ export async function POST(request: Request) {
       name,
       term,
       examDate,
+      maxMarks,
+      passMarks,
+      weightage,
     });
+
+    if (!result.ok) {
+      if (result.error === "INVALID_MAX_MARKS") {
+        return NextResponse.json({ error: "maxMarks must be greater than 0" }, { status: 400 });
+      }
+      return NextResponse.json(
+        { error: "passMarks must be between 0 and maxMarks" },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json({ id: result.id });
   } catch (err) {
     if (err instanceof AuthError) {

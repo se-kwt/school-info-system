@@ -51,6 +51,8 @@ describe("GET /api/marks", () => {
         name: "Mid-term",
         term: "Term 1",
         examDate: new Date("2026-09-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     return { school, year, klass, teacher, student, exam, subject };
@@ -146,6 +148,8 @@ describe("GET /api/marks", () => {
         name: "Other Exam",
         term: "Term 1",
         examDate: new Date("2026-09-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     const admin = await prisma.user.create({
@@ -207,6 +211,8 @@ describe("POST /api/marks", () => {
         name: "Mid-term",
         term: "Term 1",
         examDate: new Date("2026-09-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     return { school, year, klass, teacher, student, exam, subject };
@@ -227,7 +233,6 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         examId: exam.id,
         subjectId: subject.id,
-        maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
       headers: { "content-type": "application/json" },
@@ -250,7 +255,6 @@ describe("POST /api/marks", () => {
           classId: klass.id,
           examId: exam.id,
           subjectId: subject.id,
-          maxMarks: 100,
           entries: [{ studentId: student.id, marksObtained }],
         }),
         headers: { "content-type": "application/json" },
@@ -291,6 +295,8 @@ describe("POST /api/marks", () => {
         name: "Other Exam",
         term: "Term 1",
         examDate: new Date("2026-09-01"),
+        maxMarks: 100,
+        passMarks: 40,
       },
     });
     loginAs(teacher.id, "teacher", school.id);
@@ -301,7 +307,6 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         examId: otherExam.id,
         subjectId: subject.id,
-        maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
       headers: { "content-type": "application/json" },
@@ -323,7 +328,6 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         examId: exam.id,
         subjectId: subject.id,
-        maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
       headers: { "content-type": "application/json" },
@@ -343,7 +347,6 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         examId: exam.id,
         subjectId: otherSubject.id,
-        maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
       headers: { "content-type": "application/json" },
@@ -371,7 +374,6 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         examId: exam.id,
         subjectId: subject.id,
-        maxMarks: 100,
         entries: [{ studentId: otherStudent.id, marksObtained: 95 }],
       }),
       headers: { "content-type": "application/json" },
@@ -381,25 +383,6 @@ describe("POST /api/marks", () => {
 
     const marks = await prisma.mark.findMany({ where: { studentId: otherStudent.id } });
     expect(marks).toHaveLength(0);
-  });
-
-  it("rejects maxMarks of 0 or negative with 400", async () => {
-    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
-    loginAs(teacher.id, "teacher", school.id);
-
-    const request = new Request("http://localhost/api/marks", {
-      method: "POST",
-      body: JSON.stringify({
-        classId: klass.id,
-        examId: exam.id,
-        subjectId: subject.id,
-        maxMarks: 0,
-        entries: [{ studentId: student.id, marksObtained: 0 }],
-      }),
-      headers: { "content-type": "application/json" },
-    });
-    const response = await postMarks(request);
-    expect(response.status).toBe(400);
   });
 
   it("rejects marksObtained above maxMarks with 400", async () => {
@@ -412,7 +395,6 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         examId: exam.id,
         subjectId: subject.id,
-        maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 105 }],
       }),
       headers: { "content-type": "application/json" },
@@ -431,7 +413,6 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         examId: exam.id,
         subjectId: subject.id,
-        maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: -5 }],
       }),
       headers: { "content-type": "application/json" },
@@ -453,7 +434,6 @@ describe("POST /api/marks", () => {
         classId: klass.id,
         examId: exam.id,
         subjectId: subject.id,
-        maxMarks: 100,
         entries: [{ studentId: student.id, marksObtained: 95 }],
       }),
       headers: { "content-type": "application/json" },
@@ -493,7 +473,6 @@ describe("POST /api/marks", () => {
           classId: klass.id,
           examId: exam.id,
           subjectId: subject.id,
-          maxMarks: 100,
           entries: [{ studentId: student.id, marksObtained: boundary.marksObtained }],
         }),
         headers: { "content-type": "application/json" },

@@ -91,7 +91,6 @@ export async function enterMarks(
     classId: number;
     examId: number;
     subjectId: number;
-    maxMarks: number;
     teacherUserId: number;
     schoolId: number;
     academicYearId: number;
@@ -108,14 +107,12 @@ export async function enterMarks(
   });
   if (!link) return { ok: false, error: "NOT_ASSIGNED" };
 
-  if (params.maxMarks <= 0) return { ok: false, error: "INVALID_MAX_MARKS" };
-
   const enrolled = await getEnrolledStudents(prisma, { classId: params.classId, academicYearId: params.academicYearId });
   const enrolledIds = new Set(enrolled.map((s) => s.id));
   const allEnrolled = params.entries.every((e) => enrolledIds.has(e.studentId));
   if (!allEnrolled) return { ok: false, error: "STUDENT_MISMATCH" };
 
-  const allValid = params.entries.every((e) => e.marksObtained >= 0 && e.marksObtained <= params.maxMarks);
+  const allValid = params.entries.every((e) => e.marksObtained >= 0 && e.marksObtained <= exam.maxMarks);
   if (!allValid) return { ok: false, error: "INVALID_MARKS_RANGE" };
 
   await prisma.$transaction(
@@ -127,13 +124,13 @@ export async function enterMarks(
           studentId: entry.studentId,
           subjectId: params.subjectId,
           marksObtained: entry.marksObtained,
-          maxMarks: params.maxMarks,
-          grade: computeGrade(entry.marksObtained, params.maxMarks),
+          maxMarks: exam.maxMarks,
+          grade: computeGrade(entry.marksObtained, exam.maxMarks),
         },
         update: {
           marksObtained: entry.marksObtained,
-          maxMarks: params.maxMarks,
-          grade: computeGrade(entry.marksObtained, params.maxMarks),
+          maxMarks: exam.maxMarks,
+          grade: computeGrade(entry.marksObtained, exam.maxMarks),
         },
       })
     )
