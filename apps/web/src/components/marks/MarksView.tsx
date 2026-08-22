@@ -8,6 +8,7 @@ interface ExamOption {
   term: string;
   examDate: string;
   published: boolean;
+  maxMarks: number;
 }
 
 interface ClassOption {
@@ -173,6 +174,41 @@ export function MarksView({
   async function handleSave() {
     setError(null);
     setMessage(null);
+
+    const exam = exams.find((e) => String(e.id) === examId);
+    if (!exam) {
+      setError("Exam not found");
+      return;
+    }
+
+    // Build entries with proper handling of absent students
+    const entries = students.map((student) => {
+      const markValue = marksEdits[student.studentId];
+      const marksObtained = markValue === "" ? 0 : Number(markValue);
+      const cell = student.marks[Number(entrySubjectId)];
+      const isAbsent = cell?.isAbsent ?? false;
+
+      return {
+        studentId: student.studentId,
+        marksObtained,
+        isAbsent,
+      };
+    });
+
+    // Validate marks: check for over-maximum (excluding absent students)
+    const overMax = entries.find((e) => !e.isAbsent && e.marksObtained > exam.maxMarks);
+    if (overMax) {
+      setError(`Marks cannot exceed ${exam.maxMarks}`);
+      return;
+    }
+
+    // Validate marks: check for negative values (excluding absent students)
+    const negative = entries.find((e) => !e.isAbsent && e.marksObtained < 0);
+    if (negative) {
+      setError("Marks cannot be negative");
+      return;
+    }
+
     const response = await fetch("/api/marks", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -180,9 +216,9 @@ export function MarksView({
         classId: Number(classId),
         examId: Number(examId),
         subjectId: Number(entrySubjectId),
-        entries: students.map((student) => ({
-          studentId: student.studentId,
-          marksObtained: Number(marksEdits[student.studentId] ?? 0),
+        entries: entries.map((e) => ({
+          studentId: e.studentId,
+          marksObtained: e.marksObtained,
         })),
       }),
     });

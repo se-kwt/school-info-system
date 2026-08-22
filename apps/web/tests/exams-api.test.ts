@@ -54,7 +54,7 @@ describe("/api/exams", () => {
     expect(getResponse.status).toBe(200);
     const body = await getResponse.json();
     expect(body.exams).toEqual([
-      { id: created.id, name: "Mid-term", term: "Term 1", examDate: "2026-09-01", academicYearId: year.id, published: false },
+      { id: created.id, name: "Mid-term", term: "Term 1", examDate: "2026-09-01", academicYearId: year.id, published: false, maxMarks: 100 },
     ]);
   });
 

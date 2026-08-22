@@ -54,4 +54,127 @@ describe("MarksView", () => {
 
     expect(screen.getByLabelText("Exam")).toHaveValue("1");
   });
+
+  it("blocks submission when a score exceeds the exam maximum", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/marks?")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              subjects: [{ id: 1, name: "Math" }],
+              students: [{ studentId: 1, name: "Aadhya Reddy", marks: {} }],
+            }),
+            { status: 200 }
+          )
+        );
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const exams = [
+      { id: 1, name: "Mid Term", term: "Term 1", examDate: "2026-08-15", published: false, maxMarks: 50 },
+    ];
+    const teacherSubjects = [{ classId: 1, subjectId: 1, subjectName: "Math" }];
+
+    render(<MarksView exams={exams} classes={classes} teacherSubjects={teacherSubjects} role="teacher" />);
+
+    // Wait for the marks entry section to appear
+    await waitFor(() => {
+      expect(screen.getByText("Enter Marks")).toBeInTheDocument();
+    });
+
+    const markInput = screen.getByLabelText("Marks for Aadhya Reddy");
+    await userEvent.type(markInput, "80");
+    await userEvent.click(screen.getByRole("button", { name: "Save Marks" }));
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(screen.getByText(/cannot exceed 50/i)).toBeInTheDocument();
+  });
+
+  it("allows a score equal to the maximum", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/marks?")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              subjects: [{ id: 1, name: "Math" }],
+              students: [{ studentId: 1, name: "Aadhya Reddy", marks: {} }],
+            }),
+            { status: 200 }
+          )
+        );
+      }
+      if (url.startsWith("/api/marks") && url.includes("POST")) {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const exams = [
+      { id: 1, name: "Mid Term", term: "Term 1", examDate: "2026-08-15", published: false, maxMarks: 50 },
+    ];
+    const teacherSubjects = [{ classId: 1, subjectId: 1, subjectName: "Math" }];
+
+    render(<MarksView exams={exams} classes={classes} teacherSubjects={teacherSubjects} role="teacher" />);
+
+    // Wait for the marks entry section to appear
+    await waitFor(() => {
+      expect(screen.getByText("Enter Marks")).toBeInTheDocument();
+    });
+
+    const markInput = screen.getByLabelText("Marks for Aadhya Reddy");
+    await userEvent.type(markInput, "50");
+    await userEvent.click(screen.getByRole("button", { name: "Save Marks" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/marks",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  it("blocks submission when a score is negative", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/marks?")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              subjects: [{ id: 1, name: "Math" }],
+              students: [{ studentId: 1, name: "Aadhya Reddy", marks: {} }],
+            }),
+            { status: 200 }
+          )
+        );
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const exams = [
+      { id: 1, name: "Mid Term", term: "Term 1", examDate: "2026-08-15", published: false, maxMarks: 50 },
+    ];
+    const teacherSubjects = [{ classId: 1, subjectId: 1, subjectName: "Math" }];
+
+    render(<MarksView exams={exams} classes={classes} teacherSubjects={teacherSubjects} role="teacher" />);
+
+    // Wait for the marks entry section to appear
+    await waitFor(() => {
+      expect(screen.getByText("Enter Marks")).toBeInTheDocument();
+    });
+
+    const markInput = screen.getByLabelText("Marks for Aadhya Reddy");
+    await userEvent.type(markInput, "-5");
+    await userEvent.click(screen.getByRole("button", { name: "Save Marks" }));
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(screen.getByText(/cannot be negative/i)).toBeInTheDocument();
+  });
 });

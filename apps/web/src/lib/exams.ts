@@ -7,6 +7,7 @@ export interface ExamSummary {
   examDate: string;
   academicYearId: number;
   published: boolean;
+  maxMarks: number;
 }
 
 export async function listExams(
@@ -25,6 +26,7 @@ export async function listExams(
     examDate: exam.examDate.toISOString().slice(0, 10),
     academicYearId: exam.academicYearId,
     published: exam.published,
+    maxMarks: exam.maxMarks,
   }));
 }
 
