@@ -483,9 +483,7 @@ export async function revertPromotionRun(
       prisma.timetableEntry.count({ where: { academicYearId: run.toAcademicYearId } }),
       prisma.classTeacher.count({ where: { academicYearId: run.toAcademicYearId } }),
       prisma.assignment.count({ where: { academicYearId: run.toAcademicYearId } }),
-      prisma.attendance.count({
-        where: { date: { gte: run.toAcademicYear.startDate, lte: run.toAcademicYear.endDate } },
-      }),
+      prisma.attendance.count({ where: { academicYearId: run.toAcademicYearId } }),
     ]);
 
   if (

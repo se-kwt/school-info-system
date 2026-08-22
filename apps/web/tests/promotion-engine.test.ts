@@ -1146,4 +1146,74 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
     expect(activeYears).toHaveLength(1);
     expect(activeYears[0]?.id).toBe(fromYear.id);
   });
+
+  it("is not blocked by another school's attendance in the same date range", async () => {
+    const { confirmPromotionRun, revertPromotionRun } = await import("../src/lib/promotion");
+    const { school, toYear, runId } = await seedReadyRun();
+
+    await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+
+    // Arrange: create attendance for a DIFFERENT school inside the same date range as toYear.
+    const otherSchool = await prisma.school.create({ data: { name: "Noisy Neighbour" } });
+    const otherYear = await prisma.academicYear.create({
+      data: {
+        schoolId: otherSchool.id,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "active",
+      },
+    });
+    const otherGrade = await prisma.grade.create({ data: { schoolId: otherSchool.id, name: "Grade 1" } });
+    const otherClass = await prisma.class.create({
+      data: { schoolId: otherSchool.id, gradeId: otherGrade.id, section: "A", academicYearId: otherYear.id },
+    });
+    const otherStudent = await prisma.student.create({
+      data: { schoolId: otherSchool.id, name: "Neighbour Kid", dob: new Date("2015-01-01"), admissionNo: "NB-001" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: otherStudent.id, classId: otherClass.id, academicYearId: otherYear.id, status: "active" },
+    });
+    const otherTeacher = await prisma.user.create({
+      data: { schoolId: otherSchool.id, phone: "+10000000088", role: "teacher", name: "Neighbour Teacher" },
+    });
+    await prisma.attendance.create({
+      data: {
+        studentId: otherStudent.id,
+        academicYearId: otherYear.id,
+        date: new Date("2027-06-15"),
+        status: "present",
+        markedById: otherTeacher.id,
+      },
+    });
+
+    const result = await revertPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("is still blocked by this school's own attendance in the target year", async () => {
+    const { confirmPromotionRun, revertPromotionRun } = await import("../src/lib/promotion");
+    const { school, toYear, promotedStudent, runId } = await seedReadyRun();
+
+    await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+
+    // Create attendance for a student in THIS school in the target year
+    const teacher = await prisma.user.create({
+      data: { schoolId: school.id, phone: "+15551234567", role: "teacher", name: "Teacher" },
+    });
+    await prisma.attendance.create({
+      data: {
+        studentId: promotedStudent.id,
+        academicYearId: toYear.id,
+        date: new Date("2027-09-01"),
+        status: "present",
+        markedById: teacher.id,
+      },
+    });
+
+    const result = await revertPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+
+    expect(result).toEqual({ ok: false, error: "YEAR_HAS_ACTIVITY" });
+  });
 });
