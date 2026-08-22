@@ -88,4 +88,41 @@ describe("class-teachers lib", () => {
     if (!list.ok) throw new Error("expected ok");
     expect(list.assignments).toHaveLength(0);
   });
+
+  it("refuses to assign a deactivated teacher", async () => {
+    const inactiveTeacher = await prisma.user.create({
+      data: {
+        schoolId,
+        phone: "+10000000077",
+        role: "teacher",
+        name: "Former Teacher",
+        status: "inactive",
+      },
+    });
+
+    const result = await assignTeacherToSubject(prisma, {
+      classId,
+      schoolId,
+      subjectId,
+      teacherUserId: inactiveTeacher.id,
+    });
+
+    expect(result).toEqual({ ok: false, error: "TEACHER_INACTIVE" });
+
+    const written = await prisma.classTeacher.count({
+      where: { teacherUserId: inactiveTeacher.id },
+    });
+    expect(written).toBe(0);
+  });
+
+  it("still assigns an active teacher", async () => {
+    const result = await assignTeacherToSubject(prisma, {
+      classId,
+      schoolId,
+      subjectId,
+      teacherUserId: teacherId,
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
 });

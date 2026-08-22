@@ -25,7 +25,7 @@ export default async function ClassDetailPage(props: { params: Promise<{ id: str
   ]);
   const subjects = subjectsResult.ok ? subjectsResult.subjects : [];
   const assignments = facultyResult.ok ? facultyResult.assignments : [];
-  const teachers = staff.filter((s) => s.role === "teacher").map((s) => ({ id: s.id, name: s.name }));
+  const teachers = staff.filter((s) => s.role === "teacher" && s.status === "active").map((s) => ({ id: s.id, name: s.name, status: s.status }));
 
   return (
     <div className="p-6">

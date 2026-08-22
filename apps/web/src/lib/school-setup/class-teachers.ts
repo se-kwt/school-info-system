@@ -40,6 +40,7 @@ export type AssignResult =
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "INVALID_TEACHER" }
+  | { ok: false; error: "TEACHER_INACTIVE" }
   | { ok: false; error: "ALREADY_ASSIGNED" };
 
 export async function assignTeacherToSubject(
@@ -54,6 +55,7 @@ export async function assignTeacherToSubject(
 
   const teacher = await prisma.user.findFirst({ where: { id: params.teacherUserId, schoolId: params.schoolId, role: "teacher" } });
   if (!teacher) return { ok: false, error: "INVALID_TEACHER" };
+  if (teacher.status !== "active") return { ok: false, error: "TEACHER_INACTIVE" };
 
   const existing = await prisma.classTeacher.findFirst({
     where: { classId: params.classId, subjectId: params.subjectId, teacherUserId: params.teacherUserId, academicYearId: klass.academicYearId },

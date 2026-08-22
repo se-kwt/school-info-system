@@ -57,6 +57,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       if (result.error === "INVALID_TEACHER") {
         return NextResponse.json({ error: "The selected teacher does not exist at this school" }, { status: 400 });
       }
+      if (result.error === "TEACHER_INACTIVE") {
+        return NextResponse.json({ error: "That teacher is deactivated and cannot be assigned" }, { status: 400 });
+      }
       return NextResponse.json({ error: "This teacher is already assigned to this subject" }, { status: 409 });
     }
 

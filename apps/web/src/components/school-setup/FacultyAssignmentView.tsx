@@ -18,6 +18,7 @@ interface SubjectOption {
 interface TeacherOption {
   id: number;
   name: string;
+  status: "active" | "inactive";
 }
 
 export function FacultyAssignmentView({
