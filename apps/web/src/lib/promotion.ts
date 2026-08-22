@@ -393,7 +393,17 @@ export async function confirmPromotionRun(
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.academicYear.update({ where: { id: run.fromAcademicYearId }, data: { status: "archived" } });
+    // Demote whichever year is currently active for this school, not just
+    // run.fromAcademicYearId specifically: an admin may have activated a
+    // different (third) year via activateAcademicYear after this run was
+    // drafted, in which case run.fromAcademicYearId is already archived and
+    // the currently-active year is the one that must be demoted first, to
+    // avoid colliding with the partial unique index on (schoolId) WHERE
+    // status = 'active' when we activate run.toAcademicYearId below.
+    await tx.academicYear.updateMany({
+      where: { schoolId: run.schoolId, status: "active" },
+      data: { status: "archived" },
+    });
     await tx.academicYear.update({ where: { id: run.toAcademicYearId }, data: { status: "active" } });
 
     for (const student of allStudents) {
@@ -506,10 +516,18 @@ export async function revertPromotionRun(
     }
 
     // Order matters: the partial unique index on (schoolId) WHERE status = 'active'
-    // is checked per-statement, not deferred to commit. Demote the "to" year to
-    // upcoming before reactivating the "from" year, or both rows would briefly be
-    // active at once and the second update would violate the constraint.
-    await tx.academicYear.update({ where: { id: run.toAcademicYearId }, data: { status: "upcoming" } });
+    // is checked per-statement, not deferred to commit. Demote whichever year is
+    // currently active before reactivating the "from" year, or both rows would
+    // briefly be active at once and the second update would violate the
+    // constraint. This is deliberately predicate-based rather than targeting
+    // run.toAcademicYearId specifically: an admin may have activated a different
+    // (third) year via activateAcademicYear after this run was confirmed, in
+    // which case run.toAcademicYearId is already archived and the currently-active
+    // year is the one that must be demoted first.
+    await tx.academicYear.updateMany({
+      where: { schoolId: run.schoolId, status: "active" },
+      data: { status: "upcoming" },
+    });
     await tx.academicYear.update({ where: { id: run.fromAcademicYearId }, data: { status: "active" } });
     await tx.promotionRun.update({ where: { id: params.promotionRunId }, data: { status: "reverted" } });
   });
