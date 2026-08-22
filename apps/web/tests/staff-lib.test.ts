@@ -65,6 +65,41 @@ describe("staff lib subject assignment", () => {
     });
     expect(result).toEqual({ ok: false, error: "INVALID_PHONE" });
   });
+
+  it("rejects assigning a class/subject to an inactive teacher via editStaff, and writes no ClassTeacher row", async () => {
+    const inactiveTeacher = await prisma.user.create({
+      data: { schoolId, phone: "+10000000012", role: "teacher", name: "Former Teacher", status: "inactive" },
+    });
+
+    const result = await editStaff(prisma, {
+      userId: inactiveTeacher.id,
+      schoolId,
+      academicYearId: yearId,
+      fields: { classId, subjectId },
+    });
+    expect(result).toEqual({ ok: false, error: "TEACHER_INACTIVE" });
+
+    const rows = await prisma.classTeacher.findMany({ where: { teacherUserId: inactiveTeacher.id } });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("still allows assigning a class/subject to an active teacher via editStaff", async () => {
+    const activeTeacher = await prisma.user.create({
+      data: { schoolId, phone: "+10000000013", role: "teacher", name: "Active Teacher", status: "active" },
+    });
+
+    const result = await editStaff(prisma, {
+      userId: activeTeacher.id,
+      schoolId,
+      academicYearId: yearId,
+      fields: { classId, subjectId },
+    });
+    expect(result).toEqual({ ok: true });
+
+    const rows = await prisma.classTeacher.findMany({ where: { teacherUserId: activeTeacher.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ classId, subjectId, academicYearId: yearId });
+  });
 });
 
 describe("staff lib pagination", () => {

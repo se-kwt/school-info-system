@@ -238,6 +238,33 @@ describe("/api/staff/[id]", () => {
     expect(assignment).toMatchObject({ classId: klass.id, subjectId: subject.id });
   });
 
+  it("rejects assigning a class+subject to an inactive teacher with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const admin = await prisma.user.create({
+      data: { phone: "+15559991003", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    const inactiveTeacher = await prisma.user.create({
+      data: { phone: "+15559991004", role: "teacher", name: "Former Teacher", schoolId: school.id, status: "inactive" },
+    });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
+    loginAs(admin.id, school.id);
+
+    const request = new Request(`http://localhost/api/staff/${inactiveTeacher.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ classId: klass.id, subjectId: subject.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchStaff(request, { params: Promise.resolve({ id: String(inactiveTeacher.id) }) });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("That teacher is deactivated and cannot be assigned");
+
+    const assignment = await prisma.classTeacher.findFirst({ where: { teacherUserId: inactiveTeacher.id } });
+    expect(assignment).toBeNull();
+  });
+
   it("clears a class assignment when role changes away from teacher", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);

@@ -57,6 +57,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       if (result.error === "SUBJECT_REQUIRED") {
         return NextResponse.json({ error: "subjectId is required when assigning a class" }, { status: 400 });
       }
+      if (result.error === "TEACHER_INACTIVE") {
+        return NextResponse.json({ error: "That teacher is deactivated and cannot be assigned" }, { status: 400 });
+      }
       return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
     }
 

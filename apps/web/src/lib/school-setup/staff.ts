@@ -114,7 +114,8 @@ export type EditStaffResult =
   | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "ROLE_CLASS_MISMATCH" }
   | { ok: false; error: "SUBJECT_REQUIRED" }
-  | { ok: false; error: "NO_ACTIVE_YEAR" };
+  | { ok: false; error: "NO_ACTIVE_YEAR" }
+  | { ok: false; error: "TEACHER_INACTIVE" };
 
 export async function editStaff(
   prisma: PrismaClient,
@@ -156,6 +157,7 @@ export async function editStaff(
     if (!params.academicYearId) return { ok: false, error: "NO_ACTIVE_YEAR" };
     const subject = await prisma.subject.findFirst({ where: { id: params.fields.subjectId as number, gradeId: targetClass.gradeId } });
     if (!subject) return { ok: false, error: "INVALID_SUBJECT" };
+    if (user.status !== "active") return { ok: false, error: "TEACHER_INACTIVE" };
   }
 
   await prisma.$transaction(async (tx) => {
