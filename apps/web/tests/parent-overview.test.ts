@@ -112,6 +112,32 @@ describe("getParentOverview", () => {
     expect(day4?.status).toBe("late");
   });
 
+  it("weights half_day as half credit and drops excused from the denominator (75%, not 33% or 50%)", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const now = new Date();
+    const day1 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 2));
+    const day2 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 3));
+    const day3 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 4));
+
+    // 1 present, 1 half_day, 1 excused -> (1 + 0.5) / 2 marked days = 75%.
+    // A naive present/late-only count would read 33% (1/3); a naive
+    // present+late+halfDay-over-all-records count would read 50% (1.5/3).
+    await prisma.attendance.createMany({
+      data: [
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: day1, status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: day2, status: "half_day", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: day3, status: "excused", markedById: fixtures.teacher.id },
+      ],
+    });
+
+    const overview = await getParentOverview(prisma, {
+      studentId: fixtures.student.id,
+      schoolId: fixtures.school.id,
+    });
+
+    expect(overview.attendanceMonthPercent).toBe(75);
+  });
+
   it("returns a full month of attendanceDays with weekday numbers and null status for unmarked days", async () => {
     const fixtures = await createSeedFixtures(prisma);
     const now = new Date();
