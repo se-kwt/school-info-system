@@ -562,6 +562,8 @@ describe("/api/attendance", () => {
     });
     const response = await postAttendance(request);
     expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("That date falls outside the academic year");
 
     const record = await prisma.attendance.count({ where: { studentId: student.id } });
     expect(record).toBe(0);
@@ -585,6 +587,8 @@ describe("/api/attendance", () => {
     });
     const response = await postAttendance(request);
     expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("That date falls outside the academic year");
   });
 
   it("allows an admin marking a past date inside the academic year", async () => {

@@ -179,6 +179,65 @@ describe("/api/promotion-runs", () => {
     expect(revertedFromYear?.status).toBe("active");
   });
 
+  it("refuses to revert via the route when an unrelated third year was activated mid-run", async () => {
+    const { school, toYear, admin, gradeOne, gradeTwo, student } =
+      await seedSchoolReadyForPromotion();
+    loginAs(admin.id, "admin", school.id);
+
+    const createRequest = new Request("http://localhost/api/promotion-runs", {
+      method: "POST",
+      body: JSON.stringify({ toAcademicYearId: toYear.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const createResponse = await postPromotionRuns(createRequest);
+    const { id: runId } = await createResponse.json();
+
+    const mappingsRequest = new Request(`http://localhost/api/promotion-runs/${runId}/mappings`, {
+      method: "PUT",
+      body: JSON.stringify({ mappings: [{ fromClassId: gradeOne.id, toClassId: gradeTwo.id }] }),
+      headers: { "content-type": "application/json" },
+    });
+    expect((await putMappings(mappingsRequest, { params: Promise.resolve({ id: String(runId) }) })).status).toBe(200);
+
+    const decisionsRequest = new Request(`http://localhost/api/promotion-runs/${runId}/decisions`, {
+      method: "PUT",
+      body: JSON.stringify({ decisions: [{ studentId: student.id, action: "promoted" }] }),
+      headers: { "content-type": "application/json" },
+    });
+    expect((await putDecisions(decisionsRequest, { params: Promise.resolve({ id: String(runId) }) })).status).toBe(200);
+
+    const confirmResponse = await postConfirm(
+      new Request(`http://localhost/api/promotion-runs/${runId}/confirm`, { method: "POST" }),
+      { params: Promise.resolve({ id: String(runId) }) }
+    );
+    expect(confirmResponse.status).toBe(200);
+
+    // Simulate an admin deliberately activating an unrelated, third year
+    // through the UI after confirmation but before revert.
+    const { activateAcademicYear } = await import("../src/lib/academic-years");
+    const thirdYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2028-29",
+        startDate: new Date("2028-06-01"),
+        endDate: new Date("2029-04-30"),
+        status: "upcoming",
+      },
+    });
+    const activated = await activateAcademicYear(prisma, { academicYearId: thirdYear.id, schoolId: school.id });
+    expect(activated).toEqual({ ok: true });
+
+    const revertResponse = await postRevert(
+      new Request(`http://localhost/api/promotion-runs/${runId}/revert`, { method: "POST" }),
+      { params: Promise.resolve({ id: String(runId) }) }
+    );
+    expect(revertResponse.status).toBe(400);
+    const revertBody = await revertResponse.json();
+    expect(revertBody.error).toBe(
+      "Another academic year is currently active — archive it before reverting"
+    );
+  });
+
   it("rejects a mapping with a cross-school toClassId with 400 and a diagnostic message", async () => {
     const { school, toYear, admin, gradeOne } = await seedSchoolReadyForPromotion();
     loginAs(admin.id, "admin", school.id);
