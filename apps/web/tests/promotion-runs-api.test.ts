@@ -179,6 +179,46 @@ describe("/api/promotion-runs", () => {
     expect(revertedFromYear?.status).toBe("active");
   });
 
+  it("rejects a mapping with a cross-school toClassId with 400 and a diagnostic message", async () => {
+    const { school, toYear, admin, gradeOne } = await seedSchoolReadyForPromotion();
+    loginAs(admin.id, "admin", school.id);
+
+    const createRequest = new Request("http://localhost/api/promotion-runs", {
+      method: "POST",
+      body: JSON.stringify({ toAcademicYearId: toYear.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const createResponse = await postPromotionRuns(createRequest);
+    const { id: runId } = await createResponse.json();
+
+    const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherYear = await prisma.academicYear.create({
+      data: {
+        schoolId: otherSchool.id,
+        name: "2027-28",
+        startDate: new Date("2027-06-01"),
+        endDate: new Date("2028-04-30"),
+        status: "upcoming",
+      },
+    });
+    const otherGrade = await prisma.grade.create({ data: { schoolId: otherSchool.id, name: "Grade 2" } });
+    const foreignClass = await prisma.class.create({
+      data: { schoolId: otherSchool.id, gradeId: otherGrade.id, section: "A", academicYearId: otherYear.id },
+    });
+
+    const mappingsRequest = new Request(`http://localhost/api/promotion-runs/${runId}/mappings`, {
+      method: "PUT",
+      body: JSON.stringify({ mappings: [{ fromClassId: gradeOne.id, toClassId: foreignClass.id }] }),
+      headers: { "content-type": "application/json" },
+    });
+    const mappingsResponse = await putMappings(mappingsRequest, {
+      params: Promise.resolve({ id: String(runId) }),
+    });
+    expect(mappingsResponse.status).toBe(400);
+    const body = await mappingsResponse.json();
+    expect(body.error).toBe("Target class must belong to this school and the target academic year");
+  });
+
   it("rejects a decision with a cross-school toClassId with 400 and a diagnostic message", async () => {
     const { school, fromYear, toYear, admin, gradeOne, student } = await seedSchoolReadyForPromotion();
     loginAs(admin.id, "admin", school.id);

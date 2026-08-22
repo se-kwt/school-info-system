@@ -499,6 +499,25 @@ describe("/api/assignments/[id]", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a subjectId the teacher isn't assigned to teach for this class with 403", async () => {
+    const { school, klass, teacher, assignment } = await seedAssignment();
+    const scienceSubject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Science" } });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(`http://localhost/api/assignments/${assignment.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ subjectId: scienceSubject.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchAssignment(request, { params: Promise.resolve({ id: String(assignment.id) }) });
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe("You are not assigned to that subject for this class");
+
+    const unchanged = await prisma.assignment.findUnique({ where: { id: assignment.id } });
+    expect(unchanged?.subjectId).not.toBe(scienceSubject.id);
+  });
+
   it("rejects an admin attempting to PATCH with 403", async () => {
     const { school, assignment } = await seedAssignment();
     const admin = await prisma.user.create({

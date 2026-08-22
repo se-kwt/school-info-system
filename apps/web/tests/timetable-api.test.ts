@@ -196,6 +196,48 @@ describe("/api/timetable", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a periodId that doesn't exist with 400", async () => {
+    const { school, klass, subject } = await seedSchoolWithClassAndTeacher();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550039990", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/timetable", {
+      method: "POST",
+      body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, periodId: 999999, subjectId: subject.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postTimetable(request);
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("Period not found");
+  });
+
+  it("rejects scheduling a lesson during a break period with 400", async () => {
+    const { school, klass, subject } = await seedSchoolWithClassAndTeacher();
+    const breakPeriod = await prisma.period.create({
+      data: { schoolId: school.id, order: 2, label: "Break", startTime: "10:00", endTime: "10:15", isBreak: true },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550039991", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/timetable", {
+      method: "POST",
+      body: JSON.stringify({ classId: klass.id, dayOfWeek: 1, periodId: breakPeriod.id, subjectId: subject.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postTimetable(request);
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("Cannot schedule a lesson during a break");
+
+    const entries = await prisma.timetableEntry.findMany({ where: { classId: klass.id, periodId: breakPeriod.id } });
+    expect(entries).toHaveLength(0);
+  });
+
   it("rejects a duplicate (classId, dayOfWeek, period) with 409", async () => {
     const { school, klass, subject, period } = await seedSchoolWithClassAndTeacher();
     const admin = await prisma.user.create({

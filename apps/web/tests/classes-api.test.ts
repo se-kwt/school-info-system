@@ -16,6 +16,7 @@ import { GET as getClasses, POST as postClasses } from "../src/app/api/classes/r
 import { PATCH as patchClass, DELETE as deleteClassRoute } from "../src/app/api/classes/[id]/route";
 import { PATCH as archiveClassRoute } from "../src/app/api/classes/[id]/archive/route";
 import { PATCH as unarchiveClassRoute } from "../src/app/api/classes/[id]/unarchive/route";
+import { POST as postFaculty } from "../src/app/api/classes/[id]/faculty/route";
 
 describe("/api/classes", () => {
   beforeEach(async () => {
@@ -292,5 +293,49 @@ describe("/api/classes/[id]", () => {
       { params: Promise.resolve({ id: String(otherClass.id) }) }
     );
     expect(archiveResponse.status).toBe(404);
+  });
+});
+
+describe("/api/classes/[id]/faculty", () => {
+  beforeEach(async () => {
+    await resetDb();
+    cookieStore.get.mockReset();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  async function loginAsAdmin(schoolId: number) {
+    const admin = await prisma.user.create({
+      data: { phone: "+15551120000", role: "admin", name: "Test Admin", schoolId },
+    });
+    const token = signSessionToken({ userId: admin.id, role: "admin", schoolId });
+    cookieStore.get.mockReturnValue({ value: token });
+  }
+
+  it("rejects assigning a deactivated teacher with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
+    const inactiveTeacher = await prisma.user.create({
+      data: { phone: "+15551121111", role: "teacher", name: "Former Teacher", schoolId: school.id, status: "inactive" },
+    });
+    await loginAsAdmin(school.id);
+
+    const request = new Request(`http://localhost/api/classes/${klass.id}/faculty`, {
+      method: "POST",
+      body: JSON.stringify({ subjectId: subject.id, teacherUserId: inactiveTeacher.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postFaculty(request, { params: Promise.resolve({ id: String(klass.id) }) });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("That teacher is deactivated and cannot be assigned");
+
+    const link = await prisma.classTeacher.findFirst({ where: { classId: klass.id, teacherUserId: inactiveTeacher.id } });
+    expect(link).toBeNull();
   });
 });
