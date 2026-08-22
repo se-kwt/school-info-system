@@ -459,4 +459,24 @@ describe("/api/attendance", () => {
     expect(records.find((r) => r.studentId === secondStudent.id)?.status).toBe("late");
     expect(records.find((r) => r.studentId === thirdStudent.id)).toBeUndefined();
   });
+
+  it("stamps the academic year onto every attendance record", async () => {
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request("http://localhost/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        date: today,
+        entries: [{ studentId: student.id, status: "present" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postAttendance(request);
+    expect(response.status).toBe(200);
+
+    const record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
+    expect(record?.academicYearId).toBe(year.id);
+  });
 });

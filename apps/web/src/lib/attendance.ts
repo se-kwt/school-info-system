@@ -147,6 +147,7 @@ export async function markAttendance(
             where: { studentId_date: { studentId: entry.studentId, date: targetDate } },
             create: {
               studentId: entry.studentId,
+              academicYearId: params.academicYearId,
               date: targetDate,
               status: entry.status,
               markedById: params.teacherUserId,
