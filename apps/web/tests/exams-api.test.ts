@@ -148,6 +148,11 @@ describe("/api/exams", () => {
     });
     const response = await postExams(request);
     expect(response.status).toBe(400);
+    // maxMarks: 0 must reach createExam's own INVALID_MAX_MARKS branch, not be
+    // swallowed by the route's required-field guard (which used to reject it
+    // as falsy before createExam's validation ever ran).
+    const body = await response.json();
+    expect(body.error).toBe("maxMarks must be greater than 0");
   });
 
   it("rejects a passMarks that exceeds maxMarks with 400", async () => {

@@ -38,7 +38,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (!name || !term || !examDate || !maxMarks || passMarks === undefined || passMarks === null) {
+    if (
+      !name ||
+      !term ||
+      !examDate ||
+      maxMarks === undefined ||
+      maxMarks === null ||
+      passMarks === undefined ||
+      passMarks === null
+    ) {
       return NextResponse.json(
         { error: "name, term, examDate, maxMarks, and passMarks are required" },
         { status: 400 }

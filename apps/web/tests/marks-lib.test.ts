@@ -182,6 +182,35 @@ describe("marks lib subjectId", () => {
     ).resolves.toEqual({ ok: false, error: "INVALID_PASS_MARKS" });
   });
 
+  it("rejects createExam's own maxMarks of 0, independent of any caller-side guard", async () => {
+    // The route's own required-field check is falsy-based (!maxMarks), so it
+    // rejects maxMarks: 0 before createExam ever runs. That means createExam's
+    // own `maxMarks <= 0` branch was previously unreachable through the API and
+    // untested directly -- deleting it would not fail any existing test. Call
+    // createExam directly here to exercise that validation for real.
+    await expect(
+      createExam(prisma, schoolId, yearId, {
+        name: "Zero Max",
+        term: "Term 1",
+        examDate: "2026-09-01",
+        maxMarks: 0,
+        passMarks: 0,
+      })
+    ).resolves.toEqual({ ok: false, error: "INVALID_MAX_MARKS" });
+  });
+
+  it("rejects createExam's own negative maxMarks, independent of any caller-side guard", async () => {
+    await expect(
+      createExam(prisma, schoolId, yearId, {
+        name: "Negative Max",
+        term: "Term 1",
+        examDate: "2026-09-01",
+        maxMarks: -5,
+        passMarks: 0,
+      })
+    ).resolves.toEqual({ ok: false, error: "INVALID_MAX_MARKS" });
+  });
+
   it("lets a teacher enter and read marks against an unpublished exam", async () => {
     const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } });
     expect(exam.published).toBe(false);
