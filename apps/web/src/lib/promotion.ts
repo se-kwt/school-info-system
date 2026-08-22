@@ -502,7 +502,12 @@ export async function revertPromotionRun(
   });
 
   await prisma.$transaction(async (tx) => {
-    await tx.enrollment.deleteMany({ where: { academicYearId: run.toAcademicYearId } });
+    await tx.enrollment.deleteMany({
+      where: {
+        academicYearId: run.toAcademicYearId,
+        studentId: { in: logEntries.map((entry) => entry.studentId) },
+      },
+    });
     for (const entry of logEntries) {
       await tx.enrollment.updateMany({
         where: { studentId: entry.studentId, academicYearId: run.fromAcademicYearId },

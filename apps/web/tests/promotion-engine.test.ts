@@ -1216,4 +1216,57 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
 
     expect(result).toEqual({ ok: false, error: "YEAR_HAS_ACTIVITY" });
   });
+
+  it("leaves manually-created enrollments in the target year intact", async () => {
+    const { confirmPromotionRun, revertPromotionRun } = await import("../src/lib/promotion");
+    const { school, toYear, runId } = await seedReadyRun();
+
+    // Arrange: confirm the promotion run to create enrollments in toYear
+    await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+
+    // Create a manually-enrolled student in the target year
+    const bystander = await prisma.student.create({
+      data: { schoolId: school.id, name: "Manual Enrollee", dob: new Date("2015-01-01"), admissionNo: "MAN-001" },
+    });
+    const targetClass = await prisma.class.findFirstOrThrow({
+      where: { schoolId: school.id, academicYearId: toYear.id },
+    });
+    const bystanderEnrollment = await prisma.enrollment.create({
+      data: {
+        studentId: bystander.id,
+        classId: targetClass.id,
+        academicYearId: toYear.id,
+        status: "active",
+      },
+    });
+
+    const result = await revertPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+    expect(result).toEqual({ ok: true });
+
+    const survivor = await prisma.enrollment.findUnique({ where: { id: bystanderEnrollment.id } });
+    expect(survivor).not.toBeNull();
+    expect(survivor?.status).toBe("active");
+  });
+
+  it("still removes the enrollments the run created", async () => {
+    const { confirmPromotionRun, revertPromotionRun } = await import("../src/lib/promotion");
+    const { school, toYear, promotedStudent, runId } = await seedReadyRun();
+
+    // Arrange: confirm the run to create enrollments
+    await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+
+    // Verify the promoted student has an enrollment in toYear
+    const beforeRevert = await prisma.enrollment.findFirst({
+      where: { studentId: promotedStudent.id, academicYearId: toYear.id },
+    });
+    expect(beforeRevert).not.toBeNull();
+
+    const result = await revertPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+    expect(result).toEqual({ ok: true });
+
+    const removed = await prisma.enrollment.findFirst({
+      where: { studentId: promotedStudent.id, academicYearId: toYear.id },
+    });
+    expect(removed).toBeNull();
+  });
 });
