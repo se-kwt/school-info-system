@@ -60,6 +60,30 @@ describe("AcademicYearsView", () => {
     expect(screen.queryByRole("button", { name: "Activate 2026-27" })).toBeNull();
   });
 
+  it("shows the error message from the API when archiving is refused", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({
+        error: "Activate the next year instead — a school must always have one active year",
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AcademicYearsView
+        initialYears={[
+          { id: 2, name: "2027-28", startDate: "2027-04-01", endDate: "2028-03-31", status: "upcoming" },
+        ]}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Archive 2027-28" }));
+
+    expect(
+      await screen.findByText("Activate the next year instead — a school must always have one active year")
+    ).toBeInTheDocument();
+  });
+
   it("shows no Activate button for an archived year", () => {
     render(
       <AcademicYearsView
