@@ -35,4 +35,24 @@ describe("MonthCalendar", () => {
     expect(screen.getByText("Absent")).toBeInTheDocument();
     expect(screen.getByText("No record")).toBeInTheDocument();
   });
+
+  it("surfaces a day's note as a tooltip, a marker, and a list entry", () => {
+    const daysWithNote: ParentAttendanceDay[] = [
+      ...days,
+      { date: "2026-08-05", dayOfMonth: 5, weekday: 3, status: "absent", note: "Left early, dentist" },
+    ];
+
+    render(<MonthCalendar days={daysWithNote} />);
+
+    const notedCell = screen.getByText("5");
+    expect(notedCell).toHaveAttribute("title", "Left early, dentist");
+    expect(notedCell).toHaveClass("ring-1", "ring-neutral-400");
+
+    const unnotedCell = screen.getByText("2");
+    expect(unnotedCell).not.toHaveAttribute("title");
+    expect(unnotedCell).not.toHaveClass("ring-1");
+
+    expect(screen.getByText("2026-08-05")).toBeInTheDocument();
+    expect(screen.getByText(/Left early, dentist/)).toBeInTheDocument();
+  });
 });
