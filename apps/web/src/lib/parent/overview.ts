@@ -156,7 +156,7 @@ export async function getParentOverview(
     let totalOutstanding = 0;
     let nearestDueDate: string | null = null;
     for (const structure of feeStructures) {
-      const paid = structure.payments[0]?.amountPaid ?? 0;
+      const paid = structure.payments.reduce((sum, p) => sum + p.amountPaid, 0);
       const outstanding = Math.max(0, structure.amount - paid);
       totalOutstanding += outstanding;
       if (outstanding > 0 && nearestDueDate === null) {

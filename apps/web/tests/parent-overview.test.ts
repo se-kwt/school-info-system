@@ -361,8 +361,10 @@ describe("getParentOverview", () => {
         studentId: fixtures.student.id,
         feeStructureId: nearFeeStructure.id,
         amountPaid: 2000,
+        paidDate: new Date(),
+        mode: "cash",
+        receiptNo: "R-TEST-0001",
         recordedById: fixtures.accountant.id,
-        status: "partial",
       },
     });
 

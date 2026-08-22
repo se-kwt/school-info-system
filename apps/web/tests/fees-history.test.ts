@@ -67,8 +67,10 @@ describe("getParentFeesHistory", () => {
         studentId: fixtures.student.id,
         feeStructureId: priorStructure.id,
         amountPaid: 4000,
+        paidDate: new Date(),
+        mode: "cash",
+        receiptNo: "R-TEST-0001",
         recordedById: fixtures.accountant.id,
-        status: "paid",
       },
     });
 

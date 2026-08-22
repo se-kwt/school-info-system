@@ -1,5 +1,10 @@
-import type { FeeStatus, PrismaClient } from "@prisma/client";
+import type { PaymentMode, PrismaClient } from "@prisma/client";
 import { getEnrolledStudents } from "./enrollment";
+
+// `FeeStatus` used to be a stored enum column on `FeePayment`. Status is now
+// derived from the ledger (see `computeFeeStatus`) rather than persisted, so
+// this is a plain TS union rather than a Prisma-generated enum type.
+export type FeeStatus = "paid" | "partial" | "unpaid";
 
 export interface FeeRosterEntry {
   studentId: number;
@@ -26,23 +31,27 @@ export async function getFeeRoster(
     classId: feeStructure.classId,
     academicYearId: feeStructure.academicYearId,
   });
-  const payments = await prisma.feePayment.findMany({
+
+  const payments = await prisma.feePayment.groupBy({
+    by: ["studentId"],
     where: {
       feeStructureId: params.feeStructureId,
       studentId: { in: enrolled.map((student) => student.id) },
     },
+    _sum: { amountPaid: true },
   });
+  const paidByStudent = new Map(payments.map((p) => [p.studentId, p._sum.amountPaid ?? 0]));
 
   return {
     ok: true,
     students: enrolled.map((student) => {
-      const payment = payments.find((p) => p.studentId === student.id);
+      const amountPaid = paidByStudent.get(student.id) ?? 0;
       return {
         studentId: student.id,
         name: student.name,
-        amountPaid: payment ? payment.amountPaid : 0,
+        amountPaid,
         amount: feeStructure.amount,
-        status: payment ? payment.status : "unpaid",
+        status: computeFeeStatus(amountPaid, feeStructure.amount),
       };
     }),
   };
@@ -54,8 +63,19 @@ export function computeFeeStatus(amountPaid: number, amount: number): FeeStatus 
   return "paid";
 }
 
+async function sumPaid(
+  prisma: PrismaClient,
+  params: { studentId: number; feeStructureId: number }
+): Promise<number> {
+  const result = await prisma.feePayment.aggregate({
+    where: { studentId: params.studentId, feeStructureId: params.feeStructureId },
+    _sum: { amountPaid: true },
+  });
+  return result._sum.amountPaid ?? 0;
+}
+
 export type RecordPaymentResult =
-  | { ok: true; amountPaid: number; status: FeeStatus }
+  | { ok: true; amountPaid: number; status: FeeStatus; receiptNo: string }
   | { ok: false; error: "INVALID_FEE_STRUCTURE" }
   | { ok: false; error: "STUDENT_MISMATCH" }
   | { ok: false; error: "INVALID_AMOUNT" }
@@ -69,11 +89,14 @@ export async function recordPayment(
     schoolId: number;
     recordedById: number;
     amount: number;
+    mode: PaymentMode;
+    reference?: string;
   }
 ): Promise<RecordPaymentResult> {
-  // NOTE: early returns below still COMMIT the transaction (Prisma only rolls back on a thrown
-  // error) -- safe today because nothing has written yet at those points, but any future write
-  // added above an early-return branch must account for this.
+  // NOTE: early returns below still COMMIT the transaction (Prisma only rolls back
+  // on a thrown error). Every early return here sits BEFORE the single create at the
+  // end of the body, so committing an empty transaction is harmless. Any future write
+  // added above an early return breaks that and must be reordered or made to throw.
   return prisma.$transaction(
     async (tx) => {
       const feeStructure = await tx.feeStructure.findFirst({
@@ -92,39 +115,82 @@ export async function recordPayment(
       if (!enrollment) return { ok: false, error: "STUDENT_MISMATCH" };
       if (params.amount <= 0) return { ok: false, error: "INVALID_AMOUNT" };
 
-      const existing = await tx.feePayment.findUnique({
-        where: {
-          studentId_feeStructureId: { studentId: params.studentId, feeStructureId: params.feeStructureId },
-        },
+      const priorTotal = await sumPaid(tx as PrismaClient, {
+        studentId: params.studentId,
+        feeStructureId: params.feeStructureId,
       });
-      const existingAmountPaid = existing ? existing.amountPaid : 0;
-      const newAmountPaid = existingAmountPaid + params.amount;
+      const newAmountPaid = priorTotal + params.amount;
 
       if (newAmountPaid > feeStructure.amount) return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
 
-      const status = computeFeeStatus(newAmountPaid, feeStructure.amount);
-      await tx.feePayment.upsert({
-        where: {
-          studentId_feeStructureId: { studentId: params.studentId, feeStructureId: params.feeStructureId },
-        },
-        create: {
+      const priorCount = await tx.feePayment.count({
+        where: { feeStructureId: params.feeStructureId },
+      });
+      const receiptNo = `R-${params.feeStructureId}-${String(priorCount + 1).padStart(5, "0")}`;
+
+      await tx.feePayment.create({
+        data: {
           studentId: params.studentId,
           feeStructureId: params.feeStructureId,
-          amountPaid: newAmountPaid,
+          amountPaid: params.amount,
           paidDate: new Date(),
+          mode: params.mode,
+          receiptNo,
+          reference: params.reference ?? null,
           recordedById: params.recordedById,
-          status,
-        },
-        update: {
-          amountPaid: newAmountPaid,
-          paidDate: new Date(),
-          recordedById: params.recordedById,
-          status,
         },
       });
 
-      return { ok: true, amountPaid: newAmountPaid, status };
+      return {
+        ok: true,
+        amountPaid: newAmountPaid,
+        status: computeFeeStatus(newAmountPaid, feeStructure.amount),
+        receiptNo,
+      };
     },
     { isolationLevel: "Serializable" }
   );
+}
+
+export interface PaymentHistoryEntry {
+  id: number;
+  amountPaid: number;
+  paidDate: string;
+  mode: PaymentMode;
+  receiptNo: string;
+  reference: string | null;
+  recordedByName: string;
+}
+
+export type ListPaymentsResult =
+  | { ok: true; payments: PaymentHistoryEntry[] }
+  | { ok: false; error: "INVALID_FEE_STRUCTURE" };
+
+export async function listPaymentsForStudent(
+  prisma: PrismaClient,
+  params: { studentId: number; feeStructureId: number; schoolId: number }
+): Promise<ListPaymentsResult> {
+  const feeStructure = await prisma.feeStructure.findFirst({
+    where: { id: params.feeStructureId, schoolId: params.schoolId },
+  });
+  if (!feeStructure) return { ok: false, error: "INVALID_FEE_STRUCTURE" };
+
+  const payments = await prisma.feePayment.findMany({
+    where: { studentId: params.studentId, feeStructureId: params.feeStructureId },
+    include: { recordedBy: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return {
+    ok: true,
+    payments: payments.map((p) => ({
+      id: p.id,
+      amountPaid: p.amountPaid,
+      paidDate: p.paidDate.toISOString().slice(0, 10),
+      mode: p.mode,
+      receiptNo: p.receiptNo,
+      reference: p.reference,
+      recordedByName: p.recordedBy.name,
+    })),
+  };
 }

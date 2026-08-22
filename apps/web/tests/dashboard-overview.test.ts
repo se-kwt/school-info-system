@@ -328,8 +328,9 @@ describe("getDashboardOverview", () => {
         feeStructureId: feeStructure.id,
         amountPaid: 400,
         paidDate: new Date(),
+        mode: "cash",
+        receiptNo: "R-TEST-0001",
         recordedById: fixtures.accountant.id,
-        status: "partial",
       },
     });
 
@@ -407,8 +408,9 @@ describe("getDashboardOverview", () => {
         feeStructureId: feeStructure.id,
         amountPaid: 1000,
         paidDate: new Date(),
+        mode: "cash",
+        receiptNo: "R-TEST-0002",
         recordedById: fixtures.accountant.id,
-        status: "paid",
       },
     });
     await prisma.feePayment.create({
@@ -417,8 +419,9 @@ describe("getDashboardOverview", () => {
         feeStructureId: feeStructure.id,
         amountPaid: 500,
         paidDate: new Date(),
+        mode: "cash",
+        receiptNo: "R-TEST-0003",
         recordedById: fixtures.accountant.id,
-        status: "partial",
       },
     });
     void studentC;

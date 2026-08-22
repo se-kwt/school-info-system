@@ -418,6 +418,15 @@ model FeeStructure {
   @@index([academicYearId])
 }
 
+enum PaymentMode {
+  cash
+  cheque
+  card
+  bank_transfer
+  upi
+  other
+}
+
 model FeePayment {
   id             Int          @id @default(autoincrement())
   student        Student      @relation(fields: [studentId], references: [id])
@@ -425,14 +434,19 @@ model FeePayment {
   feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
   feeStructureId Int
   amountPaid     Float
-  paidDate       DateTime?
+  paidDate       DateTime
+  mode           PaymentMode
+  receiptNo      String
+  reference      String?
   recordedBy     User         @relation("RecordedBy", fields: [recordedById], references: [id])
   recordedById   Int
-  status         FeeStatus    @default(unpaid)
+  createdAt      DateTime     @default(now())
 
-  @@unique([studentId, feeStructureId])
+  @@unique([feeStructureId, receiptNo])
+  @@index([studentId, feeStructureId])
   @@index([feeStructureId])
   @@index([recordedById])
+  @@index([paidDate])
 }
 
 model Notification {

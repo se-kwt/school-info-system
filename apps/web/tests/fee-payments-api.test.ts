@@ -13,6 +13,7 @@ import { prisma, resetDb } from "./helpers/db";
 import { createActiveYear, createClass, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getFeePayments, POST as postFeePayments } from "../src/app/api/fee-payments/route";
+import { recordPayment, listPaymentsForStudent } from "../src/lib/fee-payments";
 
 describe("GET /api/fee-payments", () => {
   beforeEach(async () => {
@@ -83,7 +84,9 @@ describe("GET /api/fee-payments", () => {
         studentId: student.id,
         feeStructureId: feeStructure.id,
         amountPaid: 3000,
-        status: "partial",
+        paidDate: new Date(),
+        mode: "cash",
+        receiptNo: "R-TEST-0001",
         recordedById: admin.id,
       },
     });
@@ -201,19 +204,19 @@ describe("POST /api/fee-payments", () => {
 
     const request = new Request("http://localhost/api/fee-payments", {
       method: "POST",
-      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 2000 }),
+      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 2000, mode: "cash" }),
       headers: { "content-type": "application/json" },
     });
     const response = await postFeePayments(request);
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ amountPaid: 2000, status: "partial" });
+    expect(body).toMatchObject({ amountPaid: 2000, status: "partial" });
 
     const payment = await prisma.feePayment.findFirst({ where: { studentId: student.id } });
-    expect(payment).toMatchObject({ amountPaid: 2000, status: "partial" });
+    expect(payment).toMatchObject({ amountPaid: 2000, mode: "cash" });
   });
 
-  it("adds cumulatively and recomputes status through unpaid to partial to paid", async () => {
+  it("adds cumulatively and recomputes status through unpaid to partial to paid, keeping each instalment as its own row", async () => {
     const { school, student, feeStructure } = await seedSchoolWithFeeStructure();
     const admin = await prisma.user.create({
       data: { phone: "+15550112222", role: "admin", name: "Test Admin", schoolId: school.id },
@@ -223,21 +226,25 @@ describe("POST /api/fee-payments", () => {
     async function pay(amount: number) {
       const request = new Request("http://localhost/api/fee-payments", {
         method: "POST",
-        body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount }),
+        body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount, mode: "cash" }),
         headers: { "content-type": "application/json" },
       });
       return postFeePayments(request);
     }
 
     const first = await pay(2000);
-    expect((await first.json())).toEqual({ amountPaid: 2000, status: "partial" });
+    expect((await first.json())).toMatchObject({ amountPaid: 2000, status: "partial" });
 
     const second = await pay(3000);
-    expect((await second.json())).toEqual({ amountPaid: 5000, status: "paid" });
+    expect((await second.json())).toMatchObject({ amountPaid: 5000, status: "paid" });
 
-    const rows = await prisma.feePayment.findMany({ where: { studentId: student.id } });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ amountPaid: 5000, status: "paid" });
+    const rows = await prisma.feePayment.findMany({
+      where: { studentId: student.id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows[0].amountPaid).toBe(2000);
+    expect(rows[1].amountPaid).toBe(3000);
   });
 
   it("rejects a payment that would exceed the amount due with 400, no row created", async () => {
@@ -249,7 +256,7 @@ describe("POST /api/fee-payments", () => {
 
     const request = new Request("http://localhost/api/fee-payments", {
       method: "POST",
-      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 6000 }),
+      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 6000, mode: "cash" }),
       headers: { "content-type": "application/json" },
     });
     const response = await postFeePayments(request);
@@ -269,7 +276,7 @@ describe("POST /api/fee-payments", () => {
     async function pay(amount: number) {
       const request = new Request("http://localhost/api/fee-payments", {
         method: "POST",
-        body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount }),
+        body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount, mode: "cash" }),
         headers: { "content-type": "application/json" },
       });
       return postFeePayments(request);
@@ -279,8 +286,44 @@ describe("POST /api/fee-payments", () => {
     const secondResponse = await pay(2000);
     expect(secondResponse.status).toBe(400);
 
+    const rows = await prisma.feePayment.findMany({ where: { studentId: student.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].amountPaid).toBe(4000);
+  });
+
+  it("rejects a POST missing mode with 400", async () => {
+    const { school, student, feeStructure } = await seedSchoolWithFeeStructure();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550119999", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/fee-payments", {
+      method: "POST",
+      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 1000 }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postFeePayments(request);
+    expect(response.status).toBe(400);
+
     const payment = await prisma.feePayment.findFirst({ where: { studentId: student.id } });
-    expect(payment?.amountPaid).toBe(4000);
+    expect(payment).toBeNull();
+  });
+
+  it("rejects a POST with an invalid mode with 400", async () => {
+    const { school, student, feeStructure } = await seedSchoolWithFeeStructure();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550119998", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/fee-payments", {
+      method: "POST",
+      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 1000, mode: "bitcoin" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postFeePayments(request);
+    expect(response.status).toBe(400);
   });
 
   it("rejects a studentId that doesn't belong to the fee structure's class with 400", async () => {
@@ -305,6 +348,7 @@ describe("POST /api/fee-payments", () => {
         feeStructureId: feeStructure.id,
         studentId: otherStudent.id,
         amount: 1000,
+        mode: "cash",
       }),
       headers: { "content-type": "application/json" },
     });
@@ -321,7 +365,7 @@ describe("POST /api/fee-payments", () => {
 
     const request = new Request("http://localhost/api/fee-payments", {
       method: "POST",
-      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 0 }),
+      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 0, mode: "cash" }),
       headers: { "content-type": "application/json" },
     });
     const response = await postFeePayments(request);
@@ -354,6 +398,7 @@ describe("POST /api/fee-payments", () => {
         feeStructureId: otherFeeStructure.id,
         studentId: student.id,
         amount: 500,
+        mode: "cash",
       }),
       headers: { "content-type": "application/json" },
     });
@@ -370,26 +415,35 @@ describe("POST /api/fee-payments", () => {
 
     const request = new Request("http://localhost/api/fee-payments", {
       method: "POST",
-      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 5000 }),
+      body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount: 5000, mode: "upi", reference: "UPI-1234" }),
       headers: { "content-type": "application/json" },
     });
     const response = await postFeePayments(request);
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ amountPaid: 5000, status: "paid" });
+    expect(body).toMatchObject({ amountPaid: 5000, status: "paid" });
+
+    const payment = await prisma.feePayment.findFirst({ where: { studentId: student.id } });
+    expect(payment).toMatchObject({ amountPaid: 5000, mode: "upi", reference: "UPI-1234" });
   });
 
   it("does not lose a payment when two POSTs race on the same student/fee", async () => {
+    // This is the concurrency regression guard: `recordPayment` runs its
+    // read-check-write sequence inside a single Serializable transaction, and
+    // the route retries once on Prisma's P2034 serialization-failure code.
+    // Under the ledger model each accepted payment appends its own row, so a
+    // "payment not lost" assertion is: two rows exist and their amounts sum
+    // to the total, not that a single upserted row reached the total.
     const { school, student, feeStructure } = await seedSchoolWithFeeStructure();
     const admin = await prisma.user.create({
-      data: { phone: "+15550114444", role: "admin", name: "Test Admin", schoolId: school.id },
+      data: { phone: "+15550114445", role: "admin", name: "Test Admin", schoolId: school.id },
     });
     loginAs(admin.id, "admin", school.id);
 
     function pay(amount: number) {
       const request = new Request("http://localhost/api/fee-payments", {
         method: "POST",
-        body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount }),
+        body: JSON.stringify({ feeStructureId: feeStructure.id, studentId: student.id, amount, mode: "cash" }),
         headers: { "content-type": "application/json" },
       });
       return postFeePayments(request);
@@ -401,7 +455,153 @@ describe("POST /api/fee-payments", () => {
     expect(r2.status).toBe(200);
 
     const rows = await prisma.feePayment.findMany({ where: { studentId: student.id } });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].amountPaid).toBe(5000); // both payments must be reflected, not just the last writer's
+    expect(rows).toHaveLength(2); // both payments must be reflected, not just the last writer's
+    const total = rows.reduce((sum, r) => sum + r.amountPaid, 0);
+    expect(total).toBe(5000);
+    expect(new Set(rows.map((r) => r.amountPaid))).toEqual(new Set([2000, 3000]));
+  });
+});
+
+describe("recordPayment / listPaymentsForStudent (ledger)", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  async function seedFixtures() {
+    const school = await prisma.school.create({ data: { name: "Ledger Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Ledger Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-950",
+    });
+    const feeStructure = await prisma.feeStructure.create({
+      data: {
+        schoolId: school.id,
+        academicYearId: year.id,
+        classId: klass.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: new Date("2026-09-01"),
+      },
+    });
+    const accountant = await prisma.user.create({
+      data: { phone: "+15550120001", role: "accountant", name: "First Accountant", schoolId: school.id },
+    });
+    const secondAccountant = await prisma.user.create({
+      data: { phone: "+15550120002", role: "accountant", name: "Second Accountant", schoolId: school.id },
+    });
+    return {
+      schoolId: school.id,
+      feeStructureId: feeStructure.id,
+      studentId: student.id,
+      accountantId: accountant.id,
+      secondAccountantId: secondAccountant.id,
+    };
+  }
+
+  it("keeps every instalment as its own row", async () => {
+    const { feeStructureId, studentId, schoolId, accountantId, secondAccountantId } = await seedFixtures();
+
+    const first = await recordPayment(prisma, {
+      feeStructureId,
+      studentId,
+      schoolId,
+      recordedById: accountantId,
+      amount: 2000,
+      mode: "cash",
+    });
+    expect(first.ok).toBe(true);
+
+    const second = await recordPayment(prisma, {
+      feeStructureId,
+      studentId,
+      schoolId,
+      recordedById: secondAccountantId,
+      amount: 3000,
+      mode: "upi",
+      reference: "UPI-9981",
+    });
+    expect(second.ok).toBe(true);
+
+    const rows = await prisma.feePayment.findMany({
+      where: { studentId, feeStructureId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    expect(rows).toHaveLength(2);
+    expect(Number(rows[0].amountPaid)).toBe(2000);
+    expect(rows[0].mode).toBe("cash");
+    expect(rows[0].recordedById).toBe(accountantId);
+    expect(Number(rows[1].amountPaid)).toBe(3000);
+    expect(rows[1].mode).toBe("upi");
+    expect(rows[1].reference).toBe("UPI-9981");
+    expect(rows[1].recordedById).toBe(secondAccountantId);
+  });
+
+  it("reports the running total and derived status from the ledger", async () => {
+    // feeStructure.amount is 5000 in this fixture
+    const { feeStructureId, studentId, schoolId, accountantId } = await seedFixtures();
+
+    const first = await recordPayment(prisma, {
+      feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 2000, mode: "cash",
+    });
+    expect(first).toMatchObject({ ok: true, amountPaid: 2000, status: "partial" });
+
+    const second = await recordPayment(prisma, {
+      feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 3000, mode: "cash",
+    });
+    expect(second).toMatchObject({ ok: true, amountPaid: 5000, status: "paid" });
+  });
+
+  it("still refuses a payment that would exceed the amount due", async () => {
+    const { feeStructureId, studentId, schoolId, accountantId } = await seedFixtures();
+
+    await recordPayment(prisma, {
+      feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 4000, mode: "cash",
+    });
+
+    const result = await recordPayment(prisma, {
+      feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 2000, mode: "cash",
+    });
+
+    expect(result).toEqual({ ok: false, error: "EXCEEDS_AMOUNT_DUE" });
+    expect(await prisma.feePayment.count({ where: { studentId, feeStructureId } })).toBe(1);
+  });
+
+  it("issues a unique receipt number per payment", async () => {
+    const { feeStructureId, studentId, schoolId, accountantId } = await seedFixtures();
+
+    await recordPayment(prisma, { feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 1000, mode: "cash" });
+    await recordPayment(prisma, { feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 1000, mode: "cash" });
+
+    const rows = await prisma.feePayment.findMany({ where: { studentId, feeStructureId } });
+    const receipts = rows.map((r) => r.receiptNo);
+
+    expect(new Set(receipts).size).toBe(2);
+    expect(receipts.every((r) => typeof r === "string" && r.length > 0)).toBe(true);
+  });
+
+  it("returns the full instalment history for a student", async () => {
+    const { feeStructureId, studentId, schoolId, accountantId } = await seedFixtures();
+
+    await recordPayment(prisma, { feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 2000, mode: "cash" });
+    await recordPayment(prisma, { feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 3000, mode: "cheque", reference: "CHQ-4412" });
+
+    const result = await listPaymentsForStudent(prisma, { studentId, feeStructureId, schoolId });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payments).toHaveLength(2);
+    expect(result.payments[1].reference).toBe("CHQ-4412");
   });
 });

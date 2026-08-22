@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, PaymentMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { getFeeRoster, recordPayment, type RecordPaymentResult } from "@/lib/fee-payments";
+
+const VALID_PAYMENT_MODES = new Set<string>(Object.values(PaymentMode));
 
 /**
  * `recordPayment` runs inside a Serializable transaction. Under real
@@ -79,8 +81,10 @@ export async function POST(request: Request) {
     let feeStructureId: number | undefined;
     let studentId: number | undefined;
     let amount: number | undefined;
+    let mode: string | undefined;
+    let reference: string | undefined;
     try {
-      ({ feeStructureId, studentId, amount } = await request.json());
+      ({ feeStructureId, studentId, amount, mode, reference } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -92,12 +96,21 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!mode || !VALID_PAYMENT_MODES.has(mode)) {
+      return NextResponse.json(
+        { error: "mode is required and must be one of: " + Array.from(VALID_PAYMENT_MODES).join(", ") },
+        { status: 400 }
+      );
+    }
+
     const result = await recordPaymentWithRetry({
       feeStructureId,
       studentId,
       schoolId: claims.schoolId,
       recordedById: claims.userId,
       amount,
+      mode: mode as PaymentMode,
+      reference,
     });
 
     if (!result.ok) {
@@ -122,7 +135,11 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ amountPaid: result.amountPaid, status: result.status });
+    return NextResponse.json({
+      amountPaid: result.amountPaid,
+      status: result.status,
+      receiptNo: result.receiptNo,
+    });
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
