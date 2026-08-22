@@ -85,6 +85,21 @@ export async function listAssignments(
   };
 }
 
+async function assertTeacherOwnsSubject(
+  prisma: PrismaClient,
+  params: { classId: number; subjectId: number; teacherUserId: number; academicYearId: number }
+): Promise<boolean> {
+  const link = await prisma.classTeacher.findFirst({
+    where: {
+      classId: params.classId,
+      subjectId: params.subjectId,
+      teacherUserId: params.teacherUserId,
+      academicYearId: params.academicYearId,
+    },
+  });
+  return link !== null;
+}
+
 export type CreateAssignmentResult = { ok: true; id: number } | { ok: false; error: "NOT_ASSIGNED" };
 
 export async function createAssignment(
@@ -101,15 +116,13 @@ export async function createAssignment(
     attachmentName?: string;
   }
 ): Promise<CreateAssignmentResult> {
-  const link = await prisma.classTeacher.findFirst({
-    where: {
-      classId: params.classId,
-      subjectId: params.subjectId,
-      teacherUserId: params.teacherUserId,
-      academicYearId: params.academicYearId,
-    },
+  const owns = await assertTeacherOwnsSubject(prisma, {
+    classId: params.classId,
+    subjectId: params.subjectId,
+    teacherUserId: params.teacherUserId,
+    academicYearId: params.academicYearId,
   });
-  if (!link) return { ok: false, error: "NOT_ASSIGNED" };
+  if (!owns) return { ok: false, error: "NOT_ASSIGNED" };
 
   const assignment = await prisma.$transaction(async (tx) => {
     const created = await tx.assignment.create({
@@ -165,7 +178,8 @@ export async function createAssignment(
 export type EditAssignmentResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
-  | { ok: false; error: "FORBIDDEN" };
+  | { ok: false; error: "FORBIDDEN" }
+  | { ok: false; error: "INVALID_SUBJECT" };
 
 export async function editAssignment(
   prisma: PrismaClient,
@@ -189,6 +203,16 @@ export async function editAssignment(
   });
   if (!assignment || assignment.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
   if (assignment.createdById !== params.teacherUserId) return { ok: false, error: "FORBIDDEN" };
+
+  if (params.fields.subjectId !== undefined) {
+    const owns = await assertTeacherOwnsSubject(prisma, {
+      classId: assignment.classId,
+      subjectId: params.fields.subjectId,
+      teacherUserId: params.teacherUserId,
+      academicYearId: assignment.academicYearId,
+    });
+    if (!owns) return { ok: false, error: "INVALID_SUBJECT" };
+  }
 
   const data: {
     subjectId?: number;

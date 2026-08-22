@@ -50,6 +50,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       if (result.error === "NOT_FOUND") {
         return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
       }
+      if (result.error === "INVALID_SUBJECT") {
+        return NextResponse.json(
+          { error: "You are not assigned to that subject for this class" },
+          { status: 403 }
+        );
+      }
       return NextResponse.json(
         { error: "Only the teacher who created this assignment can edit it" },
         { status: 403 }
