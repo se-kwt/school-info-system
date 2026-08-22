@@ -12,6 +12,7 @@ interface ClassOption {
 interface SubjectOption {
   id: number;
   name: string;
+  gradeId: number;
 }
 
 interface FacultyAssignment {
@@ -57,6 +58,10 @@ export function TimetableView({
   role: "teacher" | "admin";
 }) {
   const [classId, setClassId] = useState(classes[0] ? String(classes[0].id) : "");
+  const selectedClass = classes.find((c) => String(c.id) === classId) ?? null;
+  const availableSubjects = selectedClass
+    ? subjects.filter((s) => s.gradeId === selectedClass.gradeId)
+    : [];
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [faculty, setFaculty] = useState<FacultyAssignment[]>([]);
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
@@ -212,7 +217,7 @@ export function TimetableView({
                       className={inputClass}
                     >
                       <option value="">Select subject</option>
-                      {subjects.map((subject) => (
+                      {availableSubjects.map((subject) => (
                         <option key={subject.id} value={subject.id}>
                           {subject.name}
                         </option>
@@ -256,7 +261,7 @@ export function TimetableView({
                       onChange={(event) => setEditSubject(event.target.value)}
                       className={inputClass}
                     >
-                      {subjects.map((subject) => (
+                      {availableSubjects.map((subject) => (
                         <option key={subject.id} value={subject.id}>
                           {subject.name}
                         </option>
