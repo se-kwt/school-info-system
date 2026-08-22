@@ -503,8 +503,12 @@ export async function revertPromotionRun(
       }
     }
 
-    await tx.academicYear.update({ where: { id: run.fromAcademicYearId }, data: { status: "active" } });
+    // Order matters: the partial unique index on (schoolId) WHERE status = 'active'
+    // is checked per-statement, not deferred to commit. Demote the "to" year to
+    // upcoming before reactivating the "from" year, or both rows would briefly be
+    // active at once and the second update would violate the constraint.
     await tx.academicYear.update({ where: { id: run.toAcademicYearId }, data: { status: "upcoming" } });
+    await tx.academicYear.update({ where: { id: run.fromAcademicYearId }, data: { status: "active" } });
     await tx.promotionRun.update({ where: { id: params.promotionRunId }, data: { status: "reverted" } });
   });
 

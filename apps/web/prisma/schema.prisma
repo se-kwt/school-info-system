@@ -440,6 +440,11 @@ model OtpCode {
   @@index([phone])
 }
 
+/// Partial unique index `AcademicYear_schoolId_active_key` enforces at most one
+/// `status = 'active'` row per school. It lives in migration
+/// `20260822173429_academic_year_single_active` because Prisma 5.20 cannot express
+/// partial indexes here. `prisma migrate dev` will try to DROP it in every
+/// future generated migration — read the generated SQL and delete that line.
 model AcademicYear {
   id        Int                @id @default(autoincrement())
   school    School             @relation(fields: [schoolId], references: [id])

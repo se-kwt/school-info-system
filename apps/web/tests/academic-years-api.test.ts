@@ -161,4 +161,71 @@ describe("/api/academic-years", () => {
     const body = await response.json();
     expect(body.academicYears).toEqual([]);
   });
+
+  it("refuses a second active year for the same school at the database level", async () => {
+    const school = await prisma.school.create({ data: { name: "Constraint School" } });
+    await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
+    });
+
+    await expect(
+      prisma.academicYear.create({
+        data: {
+          schoolId: school.id,
+          name: "2027-28",
+          startDate: new Date("2027-04-01"),
+          endDate: new Date("2028-03-31"),
+          status: "active",
+        },
+      })
+    ).rejects.toThrow();
+  });
+
+  it("allows two active years in different schools", async () => {
+    const schoolA = await prisma.school.create({ data: { name: "School A" } });
+    const schoolB = await prisma.school.create({ data: { name: "School B" } });
+
+    await prisma.academicYear.create({
+      data: {
+        schoolId: schoolA.id,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
+    });
+
+    const second = await prisma.academicYear.create({
+      data: {
+        schoolId: schoolB.id,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
+    });
+
+    expect(second.status).toBe("active");
+  });
+
+  it("allows many upcoming and archived years in one school", async () => {
+    const school = await prisma.school.create({ data: { name: "Many Years School" } });
+    await prisma.academicYear.createMany({
+      data: [
+        { schoolId: school.id, name: "2024-25", startDate: new Date("2024-04-01"), endDate: new Date("2025-03-31"), status: "archived" },
+        { schoolId: school.id, name: "2025-26", startDate: new Date("2025-04-01"), endDate: new Date("2026-03-31"), status: "archived" },
+        { schoolId: school.id, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+        { schoolId: school.id, name: "2028-29", startDate: new Date("2028-04-01"), endDate: new Date("2029-03-31"), status: "upcoming" },
+      ],
+    });
+
+    const count = await prisma.academicYear.count({ where: { schoolId: school.id } });
+    expect(count).toBe(4);
+  });
 });
