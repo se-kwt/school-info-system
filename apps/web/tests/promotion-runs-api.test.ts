@@ -178,4 +178,49 @@ describe("/api/promotion-runs", () => {
     const revertedFromYear = await prisma.academicYear.findUnique({ where: { id: fromYear.id } });
     expect(revertedFromYear?.status).toBe("active");
   });
+
+  it("rejects a decision with a cross-school toClassId with 400 and a diagnostic message", async () => {
+    const { school, fromYear, toYear, admin, gradeOne, student } = await seedSchoolReadyForPromotion();
+    loginAs(admin.id, "admin", school.id);
+
+    const createRequest = new Request("http://localhost/api/promotion-runs", {
+      method: "POST",
+      body: JSON.stringify({ toAcademicYearId: toYear.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const createResponse = await postPromotionRuns(createRequest);
+    const { id: runId } = await createResponse.json();
+
+    const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherYear = await prisma.academicYear.create({
+      data: {
+        schoolId: otherSchool.id,
+        name: "2027-28",
+        startDate: new Date("2027-06-01"),
+        endDate: new Date("2028-04-30"),
+        status: "upcoming",
+      },
+    });
+    const otherGrade = await prisma.grade.create({ data: { schoolId: otherSchool.id, name: "Grade 2" } });
+    const foreignClass = await prisma.class.create({
+      data: { schoolId: otherSchool.id, gradeId: otherGrade.id, section: "A", academicYearId: otherYear.id },
+    });
+
+    void fromYear;
+    void gradeOne;
+
+    const decisionsRequest = new Request(`http://localhost/api/promotion-runs/${runId}/decisions`, {
+      method: "PUT",
+      body: JSON.stringify({
+        decisions: [{ studentId: student.id, action: "promoted", toClassId: foreignClass.id }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const decisionsResponse = await putDecisions(decisionsRequest, {
+      params: Promise.resolve({ id: String(runId) }),
+    });
+    expect(decisionsResponse.status).toBe(400);
+    const body = await decisionsResponse.json();
+    expect(body.error).toBe("Target class must belong to this school and the target academic year");
+  });
 });

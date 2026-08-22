@@ -45,6 +45,12 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
           { status: 400 }
         );
       }
+      if (result.error === "INVALID_TARGET_CLASS") {
+        return NextResponse.json(
+          { error: "Target class must belong to this school and the target academic year" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         { error: 'toClassId is required when action is "promoted"' },
         { status: 400 }
