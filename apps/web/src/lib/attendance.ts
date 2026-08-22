@@ -2,6 +2,7 @@ import type { AttendanceStatus, PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "./auth/jwt";
 import { getEnrolledStudents } from "./enrollment";
 import { getSchoolLocalToday } from "./date-utils";
+import { attendancePercent } from "./attendance-status";
 
 export interface RosterEntry {
   studentId: number;
@@ -65,11 +66,7 @@ export async function getAttendanceRoster(
     ok: true,
     students: enrolled.map((student) => {
       const monthRecords = attendanceRows.filter((record) => record.studentId === student.id);
-      const attendedCount = monthRecords.filter(
-        (record) => record.status === "present" || record.status === "late"
-      ).length;
-      const monthPercent =
-        monthRecords.length === 0 ? 0 : Math.round((attendedCount / monthRecords.length) * 100);
+      const monthPercent = attendancePercent(monthRecords);
       const todayRecord = monthRecords.find(
         (record) => record.date.toISOString().slice(0, 10) === params.date
       );

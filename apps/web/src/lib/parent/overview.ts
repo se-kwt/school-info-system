@@ -1,6 +1,6 @@
 import type { PrismaClient, Student } from "@prisma/client";
 import { displayStatus } from "../assignments";
-import { attendanceWeight, type AttendanceStatusValue } from "../attendance-status";
+import { attendancePercent } from "../attendance-status";
 
 export async function getParentChildren(
   prisma: PrismaClient,
@@ -79,17 +79,6 @@ function monthRange(): { start: Date; end: Date } {
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   return { start, end };
-}
-
-export function attendancePercent(records: { status: string }[]): number {
-  const weighted = records.reduce(
-    (acc, r) => {
-      const { counted, credit } = attendanceWeight(r.status as Exclude<AttendanceStatusValue, null>);
-      return counted ? { total: acc.total + 1, credit: acc.credit + credit } : acc;
-    },
-    { total: 0, credit: 0 }
-  );
-  return weighted.total === 0 ? 0 : Math.round((weighted.credit / weighted.total) * 100);
 }
 
 export function buildAttendanceMonthDays(

@@ -413,6 +413,29 @@ describe("/api/attendance", () => {
     expect(body.students[0].monthPercent).toBe(100);
   });
 
+  it("weights half_day as half credit and drops excused from the denominator (75%, not 33% or 50%)", async () => {
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+
+    // 1 present, 1 half_day, 1 excused -> (1 + 0.5) / 2 marked days = 75%.
+    // A naive present/late-only count would read 33% (1/3); a naive
+    // present+late+halfDay-over-all-records count would read 50% (1.5/3).
+    await prisma.attendance.createMany({
+      data: [
+        { studentId: student.id, academicYearId: year.id, date: new Date(Date.UTC(2026, 6, 1)), status: "present", markedById: teacher.id },
+        { studentId: student.id, academicYearId: year.id, date: new Date(Date.UTC(2026, 6, 2)), status: "half_day", markedById: teacher.id },
+        { studentId: student.id, academicYearId: year.id, date: new Date(Date.UTC(2026, 6, 3)), status: "excused", markedById: teacher.id },
+      ],
+    });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request(
+      `http://localhost/api/attendance?classId=${klass.id}&date=2026-07-06`
+    );
+    const response = await getAttendance(request);
+    const body = await response.json();
+    expect(body.students[0].monthPercent).toBe(75);
+  });
+
   it("deletes an existing attendance record when the entry status is null", async () => {
     const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
     await prisma.attendance.create({

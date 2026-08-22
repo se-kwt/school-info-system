@@ -38,3 +38,18 @@ export function attendanceWeight(
       return { counted: false, credit: 0 };
   }
 }
+
+export function attendancePercent(
+  records: Array<{ status: Exclude<AttendanceStatusValue, null> | string }>
+): number {
+  const weighted = records.reduce(
+    (acc, r) => {
+      const { counted, credit } = attendanceWeight(
+        r.status as Exclude<AttendanceStatusValue, null>
+      );
+      return counted ? { total: acc.total + 1, credit: acc.credit + credit } : acc;
+    },
+    { total: 0, credit: 0 }
+  );
+  return weighted.total === 0 ? 0 : Math.round((weighted.credit / weighted.total) * 100);
+}

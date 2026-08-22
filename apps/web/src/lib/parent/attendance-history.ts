@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
-import { attendancePercent, buildAttendanceMonthDays, type ParentAttendanceDay } from "./overview";
+import { buildAttendanceMonthDays, type ParentAttendanceDay } from "./overview";
+import { attendancePercent } from "../attendance-status";
 
 export interface ParentAttendanceMonth {
   year: number;
