@@ -1,11 +1,13 @@
 import { requireDashboardRole } from "@/lib/auth/require-dashboard-role";
 import { listClasses } from "@/lib/school-setup/classes";
+import { getActiveAcademicYear } from "@/lib/academic-years";
 import { prisma } from "@/lib/prisma";
 import { FeesView } from "@/components/fees/FeesView";
 
 export default async function FeesPage() {
   const claims = await requireDashboardRole(["admin", "accountant"]);
-  const classes = await listClasses(prisma, claims.schoolId);
+  const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
+  const classes = await listClasses(prisma, claims.schoolId, { academicYearId: activeYear?.id ?? -1 });
 
   return (
     <div className="flex flex-col gap-4">

@@ -16,6 +16,7 @@ import {
   GET as getFeeStructures,
   POST as postFeeStructures,
 } from "../src/app/api/fee-structures/route";
+import { listFeeStructures } from "../src/lib/fee-structures";
 
 describe("/api/fee-structures", () => {
   beforeEach(async () => {
@@ -254,6 +255,33 @@ describe("/api/fee-structures", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.feeStructures.map((f: { term: string }) => f.term)).toEqual(["Current Term"]);
+  });
+
+  it("listFeeStructures rejects a class that belongs to a different academic year", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const activeYear = await createActiveYear(prisma, school.id);
+    const staleYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2025-26",
+        startDate: new Date("2025-04-01"),
+        endDate: new Date("2026-03-31"),
+        status: "archived",
+      },
+    });
+    const staleClass = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: staleYear.id,
+      name: "Grade 5",
+      section: "A",
+    });
+
+    const result = await listFeeStructures(prisma, {
+      classId: staleClass.id,
+      schoolId: school.id,
+      academicYearId: activeYear.id,
+    });
+    expect(result).toEqual({ ok: false, error: "INVALID_CLASS" });
   });
 
   it("rejects a missing classId with 400", async () => {
