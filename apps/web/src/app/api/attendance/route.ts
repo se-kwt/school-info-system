@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       role: claims.role,
       entries: entries as Array<{
         studentId: number;
-        status: "present" | "absent" | "late" | null;
+        status: "present" | "absent" | "late" | "half_day" | "excused" | "holiday" | null;
         note?: string;
       }>,
     });

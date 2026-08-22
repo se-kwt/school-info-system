@@ -24,6 +24,9 @@ enum AttendanceStatus {
   present
   absent
   late
+  half_day
+  excused
+  holiday
 }
 
 enum AssignmentStatusValue {

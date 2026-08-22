@@ -2,10 +2,16 @@ import type { ParentAttendanceDay } from "@/lib/parent/overview";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-const ATTENDANCE_STATUS_CLASS: Record<"present" | "late" | "absent", string> = {
+const ATTENDANCE_STATUS_CLASS: Record<
+  "present" | "late" | "absent" | "half_day" | "excused" | "holiday",
+  string
+> = {
   present: "bg-emerald-100 text-emerald-700",
   late: "bg-amber-100 text-amber-700",
   absent: "bg-red-100 text-red-700",
+  half_day: "bg-sky-100 text-sky-700",
+  excused: "bg-violet-100 text-violet-700",
+  holiday: "bg-neutral-200 text-neutral-600",
 };
 
 function LegendDot({ colorClassName, label }: { colorClassName: string; label: string }) {

@@ -7,7 +7,7 @@ export interface ReviewEntry {
   name: string;
   rollNumber: string | null;
   photoUrl: string | null;
-  status: "present" | "absent" | "late" | null;
+  status: "present" | "absent" | "late" | "half_day" | "excused" | "holiday" | null;
 }
 
 export function AttendanceReviewPanel({

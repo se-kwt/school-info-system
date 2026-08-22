@@ -102,7 +102,11 @@ export async function markAttendance(
     schoolId: number;
     teacherUserId: number;
     role: SessionClaims["role"];
-    entries: Array<{ studentId: number; status: "present" | "absent" | "late" | null; note?: string }>;
+    entries: Array<{
+      studentId: number;
+      status: "present" | "absent" | "late" | "half_day" | "excused" | "holiday" | null;
+      note?: string;
+    }>;
   }
 ): Promise<MarkAttendanceResult> {
   if (params.role === "teacher") {

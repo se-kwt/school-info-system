@@ -4,6 +4,7 @@ import { getClassesForTeacher } from "@/lib/data/scoped-queries";
 import { listClasses } from "@/lib/school-setup/classes";
 import { getActiveAcademicYear } from "@/lib/academic-years";
 import { getSchoolLocalTodayStart } from "@/lib/date-utils";
+import { attendanceWeight, type AttendanceStatusValue } from "@/lib/attendance-status";
 
 export interface ClassPerformanceEntry {
   classId: number;
@@ -99,9 +100,14 @@ function addDays(date: Date, days: number): Date {
 }
 
 function attendancePercent(records: { status: string }[]): number {
-  if (records.length === 0) return 0;
-  const attended = records.filter((r) => r.status === "present" || r.status === "late").length;
-  return Math.round((attended / records.length) * 100);
+  const weighted = records.reduce(
+    (acc, r) => {
+      const { counted, credit } = attendanceWeight(r.status as Exclude<AttendanceStatusValue, null>);
+      return counted ? { total: acc.total + 1, credit: acc.credit + credit } : acc;
+    },
+    { total: 0, credit: 0 }
+  );
+  return weighted.total === 0 ? 0 : Math.round((weighted.credit / weighted.total) * 100);
 }
 
 export async function getDashboardOverview(

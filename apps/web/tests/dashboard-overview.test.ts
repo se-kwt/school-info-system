@@ -279,6 +279,37 @@ describe("getDashboardOverview", () => {
     }
   });
 
+  it("weights half_day as half credit and drops excused from the denominator (75%, not 33% or 50%)", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+
+    const todayStart = getSchoolLocalTodayStart();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const daysAgo = (n: number) => new Date(todayStart.getTime() - n * dayMs);
+
+    // 1 present, 1 half_day, 1 excused -> (1 + 0.5) / 2 marked days = 75%.
+    // A naive present/late-only count would read 33% (1/3); a naive
+    // present+late+halfDay-over-all-records count would read 50% (1.5/3).
+    await prisma.attendance.createMany({
+      data: [
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: daysAgo(2), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: daysAgo(1), status: "half_day", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: todayStart, status: "excused", markedById: fixtures.teacher.id },
+      ],
+    });
+
+    const claims: SessionClaims = {
+      userId: fixtures.admin.id,
+      role: "admin",
+      schoolId: fixtures.school.id,
+    };
+    const overview = await getDashboardOverview(prisma, claims);
+
+    if (overview.role === "accountant") throw new Error("unexpected role");
+
+    const byClassId = new Map(overview.classPerformance.map((c) => [c.classId, c]));
+    expect(byClassId.get(fixtures.classA.id)?.attendancePercent).toBe(75);
+  });
+
   it("returns a fees-only, school-wide overview for accountant", async () => {
     const fixtures = await createSeedFixtures(prisma);
     const feeStructure = await prisma.feeStructure.create({
