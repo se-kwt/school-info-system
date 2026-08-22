@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getAcademicYears, POST as postAcademicYears } from "../src/app/api/academic-years/route";
+import { PATCH as patchAcademicYear } from "../src/app/api/academic-years/[id]/route";
 import { activateAcademicYear, archiveAcademicYear, getActiveAcademicYear } from "../src/lib/academic-years";
 
 describe("/api/academic-years", () => {
@@ -327,5 +328,97 @@ describe("/api/academic-years", () => {
     expect(result).toEqual({ ok: true });
     expect((await prisma.academicYear.findUnique({ where: { id: cancelled.id } }))?.status).toBe("archived");
     expect((await prisma.academicYear.findUnique({ where: { id: current.id } }))?.status).toBe("active");
+  });
+
+  it("PATCH activates a year for an admin", async () => {
+    const school = await prisma.school.create({ data: { name: "Patch School" } });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550098888", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    const current = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+    });
+    const next = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const response = await patchAcademicYear(
+      new Request("http://test/api/academic-years/" + next.id, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "activate" }),
+      }),
+      { params: Promise.resolve({ id: String(next.id) }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect((await prisma.academicYear.findUnique({ where: { id: next.id } }))?.status).toBe("active");
+  });
+
+  it("PATCH rejects a non-admin", async () => {
+    const school = await prisma.school.create({ data: { name: "Role School" } });
+    const teacher = await prisma.user.create({
+      data: { phone: "+15550099999", role: "teacher", name: "Test Teacher", schoolId: school.id },
+    });
+    const year = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "upcoming" },
+    });
+    loginAs(teacher.id, "teacher", school.id);
+
+    const response = await patchAcademicYear(
+      new Request("http://test/api/academic-years/" + year.id, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "activate" }),
+      }),
+      { params: Promise.resolve({ id: String(year.id) }) }
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("PATCH rejects an unknown action", async () => {
+    const school = await prisma.school.create({ data: { name: "Action School" } });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550011111", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    const year = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "upcoming" },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const response = await patchAcademicYear(
+      new Request("http://test/api/academic-years/" + year.id, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "delete" }),
+      }),
+      { params: Promise.resolve({ id: String(year.id) }) }
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("PATCH refuses to archive the only active year", async () => {
+    const school = await prisma.school.create({ data: { name: "Only Year School" } });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550012222", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    const only = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const response = await patchAcademicYear(
+      new Request("http://test/api/academic-years/" + only.id, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "archive" }),
+      }),
+      { params: Promise.resolve({ id: String(only.id) }) }
+    );
+
+    expect(response.status).toBe(400);
   });
 });
