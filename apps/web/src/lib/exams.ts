@@ -6,6 +6,7 @@ export interface ExamSummary {
   term: string;
   examDate: string;
   academicYearId: number;
+  published: boolean;
 }
 
 export async function listExams(
@@ -23,7 +24,26 @@ export async function listExams(
     term: exam.term,
     examDate: exam.examDate.toISOString().slice(0, 10),
     academicYearId: exam.academicYearId,
+    published: exam.published,
   }));
+}
+
+export type SetExamPublishedResult = { ok: true } | { ok: false; error: "NOT_FOUND" };
+
+export async function setExamPublished(
+  prisma: PrismaClient,
+  params: { examId: number; schoolId: number; published: boolean }
+): Promise<SetExamPublishedResult> {
+  const exam = await prisma.exam.findFirst({
+    where: { id: params.examId, schoolId: params.schoolId },
+  });
+  if (!exam) return { ok: false, error: "NOT_FOUND" };
+
+  await prisma.exam.update({
+    where: { id: params.examId },
+    data: { published: params.published },
+  });
+  return { ok: true };
 }
 
 export type CreateExamResult =

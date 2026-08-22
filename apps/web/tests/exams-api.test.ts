@@ -13,6 +13,7 @@ import { prisma, resetDb } from "./helpers/db";
 import { createActiveYear } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getExams, POST as postExams } from "../src/app/api/exams/route";
+import { PATCH as patchExam } from "../src/app/api/exams/[id]/route";
 
 describe("/api/exams", () => {
   beforeEach(async () => {
@@ -53,7 +54,7 @@ describe("/api/exams", () => {
     expect(getResponse.status).toBe(200);
     const body = await getResponse.json();
     expect(body.exams).toEqual([
-      { id: created.id, name: "Mid-term", term: "Term 1", examDate: "2026-09-01", academicYearId: year.id },
+      { id: created.id, name: "Mid-term", term: "Term 1", examDate: "2026-09-01", academicYearId: year.id, published: false },
     ]);
   });
 
@@ -233,5 +234,155 @@ describe("/api/exams", () => {
     const response = await getExams(request);
     const body = await response.json();
     expect(body.exams).toHaveLength(0);
+  });
+
+  describe("PATCH /api/exams/[id]", () => {
+    it("publishes an exam", async () => {
+      const school = await prisma.school.create({ data: { name: "Test School" } });
+      const year = await createActiveYear(prisma, school.id);
+      const exam = await prisma.exam.create({
+        data: {
+          schoolId: school.id,
+          academicYearId: year.id,
+          name: "Mid-term",
+          term: "Term 1",
+          examDate: new Date("2026-09-01"),
+          maxMarks: 100,
+          passMarks: 40,
+        },
+      });
+      const admin = await prisma.user.create({
+        data: { phone: "+15550070000", role: "admin", name: "Test Admin", schoolId: school.id },
+      });
+      loginAs(admin.id, "admin", school.id);
+
+      const request = new Request(`http://localhost/api/exams/${exam.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ published: true }),
+        headers: { "content-type": "application/json" },
+      });
+      const response = await patchExam(request, { params: Promise.resolve({ id: String(exam.id) }) });
+      expect(response.status).toBe(200);
+
+      const updated = await prisma.exam.findUniqueOrThrow({ where: { id: exam.id } });
+      expect(updated.published).toBe(true);
+    });
+
+    it("unpublishes an exam", async () => {
+      const school = await prisma.school.create({ data: { name: "Test School" } });
+      const year = await createActiveYear(prisma, school.id);
+      const exam = await prisma.exam.create({
+        data: {
+          schoolId: school.id,
+          academicYearId: year.id,
+          name: "Mid-term",
+          term: "Term 1",
+          examDate: new Date("2026-09-01"),
+          maxMarks: 100,
+          passMarks: 40,
+          published: true,
+        },
+      });
+      const admin = await prisma.user.create({
+        data: { phone: "+15550070001", role: "admin", name: "Test Admin", schoolId: school.id },
+      });
+      loginAs(admin.id, "admin", school.id);
+
+      const request = new Request(`http://localhost/api/exams/${exam.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ published: false }),
+        headers: { "content-type": "application/json" },
+      });
+      const response = await patchExam(request, { params: Promise.resolve({ id: String(exam.id) }) });
+      expect(response.status).toBe(200);
+
+      const updated = await prisma.exam.findUniqueOrThrow({ where: { id: exam.id } });
+      expect(updated.published).toBe(false);
+    });
+
+    it("rejects a teacher attempting to PATCH with 403", async () => {
+      const school = await prisma.school.create({ data: { name: "Test School" } });
+      const year = await createActiveYear(prisma, school.id);
+      const exam = await prisma.exam.create({
+        data: {
+          schoolId: school.id,
+          academicYearId: year.id,
+          name: "Mid-term",
+          term: "Term 1",
+          examDate: new Date("2026-09-01"),
+          maxMarks: 100,
+          passMarks: 40,
+        },
+      });
+      const teacher = await prisma.user.create({
+        data: { phone: "+15550070002", role: "teacher", name: "Test Teacher", schoolId: school.id },
+      });
+      loginAs(teacher.id, "teacher", school.id);
+
+      const request = new Request(`http://localhost/api/exams/${exam.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ published: true }),
+        headers: { "content-type": "application/json" },
+      });
+      const response = await patchExam(request, { params: Promise.resolve({ id: String(exam.id) }) });
+      expect(response.status).toBe(403);
+    });
+
+    it("returns 404 for an exam belonging to another school", async () => {
+      const school = await prisma.school.create({ data: { name: "Test School" } });
+      const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+      const otherYear = await createActiveYear(prisma, otherSchool.id);
+      const exam = await prisma.exam.create({
+        data: {
+          schoolId: otherSchool.id,
+          academicYearId: otherYear.id,
+          name: "Other Exam",
+          term: "Term 1",
+          examDate: new Date("2026-09-01"),
+          maxMarks: 100,
+          passMarks: 40,
+        },
+      });
+      const admin = await prisma.user.create({
+        data: { phone: "+15550070003", role: "admin", name: "Test Admin", schoolId: school.id },
+      });
+      loginAs(admin.id, "admin", school.id);
+
+      const request = new Request(`http://localhost/api/exams/${exam.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ published: true }),
+        headers: { "content-type": "application/json" },
+      });
+      const response = await patchExam(request, { params: Promise.resolve({ id: String(exam.id) }) });
+      expect(response.status).toBe(404);
+    });
+
+    it("rejects a non-boolean published value with 400", async () => {
+      const school = await prisma.school.create({ data: { name: "Test School" } });
+      const year = await createActiveYear(prisma, school.id);
+      const exam = await prisma.exam.create({
+        data: {
+          schoolId: school.id,
+          academicYearId: year.id,
+          name: "Mid-term",
+          term: "Term 1",
+          examDate: new Date("2026-09-01"),
+          maxMarks: 100,
+          passMarks: 40,
+        },
+      });
+      const admin = await prisma.user.create({
+        data: { phone: "+15550070004", role: "admin", name: "Test Admin", schoolId: school.id },
+      });
+      loginAs(admin.id, "admin", school.id);
+
+      const request = new Request(`http://localhost/api/exams/${exam.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ published: "yes" }),
+        headers: { "content-type": "application/json" },
+      });
+      const response = await patchExam(request, { params: Promise.resolve({ id: String(exam.id) }) });
+      expect(response.status).toBe(400);
+    });
   });
 });

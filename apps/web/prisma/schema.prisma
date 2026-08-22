@@ -341,6 +341,7 @@ model Exam {
   weightage      Float        @default(1)
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
+  published      Boolean      @default(false)
 
   marks Mark[]
 

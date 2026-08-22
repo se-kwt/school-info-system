@@ -11,7 +11,7 @@ export interface ParentExamHistoryEntry {
 
 export async function getParentMarksHistory(prisma: PrismaClient, studentId: number): Promise<ParentExamHistoryEntry[]> {
   const marks = await prisma.mark.findMany({
-    where: { studentId },
+    where: { studentId, exam: { published: true } },
     include: { exam: true, subject: true },
     orderBy: { exam: { examDate: "desc" } },
   });

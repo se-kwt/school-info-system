@@ -208,6 +208,7 @@ describe("getParentOverview", () => {
         academicYearId: fixtures.academicYear.id,
         maxMarks: 100,
         passMarks: 40,
+        published: true,
       },
     });
     const newerExam = await prisma.exam.create({
@@ -219,6 +220,7 @@ describe("getParentOverview", () => {
         academicYearId: fixtures.academicYear.id,
         maxMarks: 100,
         passMarks: 40,
+        published: true,
       },
     });
     const mathSubject = await prisma.subject.findFirstOrThrow({
@@ -249,6 +251,34 @@ describe("getParentOverview", () => {
 
   it("returns null latestExam when the student has no marks", async () => {
     const fixtures = await createSeedFixtures(prisma);
+
+    const overview = await getParentOverview(prisma, {
+      studentId: fixtures.student.id,
+      schoolId: fixtures.school.id,
+    });
+
+    expect(overview.latestExam).toBeNull();
+  });
+
+  it("does not leak an unpublished exam's name onto the latestExam tile", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const exam = await prisma.exam.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Secret Mid Term",
+        term: "Term 1",
+        examDate: new Date("2026-08-01"),
+        academicYearId: fixtures.academicYear.id,
+        maxMarks: 100,
+        passMarks: 40,
+      },
+    });
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
+    await prisma.mark.create({
+      data: { examId: exam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 80, maxMarks: 100, grade: "B" },
+    });
 
     const overview = await getParentOverview(prisma, {
       studentId: fixtures.student.id,

@@ -167,7 +167,7 @@ export async function getParentOverview(
   }
 
   const latestMark = await prisma.mark.findFirst({
-    where: { studentId: params.studentId },
+    where: { studentId: params.studentId, exam: { published: true } },
     include: { exam: true },
     orderBy: { exam: { examDate: "desc" } },
   });
@@ -175,7 +175,7 @@ export async function getParentOverview(
   let latestExam: ParentOverview["latestExam"] = null;
   if (latestMark) {
     const examMarks = await prisma.mark.findMany({
-      where: { studentId: params.studentId, examId: latestMark.examId },
+      where: { studentId: params.studentId, examId: latestMark.examId, exam: { published: true } },
       include: { subject: true },
     });
     latestExam = {

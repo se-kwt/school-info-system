@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { createSeedFixtures } from "../prisma/fixtures";
 import { getParentMarksHistory } from "../src/lib/parent/marks-history";
+import { setExamPublished } from "../src/lib/exams";
 
 describe("getParentMarksHistory", () => {
   beforeEach(async () => {
@@ -24,6 +25,7 @@ describe("getParentMarksHistory", () => {
         academicYearId: fixtures.academicYear.id,
         maxMarks: 100,
         passMarks: 40,
+        published: true,
       },
     });
     const newerExam = await prisma.exam.create({
@@ -35,6 +37,7 @@ describe("getParentMarksHistory", () => {
         academicYearId: fixtures.academicYear.id,
         maxMarks: 100,
         passMarks: 40,
+        published: true,
       },
     });
     const mathSubject = await prisma.subject.findFirstOrThrow({
@@ -68,5 +71,57 @@ describe("getParentMarksHistory", () => {
     const history = await getParentMarksHistory(prisma, fixtures.student.id);
 
     expect(history).toEqual([]);
+  });
+
+  it("hides marks from an unpublished exam", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const exam = await prisma.exam.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Mid Term",
+        term: "Term 1",
+        examDate: new Date("2026-08-01"),
+        academicYearId: fixtures.academicYear.id,
+        maxMarks: 100,
+        passMarks: 40,
+      },
+    });
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
+    await prisma.mark.create({
+      data: { examId: exam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 70, maxMarks: 100, grade: "C" },
+    });
+
+    const history = await getParentMarksHistory(prisma, fixtures.student.id);
+
+    expect(history).toEqual([]);
+  });
+
+  it("shows marks once the exam is published", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const exam = await prisma.exam.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Mid Term",
+        term: "Term 1",
+        examDate: new Date("2026-08-01"),
+        academicYearId: fixtures.academicYear.id,
+        maxMarks: 100,
+        passMarks: 40,
+      },
+    });
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
+    await prisma.mark.create({
+      data: { examId: exam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 70, maxMarks: 100, grade: "C" },
+    });
+
+    await setExamPublished(prisma, { examId: exam.id, schoolId: fixtures.school.id, published: true });
+
+    const history = await getParentMarksHistory(prisma, fixtures.student.id);
+
+    expect(history).toHaveLength(1);
   });
 });

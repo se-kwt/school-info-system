@@ -7,6 +7,7 @@ interface ExamOption {
   name: string;
   term: string;
   examDate: string;
+  published: boolean;
 }
 
 interface ClassOption {
@@ -143,6 +144,30 @@ export function MarksView({
     setError(body.error);
   }
 
+  async function handleTogglePublished() {
+    const currentExam = exams.find((exam) => String(exam.id) === examId);
+    if (!currentExam) return;
+    setError(null);
+    setMessage(null);
+    const response = await fetch(`/api/exams/${currentExam.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ published: !currentExam.published }),
+    });
+
+    if (response.ok) {
+      setExams((prev) =>
+        prev.map((exam) =>
+          exam.id === currentExam.id ? { ...exam, published: !currentExam.published } : exam
+        )
+      );
+      setMessage(currentExam.published ? "Exam unpublished" : "Exam published");
+      return;
+    }
+    const body = await response.json();
+    setError(body.error);
+  }
+
   async function handleSave() {
     setError(null);
     setMessage(null);
@@ -196,6 +221,22 @@ export function MarksView({
             </option>
           ))}
         </select>
+
+        {role === "admin" && exams.length > 0 && (
+          <button
+            type="button"
+            onClick={handleTogglePublished}
+            className={
+              exams.find((exam) => String(exam.id) === examId)?.published
+                ? "rounded-lg border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-700 transition-all hover:bg-neutral-50"
+                : "rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-emerald-700"
+            }
+          >
+            {exams.find((exam) => String(exam.id) === examId)?.published
+              ? "Unpublish Exam"
+              : "Publish Exam"}
+          </button>
+        )}
 
         {role === "admin" && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200/60 p-2">
