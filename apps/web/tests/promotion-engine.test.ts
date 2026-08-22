@@ -129,6 +129,35 @@ describe("startOrResumePromotionRun", () => {
     });
     expect(result).toEqual({ ok: false, error: "NO_ACTIVE_YEAR" });
   });
+
+  it("refuses to start a run targeting an archived year", async () => {
+    const { startOrResumePromotionRun } = await import("../src/lib/promotion");
+    const { school, admin } = await seedSchoolWithActiveYearAndClass();
+    const archived = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2020-21", startDate: new Date("2020-04-01"), endDate: new Date("2021-03-31"), status: "archived" },
+    });
+
+    const result = await startOrResumePromotionRun(prisma, {
+      schoolId: school.id,
+      initiatedById: admin.id,
+      toAcademicYearId: archived.id,
+    });
+
+    expect(result).toEqual({ ok: false, error: "TARGET_YEAR_NOT_UPCOMING" });
+  });
+
+  it("refuses to start a run targeting the currently active year", async () => {
+    const { startOrResumePromotionRun } = await import("../src/lib/promotion");
+    const { school, admin, fromYear } = await seedSchoolWithActiveYearAndClass();
+
+    const result = await startOrResumePromotionRun(prisma, {
+      schoolId: school.id,
+      initiatedById: admin.id,
+      toAcademicYearId: fromYear.id,
+    });
+
+    expect(result).toEqual({ ok: false, error: "TARGET_YEAR_NOT_UPCOMING" });
+  });
 });
 
 describe("updateMappings", () => {

@@ -8,7 +8,8 @@ export interface PromotionMappingRow {
 export type StartPromotionRunResult =
   | { ok: true; id: number; mappings: PromotionMappingRow[] }
   | { ok: false; error: "INVALID_ACADEMIC_YEAR" }
-  | { ok: false; error: "NO_ACTIVE_YEAR" };
+  | { ok: false; error: "NO_ACTIVE_YEAR" }
+  | { ok: false; error: "TARGET_YEAR_NOT_UPCOMING" };
 
 export async function startOrResumePromotionRun(
   prisma: PrismaClient,
@@ -38,6 +39,7 @@ export async function startOrResumePromotionRun(
     where: { id: params.toAcademicYearId, schoolId: params.schoolId },
   });
   if (!toYear) return { ok: false, error: "INVALID_ACADEMIC_YEAR" };
+  if (toYear.status !== "upcoming") return { ok: false, error: "TARGET_YEAR_NOT_UPCOMING" };
 
   const classesWithEnrollments = await prisma.class.findMany({
     where: {

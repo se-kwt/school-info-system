@@ -27,6 +27,9 @@ export async function POST(request: Request) {
       if (result.error === "NO_ACTIVE_YEAR") {
         return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
       }
+      if (result.error === "TARGET_YEAR_NOT_UPCOMING") {
+        return NextResponse.json({ error: "Promotion can only target an upcoming academic year" }, { status: 400 });
+      }
       return NextResponse.json({ error: "The selected academic year does not exist" }, { status: 400 });
     }
 
