@@ -14,6 +14,7 @@ import { createActiveYear, createClass, createEnrolledStudent } from "./helpers/
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getFeePayments, POST as postFeePayments } from "../src/app/api/fee-payments/route";
 import { recordPayment, listPaymentsForStudent } from "../src/lib/fee-payments";
+import { Prisma } from "@prisma/client";
 
 describe("GET /api/fee-payments", () => {
   beforeEach(async () => {
@@ -459,6 +460,17 @@ describe("POST /api/fee-payments", () => {
     const total = rows.reduce((sum, r) => sum + r.amountPaid, 0);
     expect(total).toBe(5000);
     expect(new Set(rows.map((r) => r.amountPaid))).toEqual(new Set([2000, 3000]));
+    // Receipt numbering (`tx.feePayment.count()` inside the same Serializable
+    // transaction) races exactly like the amount check does. If two concurrent
+    // transactions both computed the same `priorCount` and thus the same
+    // receiptNo, the `@@unique([feeStructureId, receiptNo])` constraint would
+    // make the losing transaction fail with P2034, which the route retries —
+    // the retry re-reads the count (now incremented by the winner) and gets a
+    // fresh, distinct number. So a passing test here (distinct receipt numbers
+    // even though both POSTs were fired concurrently) is evidence the retry
+    // path was actually exercised for the receipt-number race, not just the
+    // amount race.
+    expect(new Set(rows.map((r) => r.receiptNo)).size).toBe(2);
   });
 });
 
@@ -589,6 +601,57 @@ describe("recordPayment / listPaymentsForStudent (ledger)", () => {
 
     expect(new Set(receipts).size).toBe(2);
     expect(receipts.every((r) => typeof r === "string" && r.length > 0)).toBe(true);
+  });
+
+  it("enforces receiptNo uniqueness per fee structure at the database level", async () => {
+    // Direct proof that `@@unique([feeStructureId, receiptNo])` is a real DB
+    // constraint, independent of `recordPayment`'s in-transaction counting.
+    // This is what a concurrent race that produces the same computed
+    // receiptNo twice would actually hit: the losing `tx.feePayment.create`
+    // fails with Prisma P2002 (unique constraint violation) inside the
+    // Serializable transaction, which surfaces to the caller as a
+    // transaction failure (P2034/P2028-style conflict) that the route's
+    // `recordPaymentWithRetry` already retries — the same retry mechanism
+    // proven for the amount-overpayment race in
+    // "does not lose a payment when two POSTs race on the same student/fee"
+    // above, and now shown here to also cover a receipt-number collision on
+    // the same unique index.
+    const { feeStructureId, studentId, schoolId, accountantId } = await seedFixtures();
+
+    await prisma.feePayment.create({
+      data: {
+        studentId,
+        feeStructureId,
+        amountPaid: 1000,
+        paidDate: new Date(),
+        mode: "cash",
+        receiptNo: "R-COLLIDE-0001",
+        recordedById: accountantId,
+      },
+    });
+
+    let caught: unknown;
+    try {
+      await prisma.feePayment.create({
+        data: {
+          studentId,
+          feeStructureId,
+          amountPaid: 500,
+          paidDate: new Date(),
+          mode: "cash",
+          receiptNo: "R-COLLIDE-0001",
+          recordedById: accountantId,
+        },
+      });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect((caught as Prisma.PrismaClientKnownRequestError).code).toBe("P2002");
+
+    const rows = await prisma.feePayment.findMany({ where: { studentId, feeStructureId } });
+    expect(rows).toHaveLength(1); // the colliding second create never committed
   });
 
   it("returns the full instalment history for a student", async () => {
