@@ -129,6 +129,7 @@ describe("getDashboardOverview", () => {
     await prisma.attendance.create({
       data: {
         studentId: fixtures.student.id,
+        academicYearId: fixtures.academicYear.id,
         date: today,
         status: "present",
         markedById: fixtures.teacher.id,
@@ -210,26 +211,26 @@ describe("getDashboardOverview", () => {
     // classA (fixtures.student): 3 present, 1 absent over the last 4 days -> 75%.
     await prisma.attendance.createMany({
       data: [
-        { studentId: fixtures.student.id, date: daysAgo(3), status: "present", markedById: fixtures.teacher.id },
-        { studentId: fixtures.student.id, date: daysAgo(2), status: "present", markedById: fixtures.teacher.id },
-        { studentId: fixtures.student.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
-        { studentId: fixtures.student.id, date: todayStart, status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: daysAgo(3), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: daysAgo(2), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: todayStart, status: "present", markedById: fixtures.teacher.id },
       ],
     });
 
     // classB (studentB): 1 present, 1 absent -> 50%.
     await prisma.attendance.createMany({
       data: [
-        { studentId: studentB.id, date: daysAgo(2), status: "present", markedById: fixtures.teacher.id },
-        { studentId: studentB.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
+        { studentId: studentB.id, academicYearId: fixtures.academicYear.id, date: daysAgo(2), status: "present", markedById: fixtures.teacher.id },
+        { studentId: studentB.id, academicYearId: fixtures.academicYear.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
       ],
     });
 
     // classC (studentC): all absent -> 0%.
     await prisma.attendance.createMany({
       data: [
-        { studentId: studentC.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
-        { studentId: studentC.id, date: todayStart, status: "absent", markedById: fixtures.teacher.id },
+        { studentId: studentC.id, academicYearId: fixtures.academicYear.id, date: daysAgo(1), status: "absent", markedById: fixtures.teacher.id },
+        { studentId: studentC.id, academicYearId: fixtures.academicYear.id, date: todayStart, status: "absent", markedById: fixtures.teacher.id },
       ],
     });
 

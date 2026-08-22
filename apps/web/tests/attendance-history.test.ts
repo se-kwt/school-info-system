@@ -19,12 +19,14 @@ describe("getParentAttendanceMonth", () => {
       data: [
         {
           studentId: fixtures.student.id,
+          academicYearId: fixtures.academicYear.id,
           date: new Date("2026-06-02"),
           status: "present",
           markedById: fixtures.teacher.id,
         },
         {
           studentId: fixtures.student.id,
+          academicYearId: fixtures.academicYear.id,
           date: new Date("2026-06-03"),
           status: "absent",
           markedById: fixtures.teacher.id,
@@ -88,10 +90,10 @@ describe("getParentAttendanceYearSummary", () => {
     const fixtures = await createSeedFixtures(prisma);
     await prisma.attendance.createMany({
       data: [
-        { studentId: fixtures.student.id, date: new Date("2026-06-02"), status: "present", markedById: fixtures.teacher.id },
-        { studentId: fixtures.student.id, date: new Date("2026-09-10"), status: "present", markedById: fixtures.teacher.id },
-        { studentId: fixtures.student.id, date: new Date("2026-12-15"), status: "absent", markedById: fixtures.teacher.id },
-        { studentId: fixtures.student.id, date: new Date("2027-02-01"), status: "late", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: new Date("2026-06-02"), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: new Date("2026-09-10"), status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: new Date("2026-12-15"), status: "absent", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: new Date("2027-02-01"), status: "late", markedById: fixtures.teacher.id },
       ],
     });
 

@@ -400,7 +400,7 @@ describe("/api/students/[id]", () => {
       admissionNo: "SCH-DEL-2",
     });
     await prisma.attendance.create({
-      data: { studentId: student.id, date: new Date("2026-07-01"), status: "present", markedById: teacher.id },
+      data: { studentId: student.id, academicYearId: year.id, date: new Date("2026-07-01"), status: "present", markedById: teacher.id },
     });
 
     const request = new Request(`http://localhost/api/students/${student.id}`, { method: "DELETE" });

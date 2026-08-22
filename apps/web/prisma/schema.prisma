@@ -273,17 +273,21 @@ model ClassTeacher {
 }
 
 model Attendance {
-  id         Int              @id @default(autoincrement())
-  student    Student          @relation(fields: [studentId], references: [id])
-  studentId  Int
-  date       DateTime
-  status     AttendanceStatus
-  markedBy   User             @relation("MarkedBy", fields: [markedById], references: [id])
-  markedById Int
-  note       String?
+  id             Int              @id @default(autoincrement())
+  student        Student          @relation(fields: [studentId], references: [id])
+  studentId      Int
+  academicYear   AcademicYear     @relation(fields: [academicYearId], references: [id])
+  academicYearId Int
+  date           DateTime
+  status         AttendanceStatus
+  markedBy       User             @relation("MarkedBy", fields: [markedById], references: [id])
+  markedById     Int
+  note           String?
 
   @@unique([studentId, date])
   @@index([markedById])
+  @@index([academicYearId])
+  @@index([date])
 }
 
 model Assignment {
@@ -463,6 +467,7 @@ model AcademicYear {
   runsFrom         PromotionRun[]   @relation("FromYear")
   runsTo           PromotionRun[]   @relation("ToYear")
   classes          Class[]
+  attendances      Attendance[]
 
   @@unique([schoolId, name])
 }

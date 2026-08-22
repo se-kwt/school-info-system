@@ -91,9 +91,9 @@ describe("getParentOverview", () => {
 
     await prisma.attendance.createMany({
       data: [
-        { studentId: fixtures.student.id, date: monthStart, status: "present", markedById: fixtures.teacher.id },
-        { studentId: fixtures.student.id, date: monthStart2, status: "absent", markedById: fixtures.teacher.id },
-        { studentId: fixtures.student.id, date: monthStart3, status: "late", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: monthStart, status: "present", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: monthStart2, status: "absent", markedById: fixtures.teacher.id },
+        { studentId: fixtures.student.id, academicYearId: fixtures.academicYear.id, date: monthStart3, status: "late", markedById: fixtures.teacher.id },
       ],
     });
 

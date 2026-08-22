@@ -298,7 +298,7 @@ describe("/api/attendance", () => {
   });
 
   it("computes an 80% monthly percentage from 4 attended out of 5 marked days", async () => {
-    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
     const statuses: Array<"present" | "absent" | "late"> = [
       "present",
       "present",
@@ -310,6 +310,7 @@ describe("/api/attendance", () => {
       await prisma.attendance.create({
         data: {
           studentId: student.id,
+          academicYearId: year.id,
           date: new Date(`2026-07-0${day}`),
           status: statuses[day - 1],
           markedById: teacher.id,
@@ -327,12 +328,13 @@ describe("/api/attendance", () => {
   });
 
   it("excludes attendance from a different month when computing monthPercent for a date on the 1st", async () => {
-    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
 
     // Two days in the previous month, both "absent" -- must NOT count toward July's percentage.
     await prisma.attendance.create({
       data: {
         studentId: student.id,
+        academicYearId: year.id,
         date: new Date(Date.UTC(2026, 5, 29)), // June 29, 2026
         status: "absent",
         markedById: teacher.id,
@@ -341,6 +343,7 @@ describe("/api/attendance", () => {
     await prisma.attendance.create({
       data: {
         studentId: student.id,
+        academicYearId: year.id,
         date: new Date(Date.UTC(2026, 5, 30)), // June 30, 2026
         status: "absent",
         markedById: teacher.id,
@@ -350,6 +353,7 @@ describe("/api/attendance", () => {
     await prisma.attendance.create({
       data: {
         studentId: student.id,
+        academicYearId: year.id,
         date: new Date(Date.UTC(2026, 6, 1)), // July 1, 2026
         status: "present",
         markedById: teacher.id,
@@ -369,9 +373,9 @@ describe("/api/attendance", () => {
   });
 
   it("deletes an existing attendance record when the entry status is null", async () => {
-    const { school, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
     await prisma.attendance.create({
-      data: { studentId: student.id, date: new Date(today), status: "present", markedById: teacher.id },
+      data: { studentId: student.id, academicYearId: year.id, date: new Date(today), status: "present", markedById: teacher.id },
     });
     loginAs(teacher.id, "teacher", school.id);
 
@@ -430,7 +434,7 @@ describe("/api/attendance", () => {
       admissionNo: "SCH-503",
     });
     await prisma.attendance.create({
-      data: { studentId: thirdStudent.id, date: new Date(today), status: "present", markedById: teacher.id },
+      data: { studentId: thirdStudent.id, academicYearId: year.id, date: new Date(today), status: "present", markedById: teacher.id },
     });
     loginAs(teacher.id, "teacher", school.id);
 
