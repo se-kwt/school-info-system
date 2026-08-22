@@ -429,6 +429,59 @@ describe("POST /api/marks", () => {
     expect(response.status).toBe(400);
   });
 
+  it("preserves isAbsent and remarks across a save that forwards them", async () => {
+    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
+    loginAs(teacher.id, "teacher", school.id);
+
+    // First save marks the student absent with a remark.
+    const firstRequest = new Request("http://localhost/api/marks", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        examId: exam.id,
+        subjectId: subject.id,
+        entries: [{ studentId: student.id, marksObtained: 0, isAbsent: true, remarks: "Sick leave" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    expect((await postMarks(firstRequest)).status).toBe(200);
+
+    // Re-saving with isAbsent/remarks forwarded (as MarksView.tsx's handleSave
+    // now does) must not clobber them back to false/null.
+    const secondRequest = new Request("http://localhost/api/marks", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        examId: exam.id,
+        subjectId: subject.id,
+        entries: [{ studentId: student.id, marksObtained: 0, isAbsent: true, remarks: "Sick leave" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    expect((await postMarks(secondRequest)).status).toBe(200);
+
+    const mark = await prisma.mark.findFirst({ where: { studentId: student.id, subjectId: subject.id } });
+    expect(mark).toMatchObject({ isAbsent: true, remarks: "Sick leave" });
+  });
+
+  it("rejects a non-boolean isAbsent with 400 instead of a Prisma 500", async () => {
+    const { school, klass, teacher, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
+    loginAs(teacher.id, "teacher", school.id);
+
+    const request = new Request("http://localhost/api/marks", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        examId: exam.id,
+        subjectId: subject.id,
+        entries: [{ studentId: student.id, marksObtained: 10, isAbsent: "no" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postMarks(request);
+    expect(response.status).toBe(400);
+  });
+
   it("rejects an admin attempting to POST with 403", async () => {
     const { school, klass, student, exam, subject } = await seedSchoolWithClassTeacherAndExam();
     const admin = await prisma.user.create({

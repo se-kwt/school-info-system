@@ -187,11 +187,13 @@ export function MarksView({
       const marksObtained = markValue === "" ? 0 : Number(markValue);
       const cell = student.marks[Number(entrySubjectId)];
       const isAbsent = cell?.isAbsent ?? false;
+      const remarks = cell?.remarks ?? null;
 
       return {
         studentId: student.studentId,
         marksObtained,
         isAbsent,
+        remarks,
       };
     });
 
@@ -219,6 +221,8 @@ export function MarksView({
         entries: entries.map((e) => ({
           studentId: e.studentId,
           marksObtained: e.marksObtained,
+          isAbsent: e.isAbsent,
+          remarks: e.remarks,
         })),
       }),
     });

@@ -61,7 +61,9 @@ export async function POST(request: Request) {
     let classId: number | undefined;
     let examId: number | undefined;
     let subjectId: number | undefined;
-    let entries: Array<{ studentId: number; marksObtained: number }> | undefined;
+    let entries:
+      | Array<{ studentId: number; marksObtained: number; isAbsent?: boolean; remarks?: string }>
+      | undefined;
     try {
       ({ classId, examId, subjectId, entries } = await request.json());
     } catch {
@@ -73,6 +75,13 @@ export async function POST(request: Request) {
         { error: "classId, examId, subjectId, and entries are required" },
         { status: 400 }
       );
+    }
+
+    const hasInvalidIsAbsent = entries.some(
+      (entry) => "isAbsent" in entry && entry.isAbsent !== undefined && typeof entry.isAbsent !== "boolean"
+    );
+    if (hasInvalidIsAbsent) {
+      return NextResponse.json({ error: "isAbsent must be a boolean" }, { status: 400 });
     }
 
     const yearResult = await resolveAcademicYear(prisma, claims.schoolId);

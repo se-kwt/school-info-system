@@ -177,4 +177,81 @@ describe("MarksView", () => {
     );
     expect(screen.getByText(/cannot be negative/i)).toBeInTheDocument();
   });
+
+  it("preserves an already-recorded isAbsent and remarks when saving marks for a different student", async () => {
+    // Regression test: handleSave used to build its request body with only
+    // { studentId, marksObtained }, dropping isAbsent/remarks entirely. The
+    // API route defaults missing isAbsent to false and missing remarks to
+    // null on every entry (both create AND update), so saving marks for one
+    // student silently wiped a previously-recorded absence/remark on every
+    // OTHER student in the same save. This test asserts the outgoing POST
+    // body actually carries forward what was loaded for the untouched,
+    // already-absent student.
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/marks?")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              subjects: [{ id: 1, name: "Math" }],
+              students: [
+                { studentId: 1, name: "Aadhya Reddy", marks: {} },
+                {
+                  studentId: 2,
+                  name: "Absent Student",
+                  marks: {
+                    1: {
+                      marksObtained: 0,
+                      maxMarks: 50,
+                      grade: "AB",
+                      isAbsent: true,
+                      remarks: "Sick leave",
+                    },
+                  },
+                },
+              ],
+            }),
+            { status: 200 }
+          )
+        );
+      }
+      if (url.startsWith("/api/marks") && init?.method === "POST") {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const exams = [
+      { id: 1, name: "Mid Term", term: "Term 1", examDate: "2026-08-15", published: false, maxMarks: 50 },
+    ];
+    const teacherSubjects = [{ classId: 1, subjectId: 1, subjectName: "Math" }];
+
+    render(<MarksView exams={exams} classes={classes} teacherSubjects={teacherSubjects} role="teacher" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Enter Marks")).toBeInTheDocument();
+    });
+
+    // Only touch the un-absent student; the absent student's cell is left alone.
+    const markInput = screen.getByLabelText("Marks for Aadhya Reddy");
+    await userEvent.type(markInput, "40");
+    await userEvent.click(screen.getByRole("button", { name: "Save Marks" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/marks",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    const postCall = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST"
+    );
+    const body = JSON.parse((postCall?.[1] as RequestInit).body as string);
+    const absentEntry = body.entries.find((e: { studentId: number }) => e.studentId === 2);
+
+    expect(absentEntry.isAbsent).toBe(true);
+    expect(absentEntry.remarks).toBe("Sick leave");
+  });
 });
