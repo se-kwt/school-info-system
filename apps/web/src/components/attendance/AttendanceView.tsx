@@ -40,6 +40,7 @@ export function AttendanceView({
   const [date, setDate] = useState(todayDateString());
   const [students, setStudents] = useState<RosterEntry[]>([]);
   const [statusMap, setStatusMap] = useState<Record<number, AttendanceStatusValue>>({});
+  const [notes, setNotes] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -49,10 +50,13 @@ export function AttendanceView({
   function applyRoster(roster: RosterEntry[]) {
     setStudents(roster);
     const nextStatusMap: Record<number, AttendanceStatusValue> = {};
+    const nextNotes: Record<number, string> = {};
     for (const student of roster) {
       nextStatusMap[student.studentId] = student.status;
+      nextNotes[student.studentId] = student.note ?? "";
     }
     setStatusMap(nextStatusMap);
+    setNotes(nextNotes);
   }
 
   useEffect(() => {
@@ -88,6 +92,10 @@ export function AttendanceView({
     }));
   }
 
+  function setNoteFor(studentId: number, value: string) {
+    setNotes((prev) => ({ ...prev, [studentId]: value }));
+  }
+
   async function handleConfirmSubmit() {
     setError(null);
     setMessage(null);
@@ -100,6 +108,7 @@ export function AttendanceView({
         entries: students.map((student) => ({
           studentId: student.studentId,
           status: statusMap[student.studentId] ?? null,
+          note: notes[student.studentId] || undefined,
         })),
       }),
     });
@@ -183,14 +192,29 @@ export function AttendanceView({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {students.map((student) => (
-          <StudentAttendanceCard
-            key={student.studentId}
-            name={student.name}
-            rollNumber={student.rollNumber}
-            photoUrl={student.photoUrl}
-            status={statusMap[student.studentId] ?? null}
-            onClick={isEditable ? () => cycleStudent(student.studentId) : () => {}}
-          />
+          <div key={student.studentId} className="flex flex-col gap-1">
+            <StudentAttendanceCard
+              name={student.name}
+              rollNumber={student.rollNumber}
+              photoUrl={student.photoUrl}
+              status={statusMap[student.studentId] ?? null}
+              onClick={isEditable ? () => cycleStudent(student.studentId) : () => {}}
+            />
+            {isEditable ? (
+              <input
+                type="text"
+                aria-label={`Note for ${student.name}`}
+                placeholder="Add a note"
+                value={notes[student.studentId] ?? ""}
+                onChange={(event) => setNoteFor(student.studentId, event.target.value)}
+                className={inputClass}
+              />
+            ) : (
+              notes[student.studentId] && (
+                <p className="px-1 text-[11px] text-neutral-400">{notes[student.studentId]}</p>
+              )
+            )}
+          </div>
         ))}
       </div>
 

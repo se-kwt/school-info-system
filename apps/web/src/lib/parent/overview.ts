@@ -63,6 +63,7 @@ export interface ParentAttendanceDay {
   dayOfMonth: number;
   weekday: number;
   status: "present" | "absent" | "late" | "half_day" | "excused" | "holiday" | null;
+  note?: string | null;
 }
 
 export interface ParentOverview {
@@ -92,7 +93,7 @@ export function attendancePercent(records: { status: string }[]): number {
 }
 
 export function buildAttendanceMonthDays(
-  records: { date: Date; status: string }[],
+  records: { date: Date; status: string; note?: string | null }[],
   year: number,
   month: number
 ): ParentAttendanceDay[] {
@@ -107,6 +108,7 @@ export function buildAttendanceMonthDays(
       dayOfMonth: day,
       weekday: cellDate.getUTCDay(),
       status: (record?.status as ParentAttendanceDay["status"]) ?? null,
+      note: record?.note ?? null,
     });
   }
   return days;
@@ -119,7 +121,7 @@ export async function getParentOverview(
   const { start, end } = monthRange();
   const attendanceRecords = await prisma.attendance.findMany({
     where: { studentId: params.studentId, date: { gte: start, lt: end } },
-    select: { date: true, status: true },
+    select: { date: true, status: true, note: true },
   });
   const attendanceMonthPercent = attendancePercent(attendanceRecords);
 

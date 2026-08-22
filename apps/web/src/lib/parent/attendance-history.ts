@@ -43,7 +43,7 @@ export async function getParentAttendanceMonth(
 
   const attendanceRecords = await prisma.attendance.findMany({
     where: { studentId: params.studentId, date: { gte: start, lt: end } },
-    select: { date: true, status: true },
+    select: { date: true, status: true, note: true },
   });
 
   const days = buildAttendanceMonthDays(attendanceRecords, year, month);

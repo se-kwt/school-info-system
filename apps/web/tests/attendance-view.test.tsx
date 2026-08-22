@@ -111,6 +111,37 @@ describe("AttendanceView", () => {
     expect(screen.getByLabelText("Attendance for Asha Verma, currently Present")).toBeInTheDocument();
   });
 
+  it("sends the typed note along with the status", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ students: roster }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AttendanceView classes={classes} role="teacher" />);
+    await waitFor(() => screen.getByText("Asha Verma"));
+
+    const card = screen.getByLabelText("Attendance for Asha Verma, currently Unmarked");
+    await userEvent.click(card);
+
+    await userEvent.type(screen.getByLabelText("Note for Asha Verma"), "Left early, dentist");
+
+    await userEvent.click(screen.getByRole("button", { name: "Submit All" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirm & Submit" }));
+
+    await waitFor(() => {
+      const postCall = fetchMock.mock.calls.find((call) => call[1]?.method === "POST");
+      expect(postCall).toBeTruthy();
+    });
+
+    const postCall = fetchMock.mock.calls.find((call) => call[1]?.method === "POST")!;
+    const body = JSON.parse(postCall[1]!.body as string);
+    const entry = body.entries.find((e: { studentId: number }) => e.studentId === 1);
+    expect(entry.note).toBe("Left early, dentist");
+  });
+
   it("is read-only for a teacher viewing a non-today date", async () => {
     render(<AttendanceView classes={classes} role="teacher" />);
     await waitFor(() => screen.getByText("Asha Verma"));

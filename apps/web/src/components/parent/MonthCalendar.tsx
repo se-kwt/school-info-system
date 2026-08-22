@@ -25,6 +25,7 @@ function LegendDot({ colorClassName, label }: { colorClassName: string; label: s
 
 export function MonthCalendar({ days }: { days: ParentAttendanceDay[] }) {
   const leadingBlanks = days.length > 0 ? days[0].weekday : 0;
+  const daysWithNotes = days.filter((day) => day.note);
 
   return (
     <div>
@@ -40,9 +41,10 @@ export function MonthCalendar({ days }: { days: ParentAttendanceDay[] }) {
         {days.map((day) => (
           <span
             key={day.date}
+            title={day.note ?? undefined}
             className={`flex h-6 w-6 items-center justify-center rounded text-[10px] font-semibold ${
               day.status ? ATTENDANCE_STATUS_CLASS[day.status] : "bg-neutral-100 text-neutral-400"
-            }`}
+            } ${day.note ? "ring-1 ring-neutral-400" : ""}`}
           >
             {day.dayOfMonth}
           </span>
@@ -54,6 +56,15 @@ export function MonthCalendar({ days }: { days: ParentAttendanceDay[] }) {
         <LegendDot colorClassName="bg-red-400" label="Absent" />
         <LegendDot colorClassName="bg-neutral-300" label="No record" />
       </div>
+      {daysWithNotes.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t border-neutral-100 pt-2">
+          {daysWithNotes.map((day) => (
+            <li key={day.date} className="text-[11px] text-neutral-500">
+              <span className="font-semibold text-neutral-700">{day.date}</span>: {day.note}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

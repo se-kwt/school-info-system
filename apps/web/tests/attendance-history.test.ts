@@ -49,6 +49,29 @@ describe("getParentAttendanceMonth", () => {
     expect(result.nextMonth).toBe("2026-07");
   });
 
+  it("includes the marked note on a day where one was recorded", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    await prisma.attendance.create({
+      data: {
+        studentId: fixtures.student.id,
+        academicYearId: fixtures.academicYear.id,
+        date: new Date("2026-06-02"),
+        status: "absent",
+        note: "Left early, dentist",
+        markedById: fixtures.teacher.id,
+      },
+    });
+
+    const result = await getParentAttendanceMonth(prisma, {
+      studentId: fixtures.student.id,
+      month: "2026-06",
+    });
+
+    const day = result.days.find((d) => d.dayOfMonth === 2);
+    expect(day?.note).toBe("Left early, dentist");
+    expect(result.days.find((d) => d.dayOfMonth === 3)?.note).toBeNull();
+  });
+
   it("defaults to the current month when month is omitted", async () => {
     const fixtures = await createSeedFixtures(prisma);
     const now = new Date();
