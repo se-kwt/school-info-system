@@ -303,7 +303,7 @@ describe("/api/attendance", () => {
       method: "POST",
       body: JSON.stringify({
         classId: klass.id,
-        date: "2020-01-01",
+        date: "2026-07-01",
         entries: [{ studentId: student.id, status: "present" }],
       }),
       headers: { "content-type": "application/json" },
@@ -519,5 +519,72 @@ describe("/api/attendance", () => {
 
     const record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
     expect(record?.academicYearId).toBe(year.id);
+  });
+
+  it("refuses an admin marking a date before the academic year starts", async () => {
+    const { school, klass, student } = await seedSchoolWithClassAndTeacher();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550008888", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        date: "2020-01-15",
+        entries: [{ studentId: student.id, status: "present" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postAttendance(request);
+    expect(response.status).toBe(400);
+
+    const record = await prisma.attendance.count({ where: { studentId: student.id } });
+    expect(record).toBe(0);
+  });
+
+  it("refuses an admin marking a date after the academic year ends", async () => {
+    const { school, klass, student } = await seedSchoolWithClassAndTeacher();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550009999", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        date: "2099-01-15",
+        entries: [{ studentId: student.id, status: "present" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postAttendance(request);
+    expect(response.status).toBe(400);
+  });
+
+  it("allows an admin marking a past date inside the academic year", async () => {
+    // yearId spans 2026-06-01 to 2027-04-30 in this file's fixture
+    const { school, klass, student } = await seedSchoolWithClassAndTeacher();
+    const admin = await prisma.user.create({
+      data: { phone: "+15550010101", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        date: "2026-06-15",
+        entries: [{ studentId: student.id, status: "present" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postAttendance(request);
+    expect(response.status).toBe(200);
+
+    const record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
+    expect(record?.status).toBe("present");
   });
 });

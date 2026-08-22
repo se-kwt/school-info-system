@@ -106,6 +106,12 @@ export async function POST(request: Request) {
           { status: 403 }
         );
       }
+      if (result.error === "DATE_OUTSIDE_YEAR") {
+        return NextResponse.json(
+          { error: "That date falls outside the academic year" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         { error: "One or more students do not belong to this class" },
         { status: 400 }

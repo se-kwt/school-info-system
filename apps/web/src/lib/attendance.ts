@@ -91,7 +91,8 @@ export type MarkAttendanceResult =
   | { ok: true }
   | { ok: false; error: "NOT_ASSIGNED" }
   | { ok: false; error: "STUDENT_MISMATCH" }
-  | { ok: false; error: "DATE_LOCKED" };
+  | { ok: false; error: "DATE_LOCKED" }
+  | { ok: false; error: "DATE_OUTSIDE_YEAR" };
 
 export async function markAttendance(
   prisma: PrismaClient,
@@ -128,6 +129,16 @@ export async function markAttendance(
       where: { id: params.classId, schoolId: params.schoolId },
     });
     if (!klass) return { ok: false, error: "NOT_ASSIGNED" };
+
+    const year = await prisma.academicYear.findFirst({
+      where: { id: params.academicYearId, schoolId: params.schoolId },
+    });
+    if (!year) return { ok: false, error: "NOT_ASSIGNED" };
+
+    const target = new Date(params.date);
+    if (target < year.startDate || target > year.endDate) {
+      return { ok: false, error: "DATE_OUTSIDE_YEAR" };
+    }
   }
 
   const enrolledCount = await prisma.enrollment.count({
