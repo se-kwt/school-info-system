@@ -32,7 +32,7 @@ describe("/api/exams", () => {
 
   it("creates an exam and lists it", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
-    await createActiveYear(prisma, school.id);
+    const year = await createActiveYear(prisma, school.id);
     const admin = await prisma.user.create({
       data: { phone: "+15550061111", role: "admin", name: "Test Admin", schoolId: school.id },
     });
@@ -53,8 +53,62 @@ describe("/api/exams", () => {
     expect(getResponse.status).toBe(200);
     const body = await getResponse.json();
     expect(body.exams).toEqual([
-      { id: created.id, name: "Mid-term", term: "Term 1", examDate: "2026-09-01" },
+      { id: created.id, name: "Mid-term", term: "Term 1", examDate: "2026-09-01", academicYearId: year.id },
     ]);
+  });
+
+  it("lists only the active year's exams, not a stale year's", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const staleYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2024-25",
+        startDate: new Date("2024-04-01"),
+        endDate: new Date("2025-03-31"),
+        status: "archived",
+      },
+    });
+    await prisma.exam.create({
+      data: {
+        schoolId: school.id,
+        academicYearId: staleYear.id,
+        name: "Old Midterm",
+        term: "Term 1",
+        examDate: new Date("2024-09-01"),
+      },
+    });
+    await prisma.exam.create({
+      data: {
+        schoolId: school.id,
+        academicYearId: year.id,
+        name: "Current Midterm",
+        term: "Term 1",
+        examDate: new Date("2026-09-01"),
+      },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550066666", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/exams");
+    const response = await getExams(request);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.exams.map((e: { name: string }) => e.name)).toEqual(["Current Midterm"]);
+  });
+
+  it("rejects GET when there is no active academic year", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550067777", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/exams");
+    const response = await getExams(request);
+    expect(response.status).toBe(400);
   });
 
   it("rejects a missing field with 400", async () => {
@@ -116,6 +170,7 @@ describe("/api/exams", () => {
 
   it("only lists exams belonging to the caller's school", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
     const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
     const otherYear = await createActiveYear(prisma, otherSchool.id);
     await prisma.exam.create({

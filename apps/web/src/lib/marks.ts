@@ -39,7 +39,9 @@ export async function getMarksForClassExam(
     if (!klass) return { ok: false, error: "INVALID_CLASS" };
   }
 
-  const exam = await prisma.exam.findFirst({ where: { id: params.examId, schoolId: params.schoolId } });
+  const exam = await prisma.exam.findFirst({
+    where: { id: params.examId, schoolId: params.schoolId, academicYearId: params.academicYearId },
+  });
   if (!exam) return { ok: false, error: "INVALID_EXAM" };
 
   const enrolled = await getEnrolledStudents(prisma, { classId: params.classId, academicYearId: params.academicYearId });
@@ -96,7 +98,9 @@ export async function enterMarks(
     entries: { studentId: number; marksObtained: number }[];
   }
 ): Promise<EnterMarksResult> {
-  const exam = await prisma.exam.findFirst({ where: { id: params.examId, schoolId: params.schoolId } });
+  const exam = await prisma.exam.findFirst({
+    where: { id: params.examId, schoolId: params.schoolId, academicYearId: params.academicYearId },
+  });
   if (!exam) return { ok: false, error: "INVALID_EXAM" };
 
   const link = await prisma.classTeacher.findFirst({

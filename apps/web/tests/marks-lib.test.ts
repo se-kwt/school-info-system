@@ -2,12 +2,14 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { createActiveYear } from "./helpers/enrollment";
 import { getMarksForClassExam, enterMarks } from "../src/lib/marks";
+import { createExam } from "../src/lib/exams";
 
 describe("marks lib subjectId", () => {
   let schoolId: number;
   let classId: number;
   let subjectId: number;
   let teacherId: number;
+  let adminId: number;
   let yearId: number;
   let examId: number;
   let studentId: number;
@@ -18,6 +20,8 @@ describe("marks lib subjectId", () => {
     schoolId = school.id;
     const teacher = await prisma.user.create({ data: { schoolId, phone: "+10000000001", role: "teacher", name: "Teacher One" } });
     teacherId = teacher.id;
+    const admin = await prisma.user.create({ data: { schoolId, phone: "+10000000009", role: "admin", name: "Admin One" } });
+    adminId = admin.id;
     const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
     const subject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Mathematics" } });
     subjectId = subject.id;
@@ -53,5 +57,44 @@ describe("marks lib subjectId", () => {
       entries: [{ studentId, marksObtained: 90 }],
     });
     expect(result).toEqual({ ok: false, error: "NOT_ASSIGNED" });
+  });
+
+  it("refuses to read marks for an exam from another year", async () => {
+    const staleYear = await prisma.academicYear.create({
+      data: { schoolId, name: "2024-25", startDate: new Date("2024-04-01"), endDate: new Date("2025-03-31"), status: "archived" },
+    });
+    const stale = await createExam(prisma, schoolId, staleYear.id, { name: "Old Midterm", term: "Term 1", examDate: "2024-09-01" });
+
+    const result = await getMarksForClassExam(prisma, {
+      classId,
+      examId: stale.id,
+      schoolId,
+      academicYearId: yearId,
+      role: "admin",
+      userId: adminId,
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_EXAM" });
+  });
+
+  it("refuses to enter marks against an exam from another year", async () => {
+    const staleYear = await prisma.academicYear.create({
+      data: { schoolId, name: "2024-25", startDate: new Date("2024-04-01"), endDate: new Date("2025-03-31"), status: "archived" },
+    });
+    const stale = await createExam(prisma, schoolId, staleYear.id, { name: "Old Midterm", term: "Term 1", examDate: "2024-09-01" });
+
+    const result = await enterMarks(prisma, {
+      classId,
+      examId: stale.id,
+      subjectId,
+      maxMarks: 100,
+      teacherUserId: teacherId,
+      schoolId,
+      academicYearId: yearId,
+      entries: [{ studentId, marksObtained: 80 }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_EXAM" });
+    expect(await prisma.mark.count({ where: { examId: stale.id } })).toBe(0);
   });
 });

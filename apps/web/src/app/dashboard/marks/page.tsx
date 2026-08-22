@@ -14,7 +14,7 @@ export default async function MarksPage() {
       ? await getClassesForTeacher(prisma, claims.userId, activeYear?.id ?? -1)
       : await listClasses(prisma, claims.schoolId);
 
-  const exams = await listExams(prisma, claims.schoolId);
+  const exams = activeYear ? await listExams(prisma, claims.schoolId, activeYear.id) : [];
 
   const teacherSubjectLinks =
     claims.role === "teacher"

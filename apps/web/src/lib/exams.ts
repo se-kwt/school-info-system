@@ -5,11 +5,16 @@ export interface ExamSummary {
   name: string;
   term: string;
   examDate: string;
+  academicYearId: number;
 }
 
-export async function listExams(prisma: PrismaClient, schoolId: number): Promise<ExamSummary[]> {
+export async function listExams(
+  prisma: PrismaClient,
+  schoolId: number,
+  academicYearId: number
+): Promise<ExamSummary[]> {
   const exams = await prisma.exam.findMany({
-    where: { schoolId },
+    where: { schoolId, academicYearId },
     orderBy: { examDate: "desc" },
   });
   return exams.map((exam) => ({
@@ -17,6 +22,7 @@ export async function listExams(prisma: PrismaClient, schoolId: number): Promise
     name: exam.name,
     term: exam.term,
     examDate: exam.examDate.toISOString().slice(0, 10),
+    academicYearId: exam.academicYearId,
   }));
 }
 

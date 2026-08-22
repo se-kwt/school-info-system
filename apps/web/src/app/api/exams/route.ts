@@ -8,7 +8,11 @@ import { resolveAcademicYear } from "@/lib/academic-years";
 export async function GET(request: Request) {
   try {
     const claims = await requireApiRole(["teacher", "admin"]);
-    const exams = await listExams(prisma, claims.schoolId);
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+    const exams = await listExams(prisma, claims.schoolId, yearResult.academicYear.id);
     return NextResponse.json({ exams });
   } catch (err) {
     if (err instanceof AuthError) {
