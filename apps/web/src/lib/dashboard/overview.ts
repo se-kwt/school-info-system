@@ -148,7 +148,11 @@ async function getAcademicOverview(
       where: { classId: { in: classIds }, dueDate: { gte: todayStart, lte: in7Days } },
     }),
     prisma.exam.count({
-      where: { schoolId: claims.schoolId, examDate: { gte: todayStart, lte: in7Days } },
+      where: {
+        schoolId: claims.schoolId,
+        academicYearId,
+        examDate: { gte: todayStart, lte: in7Days },
+      },
     }),
   ]);
   const upcomingCount = assignmentsDueCount + examsDueCount;

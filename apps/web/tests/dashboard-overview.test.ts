@@ -439,4 +439,61 @@ describe("getDashboardOverview", () => {
     expect(overview.feeStructureCollection[0].collectionPercent).toBe(50);
     expect(overview.outstandingAmount).toBe(1500);
   });
+
+  it("excludes exams from a different academic year even when their dates fall in the same upcoming window", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+
+    const todayStart = getSchoolLocalTodayStart();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const inDays = (n: number) => new Date(todayStart.getTime() + n * dayMs);
+
+    // A second academic year whose date range overlaps the same calendar
+    // window as the active year's upcoming-exam check -- this is the state
+    // the promotion machinery can produce.
+    const otherYear = await prisma.academicYear.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "2025-26",
+        startDate: new Date("2025-06-01"),
+        endDate: new Date("2026-12-31"),
+        status: "archived",
+      },
+    });
+
+    await prisma.exam.create({
+      data: {
+        schoolId: fixtures.school.id,
+        academicYearId: fixtures.academicYear.id,
+        name: "Current Year Midterm",
+        term: "Term 1",
+        examDate: inDays(3),
+        maxMarks: 100,
+        passMarks: 35,
+      },
+    });
+
+    await prisma.exam.create({
+      data: {
+        schoolId: fixtures.school.id,
+        academicYearId: otherYear.id,
+        name: "Other Year Midterm",
+        term: "Term 1",
+        examDate: inDays(3),
+        maxMarks: 100,
+        passMarks: 35,
+      },
+    });
+
+    const claims: SessionClaims = {
+      userId: fixtures.admin.id,
+      role: "admin",
+      schoolId: fixtures.school.id,
+    };
+    const overview = await getDashboardOverview(prisma, claims);
+
+    if (overview.role === "accountant") throw new Error("unexpected role");
+    // Only assignmentsDueCount (0 here) + the current-year exam (1) should
+    // be counted; the other academic year's exam must not leak in.
+    expect(overview.upcomingCount).toBe(1);
+  });
 });
