@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getAcademicYears, POST as postAcademicYears } from "../src/app/api/academic-years/route";
+import { activateAcademicYear, archiveAcademicYear, getActiveAcademicYear } from "../src/lib/academic-years";
 
 describe("/api/academic-years", () => {
   beforeEach(async () => {
@@ -227,5 +228,104 @@ describe("/api/academic-years", () => {
 
     const count = await prisma.academicYear.count({ where: { schoolId: school.id } });
     expect(count).toBe(4);
+  });
+
+  it("activates an upcoming year and archives the previously active one", async () => {
+    const school = await prisma.school.create({ data: { name: "Rollover School" } });
+    const current = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+    });
+    const next = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+    });
+
+    const result = await activateAcademicYear(prisma, {
+      academicYearId: next.id,
+      schoolId: school.id,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect((await prisma.academicYear.findUnique({ where: { id: next.id } }))?.status).toBe("active");
+    expect((await prisma.academicYear.findUnique({ where: { id: current.id } }))?.status).toBe("archived");
+  });
+
+  it("activates the first year of a school that has none active", async () => {
+    const school = await prisma.school.create({ data: { name: "Fresh School" } });
+    const only = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "upcoming" },
+    });
+
+    const result = await activateAcademicYear(prisma, {
+      academicYearId: only.id,
+      schoolId: school.id,
+    });
+
+    expect(result).toEqual({ ok: true });
+    const active = await getActiveAcademicYear(prisma, school.id);
+    expect(active?.id).toBe(only.id);
+  });
+
+  it("refuses to activate a year belonging to another school", async () => {
+    const schoolA = await prisma.school.create({ data: { name: "School A" } });
+    const schoolB = await prisma.school.create({ data: { name: "School B" } });
+    const foreign = await prisma.academicYear.create({
+      data: { schoolId: schoolB.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "upcoming" },
+    });
+
+    const result = await activateAcademicYear(prisma, {
+      academicYearId: foreign.id,
+      schoolId: schoolA.id,
+    });
+
+    expect(result).toEqual({ ok: false, error: "NOT_FOUND" });
+    expect((await prisma.academicYear.findUnique({ where: { id: foreign.id } }))?.status).toBe("upcoming");
+  });
+
+  it("refuses to re-activate an archived year", async () => {
+    const school = await prisma.school.create({ data: { name: "Archive School" } });
+    const old = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2024-25", startDate: new Date("2024-04-01"), endDate: new Date("2025-03-31"), status: "archived" },
+    });
+
+    const result = await activateAcademicYear(prisma, {
+      academicYearId: old.id,
+      schoolId: school.id,
+    });
+
+    expect(result).toEqual({ ok: false, error: "ALREADY_ARCHIVED" });
+  });
+
+  it("refuses to archive the only active year", async () => {
+    const school = await prisma.school.create({ data: { name: "Sole Year School" } });
+    const only = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+    });
+
+    const result = await archiveAcademicYear(prisma, {
+      academicYearId: only.id,
+      schoolId: school.id,
+    });
+
+    expect(result).toEqual({ ok: false, error: "LAST_ACTIVE_YEAR" });
+    expect((await prisma.academicYear.findUnique({ where: { id: only.id } }))?.status).toBe("active");
+  });
+
+  it("archives an upcoming year without touching the active one", async () => {
+    const school = await prisma.school.create({ data: { name: "Cancel School" } });
+    const current = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+    });
+    const cancelled = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+    });
+
+    const result = await archiveAcademicYear(prisma, {
+      academicYearId: cancelled.id,
+      schoolId: school.id,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect((await prisma.academicYear.findUnique({ where: { id: cancelled.id } }))?.status).toBe("archived");
+    expect((await prisma.academicYear.findUnique({ where: { id: current.id } }))?.status).toBe("active");
   });
 });

@@ -79,3 +79,60 @@ export async function createAcademicYear(
   });
   return { ok: true, id: created.id };
 }
+
+export type ActivateAcademicYearResult =
+  | { ok: true }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "ALREADY_ARCHIVED" };
+
+export async function activateAcademicYear(
+  prisma: PrismaClient,
+  params: { academicYearId: number; schoolId: number }
+): Promise<ActivateAcademicYearResult> {
+  const target = await prisma.academicYear.findFirst({
+    where: { id: params.academicYearId, schoolId: params.schoolId },
+  });
+  if (!target) return { ok: false, error: "NOT_FOUND" };
+  if (target.status === "archived") return { ok: false, error: "ALREADY_ARCHIVED" };
+  if (target.status === "active") return { ok: true };
+
+  await prisma.$transaction([
+    prisma.academicYear.updateMany({
+      where: { schoolId: params.schoolId, status: "active" },
+      data: { status: "archived" },
+    }),
+    prisma.academicYear.update({
+      where: { id: params.academicYearId },
+      data: { status: "active" },
+    }),
+  ]);
+
+  return { ok: true };
+}
+
+export type ArchiveAcademicYearResult =
+  | { ok: true }
+  | { ok: false; error: "NOT_FOUND" }
+  | { ok: false; error: "LAST_ACTIVE_YEAR" };
+
+export async function archiveAcademicYear(
+  prisma: PrismaClient,
+  params: { academicYearId: number; schoolId: number }
+): Promise<ArchiveAcademicYearResult> {
+  const target = await prisma.academicYear.findFirst({
+    where: { id: params.academicYearId, schoolId: params.schoolId },
+  });
+  if (!target) return { ok: false, error: "NOT_FOUND" };
+  if (target.status === "archived") return { ok: true };
+
+  if (target.status === "active") {
+    return { ok: false, error: "LAST_ACTIVE_YEAR" };
+  }
+
+  await prisma.academicYear.update({
+    where: { id: params.academicYearId },
+    data: { status: "archived" },
+  });
+
+  return { ok: true };
+}
