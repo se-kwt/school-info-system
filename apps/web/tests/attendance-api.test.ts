@@ -182,6 +182,47 @@ describe("/api/attendance", () => {
     expect(records[0].status).toBe("absent");
   });
 
+  it("preserves academicYearId when re-marking the same student+date (update branch never touches year)", async () => {
+    const { school, year, klass, teacher, student } = await seedSchoolWithClassAndTeacher();
+    loginAs(teacher.id, "teacher", school.id);
+
+    // First mark: create the attendance record with academicYearId
+    const firstRequest = new Request("http://localhost/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        date: today,
+        entries: [{ studentId: student.id, status: "present" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const firstResponse = await postAttendance(firstRequest);
+    expect(firstResponse.status).toBe(200);
+
+    // Verify the record was created with the correct academicYearId
+    let record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
+    expect(record?.academicYearId).toBe(year.id);
+    expect(record?.status).toBe("present");
+
+    // Second mark: update the same record with a different status
+    const secondRequest = new Request("http://localhost/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        date: today,
+        entries: [{ studentId: student.id, status: "absent" }],
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const secondResponse = await postAttendance(secondRequest);
+    expect(secondResponse.status).toBe(200);
+
+    // Verify the record was updated (not recreated) and academicYearId was NOT modified
+    record = await prisma.attendance.findFirst({ where: { studentId: student.id } });
+    expect(record?.academicYearId).toBe(year.id);
+    expect(record?.status).toBe("absent");
+  });
+
   it("rejects a studentId that doesn't belong to the class with 400", async () => {
     const { school, year, klass, teacher } = await seedSchoolWithClassAndTeacher();
     const otherClass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 6", section: "B" });
