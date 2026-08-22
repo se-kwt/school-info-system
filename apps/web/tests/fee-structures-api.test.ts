@@ -168,6 +168,94 @@ describe("/api/fee-structures", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a classId from a different year with 400 on create", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await createActiveYear(prisma, school.id);
+    const staleYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2025-26",
+        startDate: new Date("2025-04-01"),
+        endDate: new Date("2026-03-31"),
+        status: "archived",
+      },
+    });
+    const staleClass = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: staleYear.id,
+      name: "Grade 5",
+      section: "A",
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550098888", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/fee-structures", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: staleClass.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: "2026-06-01",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postFeeStructures(request);
+    expect(response.status).toBe(400);
+    expect(await prisma.feeStructure.count({ where: { classId: staleClass.id } })).toBe(0);
+  });
+
+  it("lists only the requested year's fee structures", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const activeYear = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: activeYear.id,
+      name: "Grade 5",
+      section: "A",
+    });
+    const staleYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2025-26",
+        startDate: new Date("2025-04-01"),
+        endDate: new Date("2026-03-31"),
+        status: "archived",
+      },
+    });
+    await prisma.feeStructure.create({
+      data: {
+        schoolId: school.id,
+        academicYearId: staleYear.id,
+        classId: klass.id,
+        term: "Old Term",
+        amount: 100,
+        dueDate: new Date("2025-06-01"),
+      },
+    });
+    await prisma.feeStructure.create({
+      data: {
+        schoolId: school.id,
+        academicYearId: activeYear.id,
+        classId: klass.id,
+        term: "Current Term",
+        amount: 200,
+        dueDate: new Date("2026-06-01"),
+      },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550099999", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request(`http://localhost/api/fee-structures?classId=${klass.id}`);
+    const response = await getFeeStructures(request);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.feeStructures.map((f: { term: string }) => f.term)).toEqual(["Current Term"]);
+  });
+
   it("rejects a missing classId with 400", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const admin = await prisma.user.create({

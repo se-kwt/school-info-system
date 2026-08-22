@@ -19,7 +19,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "classId is required" }, { status: 400 });
     }
 
-    const result = await listFeeStructures(prisma, { classId, schoolId: claims.schoolId });
+    const yearResult = await resolveAcademicYear(prisma, claims.schoolId);
+    if (!yearResult.ok) {
+      return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
+    }
+
+    const result = await listFeeStructures(prisma, {
+      classId,
+      schoolId: claims.schoolId,
+      academicYearId: yearResult.academicYear.id,
+    });
 
     if (!result.ok) {
       return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
