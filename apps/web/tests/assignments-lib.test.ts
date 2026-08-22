@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { createActiveYear } from "./helpers/enrollment";
-import { createAssignment, listAssignments, editAssignment } from "../src/lib/assignments";
+import { createAssignment, listAssignments, editAssignment, getAssignmentStatuses, updateAssignmentStatuses } from "../src/lib/assignments";
 
 describe("assignments lib subjectId", () => {
   let schoolId: number;
@@ -150,5 +150,37 @@ describe("assignments lib subjectId", () => {
     expect(result).toEqual({ ok: true });
     const updated = await prisma.assignment.findUnique({ where: { id: created.id } });
     expect(updated?.subjectId).toBe(secondSubject.id);
+  });
+
+  it("refuses status updates from a teacher who teaches the class but not the subject", async () => {
+    const otherSubject = await prisma.subject.create({
+      data: { gradeId, name: "Music" },
+    });
+    const musicTeacher = await prisma.user.create({
+      data: { schoolId, phone: "+10000000099", role: "teacher", name: "Music Teacher" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId, subjectId: otherSubject.id, teacherUserId: musicTeacher.id, academicYearId: yearId },
+    });
+
+    const created = await createAssignment(prisma, {
+      classId,
+      teacherUserId: teacherId,
+      subjectId,
+      title: "Maths homework",
+      dueDate: "2026-09-01",
+      academicYearId: yearId,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const result = await updateAssignmentStatuses(prisma, {
+      assignmentId: created.id,
+      schoolId,
+      teacherUserId: musicTeacher.id,
+      entries: [],
+    });
+
+    expect(result).toEqual({ ok: false, error: "NOT_ASSIGNED" });
   });
 });

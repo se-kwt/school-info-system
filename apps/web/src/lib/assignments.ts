@@ -260,14 +260,13 @@ export async function getAssignmentStatuses(
   if (!assignment || assignment.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
 
   if (params.role === "teacher") {
-    const link = await prisma.classTeacher.findFirst({
-      where: {
-        classId: assignment.classId,
-        teacherUserId: params.userId,
-        academicYearId: assignment.academicYearId,
-      },
+    const owns = await assertTeacherOwnsSubject(prisma, {
+      classId: assignment.classId,
+      subjectId: assignment.subjectId,
+      teacherUserId: params.userId,
+      academicYearId: assignment.academicYearId,
     });
-    if (!link) return { ok: false, error: "NOT_ASSIGNED" };
+    if (!owns) return { ok: false, error: "NOT_ASSIGNED" };
   }
 
   const statuses = await prisma.assignmentStatus.findMany({
@@ -307,14 +306,13 @@ export async function updateAssignmentStatuses(
   });
   if (!assignment || assignment.class.schoolId !== params.schoolId) return { ok: false, error: "NOT_FOUND" };
 
-  const link = await prisma.classTeacher.findFirst({
-    where: {
-      classId: assignment.classId,
-      teacherUserId: params.teacherUserId,
-      academicYearId: assignment.academicYearId,
-    },
+  const owns = await assertTeacherOwnsSubject(prisma, {
+    classId: assignment.classId,
+    subjectId: assignment.subjectId,
+    teacherUserId: params.teacherUserId,
+    academicYearId: assignment.academicYearId,
   });
-  if (!link) return { ok: false, error: "NOT_ASSIGNED" };
+  if (!owns) return { ok: false, error: "NOT_ASSIGNED" };
 
   const enrolledCount = await prisma.enrollment.count({
     where: {
