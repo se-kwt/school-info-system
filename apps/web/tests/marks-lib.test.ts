@@ -175,4 +175,26 @@ describe("marks lib subjectId", () => {
       })
     ).resolves.toEqual({ ok: false, error: "INVALID_PASS_MARKS" });
   });
+
+  it("lets a teacher enter and read marks against an unpublished exam", async () => {
+    const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } });
+    expect(exam.published).toBe(false);
+
+    const enterResult = await enterMarks(prisma, {
+      classId, examId, subjectId, teacherUserId: teacherId, schoolId, academicYearId: yearId,
+      entries: [{ studentId, marksObtained: 90 }],
+    });
+    expect(enterResult).toEqual({ ok: true });
+
+    const marks = await getMarksForClassExam(prisma, {
+      classId,
+      examId,
+      schoolId,
+      academicYearId: yearId,
+      role: "teacher",
+      userId: teacherId,
+    });
+    if (!marks.ok) throw new Error("expected ok");
+    expect(marks.students[0].marks[subjectId]).toEqual({ marksObtained: 90, maxMarks: 100, grade: "A" });
+  });
 });

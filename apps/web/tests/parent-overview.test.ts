@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { createSeedFixtures } from "../prisma/fixtures";
 import { getParentChildren, getParentChildrenWithClass, getParentOverview } from "../src/lib/parent/overview";
+import { setExamPublished } from "../src/lib/exams";
 
 describe("getParentChildren", () => {
   beforeEach(async () => {
@@ -286,6 +287,51 @@ describe("getParentOverview", () => {
     });
 
     expect(overview.latestExam).toBeNull();
+  });
+
+  it("shows the latestExam tile once the exam is published", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const exam = await prisma.exam.create({
+      data: {
+        schoolId: fixtures.school.id,
+        name: "Mid Term",
+        term: "Term 1",
+        examDate: new Date("2026-08-01"),
+        academicYearId: fixtures.academicYear.id,
+        maxMarks: 100,
+        passMarks: 40,
+      },
+    });
+    const mathSubject = await prisma.subject.findFirstOrThrow({
+      where: { gradeId: fixtures.classA.gradeId, name: "Mathematics" },
+    });
+    await prisma.mark.create({
+      data: { examId: exam.id, studentId: fixtures.student.id, subjectId: mathSubject.id, marksObtained: 80, maxMarks: 100, grade: "B" },
+    });
+
+    const beforePublish = await getParentOverview(prisma, {
+      studentId: fixtures.student.id,
+      schoolId: fixtures.school.id,
+    });
+    expect(beforePublish.latestExam).toBeNull();
+
+    const publishResult = await setExamPublished(prisma, {
+      examId: exam.id,
+      schoolId: fixtures.school.id,
+      published: true,
+    });
+    expect(publishResult).toEqual({ ok: true });
+
+    const afterPublish = await getParentOverview(prisma, {
+      studentId: fixtures.student.id,
+      schoolId: fixtures.school.id,
+    });
+
+    expect(afterPublish.latestExam?.examName).toBe("Mid Term");
+    expect(afterPublish.latestExam?.term).toBe("Term 1");
+    expect(afterPublish.latestExam?.subjects).toEqual([
+      { subjectId: mathSubject.id, subjectName: "Mathematics", marksObtained: 80, maxMarks: 100, grade: "B" },
+    ]);
   });
 
   it("sums outstanding fee amounts and finds the nearest unpaid due date", async () => {
