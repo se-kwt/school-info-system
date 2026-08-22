@@ -1074,6 +1074,12 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
 
     const run = await prisma.promotionRun.findUnique({ where: { id: runId } });
     expect(run?.status).toBe("reverted");
+
+    // Regression guard for the predicate-based demote inside the transaction:
+    // exactly one year should be active afterwards, and it must be fromYear.
+    const activeYears = await prisma.academicYear.findMany({ where: { schoolId: school.id, status: "active" } });
+    expect(activeYears).toHaveLength(1);
+    expect(activeYears[0]?.id).toBe(fromYear.id);
   });
 
   it("rejects reverting once the new year has activity recorded against it", async () => {
@@ -1103,16 +1109,17 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
     expect(result).toEqual({ ok: false, error: "NOT_CONFIRMED" });
   });
 
-  it("reverts successfully when an unrelated third year was activated mid-run", async () => {
+  it("refuses to revert when an unrelated third year was activated mid-run", async () => {
     const { confirmPromotionRun, revertPromotionRun } = await import("../src/lib/promotion");
     const { activateAcademicYear } = await import("../src/lib/academic-years");
     const { school, fromYear, toYear, runId } = await seedReadyRun();
 
     await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
 
-    // Simulate an admin activating an unrelated, third year through the UI
-    // after confirmation but before revert. This archives toYear (which the
-    // run still remembers as its "to" year) and activates thirdYear instead.
+    // Simulate an admin deliberately activating an unrelated, third year
+    // through the UI after confirmation but before revert. This archives
+    // toYear (which the run still remembers as its "to" year) and activates
+    // thirdYear instead.
     const thirdYear = await prisma.academicYear.create({
       data: {
         schoolId: school.id,
@@ -1125,26 +1132,23 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
     const activated = await activateAcademicYear(prisma, { academicYearId: thirdYear.id, schoolId: school.id });
     expect(activated).toEqual({ ok: true });
 
-    // Before the fix, this threw an unhandled Postgres unique-violation:
-    // revertPromotionRun demoted toYear (a no-op, already archived) then
-    // tried to activate fromYear directly, colliding with thirdYear which is
-    // currently active.
+    // The predicate-based demote inside the transaction would otherwise demote
+    // thirdYear silently and reactivate fromYear in its place -- undoing an
+    // admin's deliberate choice with no warning. The pre-check must refuse
+    // instead, before any write happens.
     const result = await revertPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: false, error: "ANOTHER_YEAR_ACTIVE" });
 
-    const revertedFromYear = await prisma.academicYear.findUnique({ where: { id: fromYear.id } });
-    expect(revertedFromYear?.status).toBe("active");
-    // toYear was already archived by the third-year activation (a no-op for
-    // the predicate-based demote below); it is thirdYear -- the year that was
-    // actually active at the time of revert -- that gets demoted to upcoming.
-    const revertedToYear = await prisma.academicYear.findUnique({ where: { id: toYear.id } });
-    expect(revertedToYear?.status).toBe("archived");
-    const revertedThirdYear = await prisma.academicYear.findUnique({ where: { id: thirdYear.id } });
-    expect(revertedThirdYear?.status).toBe("upcoming");
-
-    const activeYears = await prisma.academicYear.findMany({ where: { schoolId: school.id, status: "active" } });
-    expect(activeYears).toHaveLength(1);
-    expect(activeYears[0]?.id).toBe(fromYear.id);
+    // Nothing should have changed: thirdYear is still active, fromYear and
+    // toYear are untouched, and the run is still just "confirmed".
+    const unchangedThirdYear = await prisma.academicYear.findUnique({ where: { id: thirdYear.id } });
+    expect(unchangedThirdYear?.status).toBe("active");
+    const unchangedFromYear = await prisma.academicYear.findUnique({ where: { id: fromYear.id } });
+    expect(unchangedFromYear?.status).toBe("archived");
+    const unchangedToYear = await prisma.academicYear.findUnique({ where: { id: toYear.id } });
+    expect(unchangedToYear?.status).toBe("archived");
+    const run = await prisma.promotionRun.findUnique({ where: { id: runId } });
+    expect(run?.status).toBe("confirmed");
   });
 
   it("is not blocked by another school's attendance in the same date range", async () => {

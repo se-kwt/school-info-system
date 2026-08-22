@@ -463,7 +463,8 @@ export type RevertPromotionRunResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "NOT_CONFIRMED" }
-  | { ok: false; error: "YEAR_HAS_ACTIVITY" };
+  | { ok: false; error: "YEAR_HAS_ACTIVITY" }
+  | { ok: false; error: "ANOTHER_YEAR_ACTIVE" };
 
 export async function revertPromotionRun(
   prisma: PrismaClient,
@@ -496,6 +497,20 @@ export async function revertPromotionRun(
   ) {
     return { ok: false, error: "YEAR_HAS_ACTIVITY" };
   }
+
+  // Refuse rather than silently demote a genuinely unrelated third year that an
+  // admin may have deliberately activated after this run was confirmed. This is
+  // distinct from the predicate-based demote inside the transaction below, which
+  // still safely handles the expected case where toAcademicYearId is the one
+  // active year being demoted.
+  const otherActive = await prisma.academicYear.findFirst({
+    where: {
+      schoolId: params.schoolId,
+      status: "active",
+      id: { notIn: [run.fromAcademicYearId, run.toAcademicYearId] },
+    },
+  });
+  if (otherActive) return { ok: false, error: "ANOTHER_YEAR_ACTIVE" };
 
   const logEntries = await prisma.promotionLogEntry.findMany({
     where: { promotionRunId: params.promotionRunId },

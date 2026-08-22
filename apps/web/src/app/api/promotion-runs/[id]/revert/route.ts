@@ -21,6 +21,12 @@ export async function POST(_request: Request, props: { params: Promise<{ id: str
       if (result.error === "NOT_CONFIRMED") {
         return NextResponse.json({ error: "This promotion run was never confirmed" }, { status: 400 });
       }
+      if (result.error === "ANOTHER_YEAR_ACTIVE") {
+        return NextResponse.json(
+          { error: "Another academic year is currently active — archive it before reverting" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         { error: "This promotion can no longer be undone - the new year already has data recorded against it" },
         { status: 400 }
