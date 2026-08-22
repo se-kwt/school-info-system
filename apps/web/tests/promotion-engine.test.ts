@@ -173,7 +173,7 @@ describe("updateMappings", () => {
     });
     const gradeTwo = await createClass(prisma, {
       schoolId: school.id,
-      academicYearId: fromYear.id,
+      academicYearId: toYear.id,
       name: "Grade 2",
       section: "A",
     });
@@ -266,6 +266,270 @@ describe("updateMappings", () => {
     });
     expect(result).toEqual({ ok: false, error: "INVALID_MAPPING" });
   });
+
+  it("rejects a mapping whose target class belongs to another school", async () => {
+    const { startOrResumePromotionRun, updateMappings } = await import("../src/lib/promotion");
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const fromYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2026-27",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2027-04-30"),
+        status: "active",
+      },
+    });
+    const toYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2027-28",
+        startDate: new Date("2027-06-01"),
+        endDate: new Date("2028-04-30"),
+        status: "upcoming",
+      },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550983333", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
+    });
+    const student = await prisma.student.create({
+      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-3" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: student.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },
+    });
+
+    const started = await startOrResumePromotionRun(prisma, {
+      schoolId: school.id,
+      initiatedById: admin.id,
+      toAcademicYearId: toYear.id,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    const otherSchool = await prisma.school.create({ data: { name: "Other School" } });
+    const otherYear = await prisma.academicYear.create({
+      data: {
+        schoolId: otherSchool.id,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "upcoming",
+      },
+    });
+    const otherGrade = await prisma.grade.create({
+      data: { schoolId: otherSchool.id, name: "Grade 2" },
+    });
+    const foreignClass = await prisma.class.create({
+      data: {
+        schoolId: otherSchool.id,
+        gradeId: otherGrade.id,
+        section: "A",
+        academicYearId: otherYear.id,
+      },
+    });
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: started.id,
+      schoolId: school.id,
+      mappings: [{ fromClassId: gradeOne.id, toClassId: foreignClass.id }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_TARGET_CLASS" });
+
+    const stored = await prisma.promotionMapping.findFirst({
+      where: { promotionRunId: started.id, fromClassId: gradeOne.id },
+    });
+    expect(stored?.toClassId).not.toBe(foreignClass.id);
+  });
+
+  it("rejects a mapping whose target class is in the wrong academic year", async () => {
+    const { startOrResumePromotionRun, updateMappings } = await import("../src/lib/promotion");
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const fromYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2026-27",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2027-04-30"),
+        status: "active",
+      },
+    });
+    const toYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2027-28",
+        startDate: new Date("2027-06-01"),
+        endDate: new Date("2028-04-30"),
+        status: "upcoming",
+      },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550984444", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
+    });
+    const student = await prisma.student.create({
+      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-4" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: student.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },
+    });
+
+    const started = await startOrResumePromotionRun(prisma, {
+      schoolId: school.id,
+      initiatedById: admin.id,
+      toAcademicYearId: toYear.id,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    const staleYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2024-25",
+        startDate: new Date("2024-04-01"),
+        endDate: new Date("2025-03-31"),
+        status: "archived",
+      },
+    });
+    const staleClass = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: gradeOne.gradeId, section: "Z", academicYearId: staleYear.id },
+    });
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: started.id,
+      schoolId: school.id,
+      mappings: [{ fromClassId: gradeOne.id, toClassId: staleClass.id }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_TARGET_CLASS" });
+  });
+
+  it("rejects a mapping whose target class is archived", async () => {
+    const { startOrResumePromotionRun, updateMappings } = await import("../src/lib/promotion");
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const fromYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2026-27",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2027-04-30"),
+        status: "active",
+      },
+    });
+    const toYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2027-28",
+        startDate: new Date("2027-06-01"),
+        endDate: new Date("2028-04-30"),
+        status: "upcoming",
+      },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550985555", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
+    });
+    const student = await prisma.student.create({
+      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-5" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: student.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },
+    });
+
+    const started = await startOrResumePromotionRun(prisma, {
+      schoolId: school.id,
+      initiatedById: admin.id,
+      toAcademicYearId: toYear.id,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    const archivedClass = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: gradeOne.gradeId, section: "Y", academicYearId: toYear.id, archived: true },
+    });
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: started.id,
+      schoolId: school.id,
+      mappings: [{ fromClassId: gradeOne.id, toClassId: archivedClass.id }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_TARGET_CLASS" });
+  });
+
+  it("still accepts a valid target class in the run's target year", async () => {
+    const { startOrResumePromotionRun, updateMappings } = await import("../src/lib/promotion");
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const fromYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2026-27",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2027-04-30"),
+        status: "active",
+      },
+    });
+    const toYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2027-28",
+        startDate: new Date("2027-06-01"),
+        endDate: new Date("2028-04-30"),
+        status: "upcoming",
+      },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550986666", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    const gradeOne = await createClass(prisma, {
+      schoolId: school.id,
+      academicYearId: fromYear.id,
+      name: "Grade 1",
+      section: "A",
+    });
+    const student = await prisma.student.create({
+      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-6" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: student.id, classId: gradeOne.id, academicYearId: fromYear.id, status: "active" },
+    });
+
+    const started = await startOrResumePromotionRun(prisma, {
+      schoolId: school.id,
+      initiatedById: admin.id,
+      toAcademicYearId: toYear.id,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    const validClass = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: gradeOne.gradeId, section: "B", academicYearId: toYear.id },
+    });
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: started.id,
+      schoolId: school.id,
+      mappings: [{ fromClassId: gradeOne.id, toClassId: validClass.id }],
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
 });
 
 describe("getRosterForReview / setStudentDecisions / getRunSummary", () => {
@@ -309,7 +573,7 @@ describe("getRosterForReview / setStudentDecisions / getRunSummary", () => {
     });
     const gradeTwo = await createClass(prisma, {
       schoolId: school.id,
-      academicYearId: fromYear.id,
+      academicYearId: toYear.id,
       name: "Grade 2",
       section: "A",
     });
@@ -406,6 +670,46 @@ describe("getRosterForReview / setStudentDecisions / getRunSummary", () => {
     expect(result).toEqual({ ok: false, error: "MISSING_TARGET_CLASS" });
   });
 
+  it("rejects a decision whose toClassId belongs to another school", async () => {
+    const { setStudentDecisions } = await import("../src/lib/promotion");
+    const { school, runId, studentA } = await seedRunWithTwoStudents();
+
+    const otherSchool = await prisma.school.create({ data: { name: "Other School 2" } });
+    const otherYear = await prisma.academicYear.create({
+      data: {
+        schoolId: otherSchool.id,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "upcoming",
+      },
+    });
+    const otherGrade = await prisma.grade.create({
+      data: { schoolId: otherSchool.id, name: "Grade 2" },
+    });
+    const foreignClass = await prisma.class.create({
+      data: {
+        schoolId: otherSchool.id,
+        gradeId: otherGrade.id,
+        section: "A",
+        academicYearId: otherYear.id,
+      },
+    });
+
+    const result = await setStudentDecisions(prisma, {
+      promotionRunId: runId,
+      schoolId: school.id,
+      decisions: [{ studentId: studentA.id, action: "promoted", toClassId: foreignClass.id }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_TARGET_CLASS" });
+
+    const logged = await prisma.promotionLogEntry.findFirst({
+      where: { promotionRunId: runId, studentId: studentA.id },
+    });
+    expect(logged?.toClassId ?? null).not.toBe(foreignClass.id);
+  });
+
   it("getRunSummary lists students with no decision yet as undecided by default", async () => {
     const { getRunSummary } = await import("../src/lib/promotion");
     const { school, runId, studentA, studentB } = await seedRunWithTwoStudents();
@@ -464,7 +768,7 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
     });
     const gradeTwo = await createClass(prisma, {
       schoolId: school.id,
-      academicYearId: fromYear.id,
+      academicYearId: toYear.id,
       name: "Grade 2",
       section: "A",
     });

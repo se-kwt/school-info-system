@@ -83,7 +83,26 @@ export type UpdateMappingsResult =
   | { ok: true }
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "ALREADY_CONFIRMED" }
-  | { ok: false; error: "INVALID_MAPPING" };
+  | { ok: false; error: "INVALID_MAPPING" }
+  | { ok: false; error: "INVALID_TARGET_CLASS" };
+
+async function validateTargetClasses(
+  prisma: PrismaClient,
+  params: { schoolId: number; academicYearId: number; classIds: number[] }
+): Promise<boolean> {
+  const distinct = [...new Set(params.classIds)];
+  if (distinct.length === 0) return true;
+
+  const found = await prisma.class.count({
+    where: {
+      id: { in: distinct },
+      schoolId: params.schoolId,
+      academicYearId: params.academicYearId,
+      archived: false,
+    },
+  });
+  return found === distinct.length;
+}
 
 export async function updateMappings(
   prisma: PrismaClient,
@@ -106,6 +125,16 @@ export async function updateMappings(
       return { ok: false, error: "INVALID_MAPPING" };
     }
   }
+
+  const targetIds = params.mappings
+    .map((mapping) => mapping.toClassId)
+    .filter((id): id is number => id !== null);
+  const targetsValid = await validateTargetClasses(prisma, {
+    schoolId: params.schoolId,
+    academicYearId: run.toAcademicYearId,
+    classIds: targetIds,
+  });
+  if (!targetsValid) return { ok: false, error: "INVALID_TARGET_CLASS" };
 
   await prisma.$transaction(
     params.mappings.map((mapping) =>
@@ -198,7 +227,8 @@ export type SetDecisionsResult =
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "ALREADY_CONFIRMED" }
   | { ok: false; error: "STUDENT_NOT_IN_RUN" }
-  | { ok: false; error: "MISSING_TARGET_CLASS" };
+  | { ok: false; error: "MISSING_TARGET_CLASS" }
+  | { ok: false; error: "INVALID_TARGET_CLASS" };
 
 export async function setStudentDecisions(
   prisma: PrismaClient,
@@ -254,6 +284,17 @@ export async function setStudentDecisions(
       toClassId,
     });
   }
+
+  const resolvedTargets = resolved
+    .filter((entry) => entry.action === "promoted")
+    .map((entry) => entry.toClassId)
+    .filter((id): id is number => id !== null);
+  const decisionTargetsValid = await validateTargetClasses(prisma, {
+    schoolId: params.schoolId,
+    academicYearId: run.toAcademicYearId,
+    classIds: resolvedTargets,
+  });
+  if (!decisionTargetsValid) return { ok: false, error: "INVALID_TARGET_CLASS" };
 
   await prisma.$transaction(
     resolved.map((entry) =>

@@ -69,7 +69,7 @@ describe("/api/promotion-runs", () => {
     });
     const gradeTwo = await createClass(prisma, {
       schoolId: school.id,
-      academicYearId: fromYear.id,
+      academicYearId: toYear.id,
       name: "Grade 2",
       section: "A",
     });
