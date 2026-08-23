@@ -488,6 +488,66 @@ describe("students.ts sibling links", () => {
 
 });
 
+describe("students.ts admission record fields", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  it("stores the full admission record", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+
+    const result = await createStudent(prisma, school.id, year.id, {
+      name: "Full Record",
+      dob: "2015-01-01",
+      classId: klass.id,
+      admissionNo: "FULL-001",
+      address: "12 Example Road, Kochi",
+      bloodGroup: "O+",
+      nationality: "Indian",
+      religion: "Hindu",
+      previousSchool: "Little Flower LP",
+      emergencyContactName: "Aunt",
+      emergencyContactPhone: "+919876543210",
+      category: "General",
+      admissionDate: "2026-04-01",
+      parents: [{ relationship: "Guardian", name: "Parent", phone: "+10000000060" }],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const student = await prisma.student.findUniqueOrThrow({ where: { id: result.student.id } });
+    expect(student.address).toBe("12 Example Road, Kochi");
+    expect(student.bloodGroup).toBe("O+");
+    expect(student.previousSchool).toBe("Little Flower LP");
+    expect(student.emergencyContactPhone).toBe("+919876543210");
+    expect(student.admissionDate?.toISOString().slice(0, 10)).toBe("2026-04-01");
+  });
+
+  it("still creates a student when the optional fields are omitted", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+
+    const result = await createStudent(prisma, school.id, year.id, {
+      name: "Minimal",
+      dob: "2015-01-01",
+      classId: klass.id,
+      admissionNo: "MIN-001",
+      parents: [{ relationship: "Guardian", name: "Parent", phone: "+10000000061" }],
+    });
+
+    expect(result.ok).toBe(true);
+  });
+});
+
 describe("students.ts year scope on class validation", () => {
   beforeEach(async () => {
     await resetDb();

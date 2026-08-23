@@ -152,6 +152,15 @@ export async function createStudent(
     gender?: "male" | "female";
     studentIdNumber?: string;
     dateOfJoin?: string;
+    address?: string;
+    bloodGroup?: string;
+    nationality?: string;
+    religion?: string;
+    previousSchool?: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    category?: string;
+    admissionDate?: string;
     parents: { relationship: string; name: string; phone: string; email?: string }[];
     siblingStudentIds?: number[];
   }
@@ -205,6 +214,15 @@ export async function createStudent(
           gender: input.gender ?? null,
           studentIdNumber: input.studentIdNumber ?? null,
           dateOfJoin: input.dateOfJoin ? new Date(input.dateOfJoin) : null,
+          address: input.address ?? null,
+          bloodGroup: input.bloodGroup ?? null,
+          nationality: input.nationality ?? null,
+          religion: input.religion ?? null,
+          previousSchool: input.previousSchool ?? null,
+          emergencyContactName: input.emergencyContactName ?? null,
+          emergencyContactPhone: input.emergencyContactPhone ?? null,
+          category: input.category ?? null,
+          admissionDate: input.admissionDate ? new Date(input.admissionDate) : null,
         },
       });
 
@@ -289,6 +307,15 @@ export async function editStudent(
       gender?: "male" | "female";
       studentIdNumber?: string;
       dateOfJoin?: string;
+      address?: string;
+      bloodGroup?: string;
+      nationality?: string;
+      religion?: string;
+      previousSchool?: string;
+      emergencyContactName?: string;
+      emergencyContactPhone?: string;
+      category?: string;
+      admissionDate?: string;
       parents?: { relationship: string; name: string; phone: string; email?: string }[];
       siblingStudentIds?: number[];
     };
@@ -373,6 +400,15 @@ export async function editStudent(
         gender?: "male" | "female";
         studentIdNumber?: string;
         dateOfJoin?: Date;
+        address?: string;
+        bloodGroup?: string;
+        nationality?: string;
+        religion?: string;
+        previousSchool?: string;
+        emergencyContactName?: string;
+        emergencyContactPhone?: string;
+        category?: string;
+        admissionDate?: Date;
       } = {};
       if (params.fields.name !== undefined) data.name = params.fields.name;
       if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
@@ -381,6 +417,15 @@ export async function editStudent(
       if (params.fields.gender !== undefined) data.gender = params.fields.gender;
       if (params.fields.studentIdNumber !== undefined) data.studentIdNumber = params.fields.studentIdNumber;
       if (params.fields.dateOfJoin !== undefined) data.dateOfJoin = new Date(params.fields.dateOfJoin);
+      if (params.fields.address !== undefined) data.address = params.fields.address;
+      if (params.fields.bloodGroup !== undefined) data.bloodGroup = params.fields.bloodGroup;
+      if (params.fields.nationality !== undefined) data.nationality = params.fields.nationality;
+      if (params.fields.religion !== undefined) data.religion = params.fields.religion;
+      if (params.fields.previousSchool !== undefined) data.previousSchool = params.fields.previousSchool;
+      if (params.fields.emergencyContactName !== undefined) data.emergencyContactName = params.fields.emergencyContactName;
+      if (params.fields.emergencyContactPhone !== undefined) data.emergencyContactPhone = params.fields.emergencyContactPhone;
+      if (params.fields.category !== undefined) data.category = params.fields.category;
+      if (params.fields.admissionDate !== undefined) data.admissionDate = new Date(params.fields.admissionDate);
       if (Object.keys(data).length > 0) {
         await tx.student.update({ where: { id: params.studentId }, data });
       }

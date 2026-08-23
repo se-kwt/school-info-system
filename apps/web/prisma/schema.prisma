@@ -218,6 +218,15 @@ model Student {
   gender          Gender?
   studentIdNumber String?       @unique
   dateOfJoin      DateTime?
+  address               String?
+  bloodGroup            String?
+  nationality           String?
+  religion              String?
+  previousSchool        String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  category              String?
+  admissionDate         DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
