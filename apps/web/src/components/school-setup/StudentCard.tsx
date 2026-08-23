@@ -3,6 +3,7 @@
 export interface StudentRow {
   id: number;
   name: string;
+  dob: string;
   admissionNo: string;
   rollNumber: string | null;
   photoUrl: string | null;

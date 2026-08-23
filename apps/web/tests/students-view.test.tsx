@@ -14,6 +14,7 @@ const students = [
   {
     id: 1,
     name: "Existing Student",
+    dob: "2010-01-01",
     admissionNo: "SCH-1",
     rollNumber: "5",
     photoUrl: null,
@@ -28,6 +29,7 @@ const students = [
   {
     id: 2,
     name: "Other Class Student",
+    dob: "2010-06-15",
     admissionNo: "SCH-2",
     rollNumber: "1",
     photoUrl: null,
@@ -127,6 +129,20 @@ describe("StudentsView", () => {
     });
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
     expect(body.rollNumber).toBe("9");
+  });
+
+  it("pre-fills the date of birth when editing an existing student", async () => {
+    const studentsWithDob = [
+      {
+        ...students[0],
+        dob: "2015-03-14",
+      },
+    ];
+
+    render(<StudentsView initialStudents={studentsWithDob} classes={classes} isAdmin={true} />);
+    await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
+
+    expect(screen.getByLabelText(/date of birth/i)).toHaveValue("2015-03-14");
   });
 
   it("non-admin can open a card but sees no Save button", async () => {

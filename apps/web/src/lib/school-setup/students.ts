@@ -5,6 +5,7 @@ import { isValidPhone, normalizePhone } from "../phone";
 export interface StudentSummary {
   id: number;
   name: string;
+  dob: string;
   admissionNo: string;
   rollNumber: string | null;
   photoUrl: string | null;
@@ -107,6 +108,7 @@ export async function listStudents(
     return {
       id: student.id,
       name: student.name,
+      dob: student.dob.toISOString().slice(0, 10),
       admissionNo: student.admissionNo,
       rollNumber: enrollment?.rollNumber ?? null,
       photoUrl: student.photoUrl,

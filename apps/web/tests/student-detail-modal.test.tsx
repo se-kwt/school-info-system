@@ -13,6 +13,7 @@ const classes = [
 const existingStudent = {
   id: 1,
   name: "Rohan Sharma",
+  dob: "2010-01-01",
   admissionNo: "SCH-1",
   rollNumber: "5",
   photoUrl: null,

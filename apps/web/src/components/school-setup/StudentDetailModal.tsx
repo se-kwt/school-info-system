@@ -67,7 +67,7 @@ export function StudentDetailModal({
 }) {
   const [firstName, setFirstName] = useState(student?.name.split(" ")[0] ?? "");
   const [lastName, setLastName] = useState(student ? student.name.split(" ").slice(1).join(" ") : "");
-  const [dob, setDob] = useState("");
+  const [dob, setDob] = useState(student?.dob ?? "");
   const [admissionNo, setAdmissionNo] = useState(student?.admissionNo ?? "");
   const [rollNumber, setRollNumber] = useState(student?.rollNumber ?? "");
   const [classId, setClassId] = useState(
