@@ -52,6 +52,46 @@ describe("ClassesView", () => {
     vi.unstubAllGlobals();
   });
 
+  it("sends capacity and room on class create", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ id: 3, gradeId: 1, gradeName: "Grade 1", section: "C", academicYearId: 1, archived: false, capacity: 40, room: "B-204" }),
+          { status: 201 }
+        )
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify(classes), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    await userEvent.click(screen.getByRole("button", { name: "+ Create Class" }));
+    await userEvent.type(screen.getByLabelText("Section"), "C");
+    await userEvent.type(screen.getByLabelText("Capacity"), "40");
+    await userEvent.type(screen.getByLabelText("Room"), "B-204");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(fetchMock).toHaveBeenCalled();
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.capacity).toBe(40);
+    expect(body.room).toBe("B-204");
+    vi.unstubAllGlobals();
+  });
+
+  it("shows how full a class is when capacity is set", () => {
+    render(
+      <ClassesView
+        initialClasses={[
+          { id: 1, gradeId: 1, gradeName: "Grade 1", section: "A", academicYearId: 1, archived: false, capacity: 40, enrolledCount: 38, room: "B-204" },
+        ]}
+        grades={grades}
+        academicYears={academicYears}
+      />
+    );
+
+    expect(screen.getByText("38 / 40")).toBeInTheDocument();
+  });
+
   it("switches to list view and shows the same classes in a table", async () => {
     render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
     await userEvent.click(screen.getByRole("button", { name: "List view" }));

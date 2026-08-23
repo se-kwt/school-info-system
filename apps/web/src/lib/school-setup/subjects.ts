@@ -6,6 +6,11 @@ export interface SubjectSummary {
   name: string;
   gradeId: number;
   versionCount: number;
+  code: string | null;
+  creditHours: number | null;
+  weeklyPeriods: number | null;
+  isPractical: boolean;
+  isElective: boolean;
 }
 
 export type ListSubjectsResult = { ok: true; subjects: SubjectSummary[] } | { ok: false; error: "INVALID_GRADE" };
@@ -24,7 +29,17 @@ export async function listSubjects(
   });
   return {
     ok: true,
-    subjects: subjects.map((s) => ({ id: s.id, name: s.name, gradeId: s.gradeId, versionCount: s._count.versions })),
+    subjects: subjects.map((s) => ({
+      id: s.id,
+      name: s.name,
+      gradeId: s.gradeId,
+      versionCount: s._count.versions,
+      code: s.code,
+      creditHours: s.creditHours,
+      weeklyPeriods: s.weeklyPeriods,
+      isPractical: s.isPractical,
+      isElective: s.isElective,
+    })),
   };
 }
 
@@ -64,7 +79,20 @@ export async function createSubject(
         isElective: params.isElective ?? false,
       },
     });
-    return { ok: true, subject: { id: created.id, name: created.name, gradeId: created.gradeId, versionCount: 0 } };
+    return {
+      ok: true,
+      subject: {
+        id: created.id,
+        name: created.name,
+        gradeId: created.gradeId,
+        versionCount: 0,
+        code: created.code,
+        creditHours: created.creditHours,
+        weeklyPeriods: created.weeklyPeriods,
+        isPractical: created.isPractical,
+        isElective: created.isElective,
+      },
+    };
   } catch (err) {
     if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE" };
     throw err;

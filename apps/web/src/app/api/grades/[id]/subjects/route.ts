@@ -36,8 +36,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     }
 
     let name: string | undefined;
+    let code: string | undefined;
+    let creditHours: number | undefined;
+    let weeklyPeriods: number | undefined;
+    let isPractical: boolean | undefined;
+    let isElective: boolean | undefined;
     try {
-      ({ name } = await request.json());
+      ({ name, code, creditHours, weeklyPeriods, isPractical, isElective } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -45,7 +50,16 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
 
-    const result = await createSubject(prisma, { gradeId, schoolId: claims.schoolId, name });
+    const result = await createSubject(prisma, {
+      gradeId,
+      schoolId: claims.schoolId,
+      name,
+      code,
+      creditHours,
+      weeklyPeriods,
+      isPractical,
+      isElective,
+    });
     if (!result.ok) {
       if (result.error === "INVALID_GRADE") {
         return NextResponse.json({ error: "Grade not found" }, { status: 404 });

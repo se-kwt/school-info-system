@@ -12,6 +12,10 @@ export interface ClassSummary {
   room: string | null;
 }
 
+export interface ClassListItem extends ClassSummary {
+  enrolledCount: number;
+}
+
 function toSummary(klass: { id: number; gradeId: number; section: string; academicYearId: number; archived: boolean; capacity: number | null; room: string | null; grade: { name: string } }): ClassSummary {
   return {
     id: klass.id,
@@ -29,17 +33,29 @@ export async function listClasses(
   prisma: PrismaClient,
   schoolId: number,
   options?: { includeArchived?: boolean; academicYearId?: number }
-): Promise<ClassSummary[]> {
+): Promise<ClassListItem[]> {
   const classes = await prisma.class.findMany({
     where: {
       schoolId,
       ...(options?.includeArchived ? {} : { archived: false }),
       ...(options?.academicYearId ? { academicYearId: options.academicYearId } : {}),
     },
-    include: { grade: true },
+    include: {
+      grade: true,
+      // A class's academicYearId is fixed at creation and every enrollment
+      // write path (createStudent/editStudent) validates classId against
+      // that same academicYearId before writing, so an "active" enrollment
+      // for this class can never belong to a different year — filtering on
+      // status alone already scopes the count to this class's own year.
+      _count: {
+        select: {
+          enrollments: { where: { status: "active" } },
+        },
+      },
+    },
     orderBy: [{ grade: { sortOrder: "asc" } }, { section: "asc" }],
   });
-  return classes.map(toSummary);
+  return classes.map((klass) => ({ ...toSummary(klass), enrolledCount: klass._count.enrollments }));
 }
 
 export type CreateClassResult = { ok: true; class: ClassSummary } | { ok: false; error: "DUPLICATE" } | { ok: false; error: "INVALID_GRADE" } | { ok: false; error: "INVALID_YEAR" };

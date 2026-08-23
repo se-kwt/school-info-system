@@ -218,85 +218,98 @@ export async function createStudent(
     if (siblingCount !== input.siblingStudentIds.length) return { ok: false, error: "INVALID_SIBLING" };
   }
 
-  const targetClass = await prisma.class.findFirst({
-    where: { id: input.classId, schoolId, academicYearId },
-  });
-  if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
-
-  if (targetClass.capacity !== null) {
-    const enrolled = await prisma.enrollment.count({
-      where: { classId: targetClass.id, academicYearId, status: "active" },
-    });
-    if (enrolled >= targetClass.capacity) return { ok: false, error: "CLASS_FULL" };
-  }
-
   try {
-    const student = await prisma.$transaction(async (tx) => {
-      const createdStudent = await tx.student.create({
-        data: {
-          schoolId,
-          name: input.name,
-          dob: new Date(input.dob),
-          admissionNo: input.admissionNo,
-          photoUrl: input.photoUrl ?? null,
-          gender: input.gender ?? null,
-          studentIdNumber: input.studentIdNumber ?? null,
-          dateOfJoin: input.dateOfJoin ? new Date(input.dateOfJoin) : null,
-          address: input.address ?? null,
-          bloodGroup: input.bloodGroup ?? null,
-          nationality: input.nationality ?? null,
-          religion: input.religion ?? null,
-          previousSchool: input.previousSchool ?? null,
-          emergencyContactName: input.emergencyContactName ?? null,
-          emergencyContactPhone: input.emergencyContactPhone ?? null,
-          category: input.category ?? null,
-          admissionDate: input.admissionDate ? new Date(input.admissionDate) : null,
-        },
-      });
-
-      await tx.enrollment.create({
-        data: {
-          studentId: createdStudent.id,
-          classId: input.classId,
-          academicYearId,
-          status: "active",
-          rollNumber: input.rollNumber ?? null,
-        },
-      });
-
-      for (const parentInput of input.parents) {
-        const phone = normalizePhone(parentInput.phone);
-        const existingParent = await tx.user.findUnique({ where: { phone } });
-        const parent =
-          existingParent ??
-          (await tx.user.create({
-            data: {
-              schoolId,
-              phone,
-              name: parentInput.name,
-              email: parentInput.email ?? null,
-              role: "parent",
-            },
-          }));
-
-        await tx.parentStudent.create({
-          data: { parentUserId: parent.id, studentId: createdStudent.id, relationship: parentInput.relationship },
+    // The class lookup and capacity check are performed INSIDE this Serializable
+    // transaction, atomically with the enrollment write below, rather than in a
+    // separate read before the transaction. Two concurrent createStudent calls
+    // targeting the same last-seat class would otherwise both read "enrolled <
+    // capacity" as true in their own separate reads and both proceed to write —
+    // a classic TOCTOU race that would silently overfill the class. Under
+    // Serializable isolation, Postgres detects the conflicting read/write sets
+    // and aborts the losing transaction with error code P2034, which the API
+    // route layer retries once (mirrors recordPayment in fee-payments.ts and
+    // createGrade in grades.ts). Every early "ok: false" return below happens
+    // before any write in this transaction, so committing an empty transaction
+    // on those paths is harmless (same invariant documented on recordPayment).
+    return await prisma.$transaction(
+      async (tx) => {
+        const targetClass = await tx.class.findFirst({
+          where: { id: input.classId, schoolId, academicYearId },
         });
-      }
+        if (!targetClass) return { ok: false, error: "INVALID_CLASS" } as const;
 
-      if (input.siblingStudentIds) {
-        for (const siblingId of input.siblingStudentIds) {
-          await tx.studentSibling.create({ data: { studentId: createdStudent.id, siblingId } });
+        if (targetClass.capacity !== null) {
+          const enrolled = await tx.enrollment.count({
+            where: { classId: targetClass.id, academicYearId, status: "active" },
+          });
+          if (enrolled >= targetClass.capacity) return { ok: false, error: "CLASS_FULL" } as const;
         }
-      }
 
-      return createdStudent;
-    });
+        const createdStudent = await tx.student.create({
+          data: {
+            schoolId,
+            name: input.name,
+            dob: new Date(input.dob),
+            admissionNo: input.admissionNo,
+            photoUrl: input.photoUrl ?? null,
+            gender: input.gender ?? null,
+            studentIdNumber: input.studentIdNumber ?? null,
+            dateOfJoin: input.dateOfJoin ? new Date(input.dateOfJoin) : null,
+            address: input.address ?? null,
+            bloodGroup: input.bloodGroup ?? null,
+            nationality: input.nationality ?? null,
+            religion: input.religion ?? null,
+            previousSchool: input.previousSchool ?? null,
+            emergencyContactName: input.emergencyContactName ?? null,
+            emergencyContactPhone: input.emergencyContactPhone ?? null,
+            category: input.category ?? null,
+            admissionDate: input.admissionDate ? new Date(input.admissionDate) : null,
+          },
+        });
 
-    return {
-      ok: true,
-      student: { id: student.id, name: student.name, admissionNo: student.admissionNo },
-    };
+        await tx.enrollment.create({
+          data: {
+            studentId: createdStudent.id,
+            classId: input.classId,
+            academicYearId,
+            status: "active",
+            rollNumber: input.rollNumber ?? null,
+          },
+        });
+
+        for (const parentInput of input.parents) {
+          const phone = normalizePhone(parentInput.phone);
+          const existingParent = await tx.user.findUnique({ where: { phone } });
+          const parent =
+            existingParent ??
+            (await tx.user.create({
+              data: {
+                schoolId,
+                phone,
+                name: parentInput.name,
+                email: parentInput.email ?? null,
+                role: "parent",
+              },
+            }));
+
+          await tx.parentStudent.create({
+            data: { parentUserId: parent.id, studentId: createdStudent.id, relationship: parentInput.relationship },
+          });
+        }
+
+        if (input.siblingStudentIds) {
+          for (const siblingId of input.siblingStudentIds) {
+            await tx.studentSibling.create({ data: { studentId: createdStudent.id, siblingId } });
+          }
+        }
+
+        return {
+          ok: true,
+          student: { id: createdStudent.id, name: createdStudent.name, admissionNo: createdStudent.admissionNo },
+        };
+      },
+      { isolationLevel: "Serializable" }
+    );
   } catch (err) {
     const target = uniqueConstraintTarget(err);
     if (target?.includes("rollNumber")) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
@@ -394,23 +407,11 @@ export async function editStudent(
     });
     if (!enrollment) return { ok: false, error: "NO_ACTIVE_ENROLLMENT" };
 
-    if (params.fields.classId !== undefined) {
-      const targetClass = await prisma.class.findFirst({
-        where: {
-          id: params.fields.classId,
-          schoolId: params.schoolId,
-          academicYearId: params.academicYearId,
-        },
-      });
-      if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
-
-      if (targetClass.id !== enrollment.classId && targetClass.capacity !== null) {
-        const enrolled = await prisma.enrollment.count({
-          where: { classId: targetClass.id, academicYearId: params.academicYearId, status: "active" },
-        });
-        if (enrolled >= targetClass.capacity) return { ok: false, error: "CLASS_FULL" };
-      }
-    }
+    // Class validation and the capacity check are deliberately NOT done here.
+    // They run inside the Serializable transaction below, atomically with the
+    // enrollment write, so a concurrent reassignment into the same last-seat
+    // class can't race past this read the way it would with a separate
+    // read-then-write (see the transaction below for the full rationale).
 
     if (params.fields.rollNumber) {
       const targetClassId = params.fields.classId ?? enrollment.classId;
@@ -425,117 +426,148 @@ export async function editStudent(
       if (conflict) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
     }
   }
+  // Captured into a plain value (not the `let enrollment` binding) so it stays
+  // narrowed to `number` inside the transaction closure below, across the
+  // `await` boundary.
+  const currentEnrollmentClassId: number | null = enrollment ? enrollment.classId : null;
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const data: {
-        name?: string;
-        dob?: Date;
-        admissionNo?: string;
-        photoUrl?: string;
-        gender?: "male" | "female" | "other";
-        studentIdNumber?: string;
-        dateOfJoin?: Date;
-        address?: string;
-        bloodGroup?: string;
-        nationality?: string;
-        religion?: string;
-        previousSchool?: string;
-        emergencyContactName?: string;
-        emergencyContactPhone?: string;
-        category?: string;
-        admissionDate?: Date;
-      } = {};
-      if (params.fields.name !== undefined) data.name = params.fields.name;
-      if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
-      if (params.fields.admissionNo !== undefined) data.admissionNo = params.fields.admissionNo;
-      if (params.fields.photoUrl !== undefined) data.photoUrl = params.fields.photoUrl;
-      if (params.fields.gender !== undefined) data.gender = params.fields.gender;
-      if (params.fields.studentIdNumber !== undefined) data.studentIdNumber = params.fields.studentIdNumber;
-      if (params.fields.dateOfJoin !== undefined) data.dateOfJoin = new Date(params.fields.dateOfJoin);
-      if (params.fields.address !== undefined) data.address = params.fields.address;
-      if (params.fields.bloodGroup !== undefined) data.bloodGroup = params.fields.bloodGroup;
-      if (params.fields.nationality !== undefined) data.nationality = params.fields.nationality;
-      if (params.fields.religion !== undefined) data.religion = params.fields.religion;
-      if (params.fields.previousSchool !== undefined) data.previousSchool = params.fields.previousSchool;
-      if (params.fields.emergencyContactName !== undefined) data.emergencyContactName = params.fields.emergencyContactName;
-      if (params.fields.emergencyContactPhone !== undefined) data.emergencyContactPhone = params.fields.emergencyContactPhone;
-      if (params.fields.category !== undefined) data.category = params.fields.category;
-      if (params.fields.admissionDate !== undefined) data.admissionDate = new Date(params.fields.admissionDate);
-      if (Object.keys(data).length > 0) {
-        await tx.student.update({ where: { id: params.studentId }, data });
-      }
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Class validation + capacity check, atomic with the writes below.
+        // Every early "ok: false" return here happens before any write in
+        // this transaction, so committing an empty transaction on those
+        // paths is harmless (same invariant documented on recordPayment in
+        // fee-payments.ts and createStudent above).
+        if (params.fields.classId !== undefined && params.academicYearId && currentEnrollmentClassId !== null) {
+          const targetClass = await tx.class.findFirst({
+            where: {
+              id: params.fields.classId,
+              schoolId: params.schoolId,
+              academicYearId: params.academicYearId,
+            },
+          });
+          if (!targetClass) return { ok: false, error: "INVALID_CLASS" } as const;
 
-      if ((params.fields.classId !== undefined || params.fields.rollNumber !== undefined) && params.academicYearId) {
-        const enrollmentData: { classId?: number; rollNumber?: string } = {};
-        if (params.fields.classId !== undefined) enrollmentData.classId = params.fields.classId;
-        if (params.fields.rollNumber !== undefined) enrollmentData.rollNumber = params.fields.rollNumber;
-        await tx.enrollment.update({
-          where: {
-            studentId_academicYearId: { studentId: params.studentId, academicYearId: params.academicYearId },
-          },
-          data: enrollmentData,
-        });
-      }
-
-      if (params.fields.parents !== undefined) {
-        const existingLinks = await tx.parentStudent.findMany({
-          where: { studentId: params.studentId },
-          include: { parent: true },
-        });
-        const newPhones = new Set(params.fields.parents.map((p) => normalizePhone(p.phone)));
-
-        for (const link of existingLinks) {
-          if (!newPhones.has(link.parent.phone)) {
-            await tx.parentStudent.delete({ where: { id: link.id } });
+          if (targetClass.id !== currentEnrollmentClassId && targetClass.capacity !== null) {
+            const enrolled = await tx.enrollment.count({
+              where: { classId: targetClass.id, academicYearId: params.academicYearId, status: "active" },
+            });
+            if (enrolled >= targetClass.capacity) return { ok: false, error: "CLASS_FULL" } as const;
           }
         }
 
-        for (const parentInput of params.fields.parents) {
-          const phone = normalizePhone(parentInput.phone);
-          let parent = await tx.user.findUnique({ where: { phone } });
-          if (!parent) {
-            parent = await tx.user.create({
-              data: {
-                schoolId: params.schoolId,
-                phone,
-                name: parentInput.name,
-                email: parentInput.email ?? null,
-                role: "parent",
-              },
-            });
-          } else {
-            await tx.user.update({
-              where: { id: parent.id },
-              data: { name: parentInput.name, email: parentInput.email ?? null },
-            });
-          }
+        const data: {
+          name?: string;
+          dob?: Date;
+          admissionNo?: string;
+          photoUrl?: string;
+          gender?: "male" | "female" | "other";
+          studentIdNumber?: string;
+          dateOfJoin?: Date;
+          address?: string;
+          bloodGroup?: string;
+          nationality?: string;
+          religion?: string;
+          previousSchool?: string;
+          emergencyContactName?: string;
+          emergencyContactPhone?: string;
+          category?: string;
+          admissionDate?: Date;
+        } = {};
+        if (params.fields.name !== undefined) data.name = params.fields.name;
+        if (params.fields.dob !== undefined) data.dob = new Date(params.fields.dob);
+        if (params.fields.admissionNo !== undefined) data.admissionNo = params.fields.admissionNo;
+        if (params.fields.photoUrl !== undefined) data.photoUrl = params.fields.photoUrl;
+        if (params.fields.gender !== undefined) data.gender = params.fields.gender;
+        if (params.fields.studentIdNumber !== undefined) data.studentIdNumber = params.fields.studentIdNumber;
+        if (params.fields.dateOfJoin !== undefined) data.dateOfJoin = new Date(params.fields.dateOfJoin);
+        if (params.fields.address !== undefined) data.address = params.fields.address;
+        if (params.fields.bloodGroup !== undefined) data.bloodGroup = params.fields.bloodGroup;
+        if (params.fields.nationality !== undefined) data.nationality = params.fields.nationality;
+        if (params.fields.religion !== undefined) data.religion = params.fields.religion;
+        if (params.fields.previousSchool !== undefined) data.previousSchool = params.fields.previousSchool;
+        if (params.fields.emergencyContactName !== undefined) data.emergencyContactName = params.fields.emergencyContactName;
+        if (params.fields.emergencyContactPhone !== undefined) data.emergencyContactPhone = params.fields.emergencyContactPhone;
+        if (params.fields.category !== undefined) data.category = params.fields.category;
+        if (params.fields.admissionDate !== undefined) data.admissionDate = new Date(params.fields.admissionDate);
+        if (Object.keys(data).length > 0) {
+          await tx.student.update({ where: { id: params.studentId }, data });
+        }
 
-          await tx.parentStudent.upsert({
-            where: { parentUserId_studentId: { parentUserId: parent.id, studentId: params.studentId } },
-            update: { relationship: parentInput.relationship },
-            create: { parentUserId: parent.id, studentId: params.studentId, relationship: parentInput.relationship },
+        if ((params.fields.classId !== undefined || params.fields.rollNumber !== undefined) && params.academicYearId) {
+          const enrollmentData: { classId?: number; rollNumber?: string } = {};
+          if (params.fields.classId !== undefined) enrollmentData.classId = params.fields.classId;
+          if (params.fields.rollNumber !== undefined) enrollmentData.rollNumber = params.fields.rollNumber;
+          await tx.enrollment.update({
+            where: {
+              studentId_academicYearId: { studentId: params.studentId, academicYearId: params.academicYearId },
+            },
+            data: enrollmentData,
           });
         }
-      }
 
-      if (params.fields.siblingStudentIds !== undefined) {
-        await tx.studentSibling.deleteMany({
-          where: { OR: [{ studentId: params.studentId }, { siblingId: params.studentId }] },
-        });
-        for (const siblingId of params.fields.siblingStudentIds) {
-          await tx.studentSibling.create({ data: { studentId: params.studentId, siblingId } });
+        if (params.fields.parents !== undefined) {
+          const existingLinks = await tx.parentStudent.findMany({
+            where: { studentId: params.studentId },
+            include: { parent: true },
+          });
+          const newPhones = new Set(params.fields.parents.map((p) => normalizePhone(p.phone)));
+
+          for (const link of existingLinks) {
+            if (!newPhones.has(link.parent.phone)) {
+              await tx.parentStudent.delete({ where: { id: link.id } });
+            }
+          }
+
+          for (const parentInput of params.fields.parents) {
+            const phone = normalizePhone(parentInput.phone);
+            let parent = await tx.user.findUnique({ where: { phone } });
+            if (!parent) {
+              parent = await tx.user.create({
+                data: {
+                  schoolId: params.schoolId,
+                  phone,
+                  name: parentInput.name,
+                  email: parentInput.email ?? null,
+                  role: "parent",
+                },
+              });
+            } else {
+              await tx.user.update({
+                where: { id: parent.id },
+                data: { name: parentInput.name, email: parentInput.email ?? null },
+              });
+            }
+
+            await tx.parentStudent.upsert({
+              where: { parentUserId_studentId: { parentUserId: parent.id, studentId: params.studentId } },
+              update: { relationship: parentInput.relationship },
+              create: { parentUserId: parent.id, studentId: params.studentId, relationship: parentInput.relationship },
+            });
+          }
         }
-      }
-    });
+
+        if (params.fields.siblingStudentIds !== undefined) {
+          await tx.studentSibling.deleteMany({
+            where: { OR: [{ studentId: params.studentId }, { siblingId: params.studentId }] },
+          });
+          for (const siblingId of params.fields.siblingStudentIds) {
+            await tx.studentSibling.create({ data: { studentId: params.studentId, siblingId } });
+          }
+        }
+
+        return { ok: true } as const;
+      },
+      { isolationLevel: "Serializable" }
+    );
+    return result;
   } catch (err) {
     const target = uniqueConstraintTarget(err);
     if (target?.includes("rollNumber")) return { ok: false, error: "DUPLICATE_ROLL_NUMBER" };
     if (target?.includes("studentIdNumber")) return { ok: false, error: "DUPLICATE_STUDENT_ID" };
     throw err;
   }
-
-  return { ok: true };
 }
 
 export type DeleteStudentResult =

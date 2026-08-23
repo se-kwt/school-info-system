@@ -30,8 +30,10 @@ export async function POST(request: Request) {
     let gradeId: number | undefined;
     let section: string | undefined;
     let academicYearId: number | undefined;
+    let capacity: number | undefined;
+    let room: string | undefined;
     try {
-      ({ gradeId, section, academicYearId } = await request.json());
+      ({ gradeId, section, academicYearId, capacity, room } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "gradeId, section, and academicYearId are required" }, { status: 400 });
     }
 
-    const result = await createClass(prisma, claims.schoolId, { gradeId, section, academicYearId });
+    const result = await createClass(prisma, claims.schoolId, { gradeId, section, academicYearId, capacity, room });
     if (!result.ok) {
       if (result.error === "INVALID_GRADE") {
         return NextResponse.json({ error: "The selected grade does not exist" }, { status: 400 });

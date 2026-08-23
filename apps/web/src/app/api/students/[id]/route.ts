@@ -1,10 +1,34 @@
 import { NextResponse } from "next/server";
-import type { GuardianRelationship } from "@prisma/client";
+import { Prisma, type GuardianRelationship } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { getActiveAcademicYear } from "@/lib/academic-years";
-import { deleteStudent, editStudent } from "@/lib/school-setup/students";
+import { deleteStudent, editStudent, type EditStudentResult } from "@/lib/school-setup/students";
+
+/**
+ * `editStudent` runs its class-reassignment capacity check inside a
+ * Serializable transaction together with the enrollment write (see
+ * students.ts). Retry once on a conflict — same pattern/rationale as
+ * `createStudentWithRetry` in /api/students/route.ts.
+ */
+function isTransactionConflict(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    (err.code === "P2034" || err.code === "P2028")
+  );
+}
+
+async function editStudentWithRetry(params: Parameters<typeof editStudent>[1]): Promise<EditStudentResult> {
+  try {
+    return await editStudent(prisma, params);
+  } catch (err) {
+    if (isTransactionConflict(err)) {
+      return await editStudent(prisma, params);
+    }
+    throw err;
+  }
+}
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -44,7 +68,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
 
     const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
-    const result = await editStudent(prisma, {
+    const result = await editStudentWithRetry({
       studentId,
       schoolId: claims.schoolId,
       academicYearId: activeYear?.id ?? null,
@@ -104,6 +128,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    if (isTransactionConflict(err)) {
+      return NextResponse.json(
+        { error: "This request conflicted with another update. Please try again." },
+        { status: 409 }
+      );
     }
     throw err;
   }

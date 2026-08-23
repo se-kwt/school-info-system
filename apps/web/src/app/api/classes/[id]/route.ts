@@ -13,14 +13,20 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       return NextResponse.json({ error: "Class not found" }, { status: 404 });
     }
 
-    let body: { gradeId?: number; section?: string; academicYearId?: number };
+    let body: { gradeId?: number; section?: string; academicYearId?: number; capacity?: number; room?: string };
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    if (body.gradeId === undefined && body.section === undefined && body.academicYearId === undefined) {
+    if (
+      body.gradeId === undefined &&
+      body.section === undefined &&
+      body.academicYearId === undefined &&
+      body.capacity === undefined &&
+      body.room === undefined
+    ) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 

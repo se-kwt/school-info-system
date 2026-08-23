@@ -254,6 +254,55 @@ describe("/api/students", () => {
     const postResponse = await postStudents(postRequest);
     expect(postResponse.status).toBe(409);
   });
+
+  it("does not overfill a class when two enrollments race for the last seat", async () => {
+    // `createStudent`'s class-lookup + capacity check now run inside a
+    // Serializable transaction together with the enrollment write (see
+    // students.ts), with `createStudentWithRetry` in the route retrying once
+    // on a P2034/P2028 conflict. Before that fix, this test would have been
+    // able to enroll both students into a capacity-1 class, because the
+    // "count enrolled" read and the enrollment write happened in separate,
+    // non-atomic steps. Firing both POSTs concurrently with Promise.all is
+    // what actually exercises the race -- run sequentially, both requests
+    // would trivially serialize through the event loop and the bug would
+    // never surface.
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+    await prisma.class.update({ where: { id: klass.id }, data: { capacity: 1 } });
+
+    function enroll(admissionNo: string, phone: string) {
+      const request = new Request("http://localhost/api/students", {
+        method: "POST",
+        body: JSON.stringify({
+          name: `Student ${admissionNo}`,
+          dob: "2015-01-01",
+          classId: klass.id,
+          admissionNo,
+          parents: [{ relationship: "guardian", name: "P", phone }],
+        }),
+        headers: { "content-type": "application/json" },
+      });
+      return postStudents(request);
+    }
+
+    const [r1, r2] = await Promise.all([
+      enroll("RACE-001", "+15557770001"),
+      enroll("RACE-002", "+15557770002"),
+    ]);
+
+    const statuses = [r1.status, r2.status].sort();
+    // Exactly one of the two must win (201) and the other must be rejected
+    // as CLASS_FULL (400) -- never both winning (overfill) and never both
+    // losing to an unhandled 500 from an unretried serialization conflict.
+    expect(statuses).toEqual([201, 400]);
+
+    const activeEnrollments = await prisma.enrollment.count({
+      where: { classId: klass.id, academicYearId: year.id, status: "active" },
+    });
+    expect(activeEnrollments).toBe(1);
+  });
 });
 
 describe("/api/students/[id]", () => {

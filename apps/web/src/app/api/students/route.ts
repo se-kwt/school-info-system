@@ -1,10 +1,41 @@
 import { NextResponse } from "next/server";
-import type { GuardianRelationship } from "@prisma/client";
+import { Prisma, type GuardianRelationship } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
-import { listStudents, createStudent } from "@/lib/school-setup/students";
+import { listStudents, createStudent, type CreateStudentResult } from "@/lib/school-setup/students";
 import { resolveAcademicYear } from "@/lib/academic-years";
+
+/**
+ * `createStudent` runs its class-lookup + capacity check inside a Serializable
+ * transaction together with the enrollment write (see students.ts). Under real
+ * concurrent writes into a class with one seat left, Postgres can abort the
+ * losing transaction with a serialization failure (Prisma error code P2034)
+ * instead of silently letting both requests succeed and overfilling the
+ * class. Retry once — mirrors `recordPaymentWithRetry` in
+ * /api/fee-payments/route.ts and `createGradeWithRetry` in /api/grades/route.ts.
+ */
+function isTransactionConflict(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    (err.code === "P2034" || err.code === "P2028")
+  );
+}
+
+async function createStudentWithRetry(
+  schoolId: number,
+  academicYearId: number,
+  input: Parameters<typeof createStudent>[3]
+): Promise<CreateStudentResult> {
+  try {
+    return await createStudent(prisma, schoolId, academicYearId, input);
+  } catch (err) {
+    if (isTransactionConflict(err)) {
+      return await createStudent(prisma, schoolId, academicYearId, input);
+    }
+    throw err;
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -94,7 +125,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No active academic year is configured" }, { status: 400 });
     }
 
-    const result = await createStudent(prisma, claims.schoolId, yearResult.academicYear.id, {
+    const result = await createStudentWithRetry(claims.schoolId, yearResult.academicYear.id, {
       name,
       dob,
       classId,
@@ -164,6 +195,12 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    if (isTransactionConflict(err)) {
+      return NextResponse.json(
+        { error: "This request conflicted with another update. Please try again." },
+        { status: 409 }
+      );
     }
     throw err;
   }

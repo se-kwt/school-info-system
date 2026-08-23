@@ -25,7 +25,17 @@ describe("classes lib", () => {
 
     const classes = await listClasses(prisma, schoolId);
     expect(classes).toEqual([
-      { id: expect.any(Number), gradeId, gradeName: "Grade 1", section: "A", academicYearId: yearId, archived: false, capacity: null, room: null },
+      {
+        id: expect.any(Number),
+        gradeId,
+        gradeName: "Grade 1",
+        section: "A",
+        academicYearId: yearId,
+        archived: false,
+        capacity: null,
+        room: null,
+        enrolledCount: 0,
+      },
     ]);
   });
 
@@ -81,6 +91,29 @@ describe("classes lib", () => {
 
     const result = await deleteClass(prisma, { classId: created.class.id, schoolId });
     expect(result).toEqual({ ok: false, error: "HAS_HISTORY" });
+  });
+
+  it("reports enrolledCount from active enrollments only", async () => {
+    const created = await createClass(prisma, schoolId, { gradeId, section: "A", academicYearId: yearId });
+    if (!created.ok) throw new Error("setup failed");
+
+    const activeStudent = await prisma.student.create({
+      data: { schoolId, name: "Active Student", dob: new Date("2015-01-01"), admissionNo: "ENR-1" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: activeStudent.id, classId: created.class.id, academicYearId: yearId, status: "active" },
+    });
+
+    const inactiveStudent = await prisma.student.create({
+      data: { schoolId, name: "Inactive Student", dob: new Date("2015-01-01"), admissionNo: "ENR-2" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: inactiveStudent.id, classId: created.class.id, academicYearId: yearId, status: "inactive" },
+    });
+
+    const classes = await listClasses(prisma, schoolId);
+    expect(classes).toHaveLength(1);
+    expect(classes[0].enrolledCount).toBe(1);
   });
 
   it("stores and reads back capacity and room on create and edit", async () => {

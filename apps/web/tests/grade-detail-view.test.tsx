@@ -73,6 +73,56 @@ describe("GradeDetailView", () => {
     vi.unstubAllGlobals();
   });
 
+  it("sends the subject metadata on create", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 3,
+            name: "Physics",
+            gradeId: 1,
+            versionCount: 0,
+            code: "PHY-101",
+            creditHours: null,
+            weeklyPeriods: 5,
+            isPractical: false,
+            isElective: true,
+          }),
+          { status: 201 }
+        )
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify(subjects), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<GradeDetailView gradeId={1} gradeName="Grade 1" initialSubjects={subjects} />);
+    await userEvent.click(screen.getByRole("button", { name: "+ Add Subject" }));
+    await userEvent.type(screen.getByLabelText("Subject name"), "Physics");
+    await userEvent.type(screen.getByLabelText("Subject code"), "PHY-101");
+    await userEvent.type(screen.getByLabelText("Weekly periods"), "5");
+    await userEvent.click(screen.getByLabelText("Elective"));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(fetchMock).toHaveBeenCalled();
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.code).toBe("PHY-101");
+    expect(body.weeklyPeriods).toBe(5);
+    expect(body.isElective).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("shows an elective badge on elective subjects", () => {
+    const withElective = [
+      ...subjects,
+      { id: 3, name: "Music", gradeId: 1, versionCount: 0, isElective: true },
+    ];
+    render(<GradeDetailView gradeId={1} gradeName="Grade 1" initialSubjects={withElective} />);
+    const musicCard = screen.getByRole("link", { name: "Music" }).closest("div")!.parentElement!;
+    expect(within(musicCard).getByText("Elective")).toBeInTheDocument();
+    const mathCard = screen.getByRole("link", { name: "Mathematics" }).closest("div")!.parentElement!;
+    expect(within(mathCard).queryByText("Elective")).not.toBeInTheDocument();
+  });
+
   it("switches to list view and shows the same subjects in a table", async () => {
     render(<GradeDetailView gradeId={1} gradeName="Grade 1" initialSubjects={subjects} />);
     await userEvent.click(screen.getByRole("button", { name: "List view" }));

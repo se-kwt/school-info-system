@@ -16,6 +16,9 @@ export interface ClassRow {
   section: string;
   academicYearId: number;
   archived: boolean;
+  capacity?: number | null;
+  room?: string | null;
+  enrolledCount?: number;
 }
 
 interface GradeOption {
@@ -31,6 +34,11 @@ interface AcademicYearOption {
 type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
 
 const PAGE_SIZE = 8;
+
+function enrollmentLabel(klass: ClassRow): string | undefined {
+  if (klass.enrolledCount === undefined) return undefined;
+  return klass.capacity != null ? `${klass.enrolledCount} / ${klass.capacity}` : `${klass.enrolledCount}`;
+}
 
 export function ClassesView({
   initialClasses,
@@ -50,6 +58,8 @@ export function ClassesView({
   const [gradeId, setGradeId] = useState(grades[0] ? String(grades[0].id) : "");
   const [section, setSection] = useState("");
   const [academicYearId, setAcademicYearId] = useState(academicYears[0] ? String(academicYears[0].id) : "");
+  const [capacity, setCapacity] = useState("");
+  const [room, setRoom] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
 
@@ -65,12 +75,16 @@ export function ClassesView({
     setGradeId(grades[0] ? String(grades[0].id) : "");
     setSection("");
     setAcademicYearId(academicYears[0] ? String(academicYears[0].id) : "");
+    setCapacity("");
+    setRoom("");
     setError(null);
   }
 
   function openEdit(klass: ClassRow) {
     setModalState({ mode: "edit", id: klass.id });
     setSection(klass.section);
+    setCapacity(klass.capacity != null ? String(klass.capacity) : "");
+    setRoom(klass.room ?? "");
     setError(null);
   }
 
@@ -85,7 +99,13 @@ export function ClassesView({
       const response = await fetch("/api/classes", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ gradeId: Number(gradeId), section, academicYearId: Number(academicYearId) }),
+        body: JSON.stringify({
+          gradeId: Number(gradeId),
+          section,
+          academicYearId: Number(academicYearId),
+          capacity: capacity ? Number(capacity) : undefined,
+          room: room || undefined,
+        }),
       });
       if (response.status === 201) {
         closeModal();
@@ -99,7 +119,11 @@ export function ClassesView({
       const response = await fetch(`/api/classes/${modalState.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ section }),
+        body: JSON.stringify({
+          section,
+          capacity: capacity ? Number(capacity) : undefined,
+          room: room || undefined,
+        }),
       });
       if (response.ok) {
         closeModal();
@@ -220,6 +244,7 @@ export function ClassesView({
                 href={`/dashboard/classes/${klass.id}`}
                 title={title}
                 subtitle={yearName}
+                tagLine={enrollmentLabel(klass)}
                 footerBadge={klass.archived ? "Archived" : undefined}
                 onEdit={() => openEdit(klass)}
                 menuItems={menuItems}
@@ -261,6 +286,7 @@ export function ClassesView({
               <th className="border-b border-gray-200 pb-2">Grade</th>
               <th className="border-b border-gray-200 pb-2">Section</th>
               <th className="border-b border-gray-200 pb-2">Year</th>
+              <th className="border-b border-gray-200 pb-2">Roster</th>
               <th className="border-b border-gray-200 pb-2">Status</th>
               <th className="border-b border-gray-200 pb-2">Actions</th>
             </tr>
@@ -273,6 +299,7 @@ export function ClassesView({
                 <td className="border-b border-gray-100 py-2">
                   {academicYears.find((year) => year.id === klass.academicYearId)?.name ?? klass.academicYearId}
                 </td>
+                <td className="border-b border-gray-100 py-2">{enrollmentLabel(klass)}</td>
                 <td className="border-b border-gray-100 py-2">
                   {klass.archived && (
                     <span className="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-600">Archived</span>
@@ -359,6 +386,23 @@ export function ClassesView({
               ))}
             </select>
           )}
+          <input
+            type="number"
+            min="1"
+            aria-label="Capacity"
+            value={capacity}
+            onChange={(event) => setCapacity(event.target.value)}
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            placeholder="e.g. 40"
+          />
+          <input
+            type="text"
+            aria-label="Room"
+            value={room}
+            onChange={(event) => setRoom(event.target.value)}
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            placeholder="e.g. B-204"
+          />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end">
             <button

@@ -34,7 +34,19 @@ describe("subjects lib", () => {
     const result = await listSubjects(prisma, { gradeId, schoolId });
     expect(result).toEqual({
       ok: true,
-      subjects: [{ id: expect.any(Number), name: "Mathematics", gradeId, versionCount: 0 }],
+      subjects: [
+        {
+          id: expect.any(Number),
+          name: "Mathematics",
+          gradeId,
+          versionCount: 0,
+          code: null,
+          creditHours: null,
+          weeklyPeriods: null,
+          isPractical: false,
+          isElective: false,
+        },
+      ],
     });
   });
 

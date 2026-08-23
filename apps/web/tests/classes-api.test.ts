@@ -57,8 +57,39 @@ describe("/api/classes", () => {
     expect(getResponse.status).toBe(200);
     const list = await getResponse.json();
     expect(list).toEqual([
-      { id: created.id, gradeId: grade.id, gradeName: "Grade 6", section: "B", academicYearId: year.id, archived: false, capacity: null, room: null },
+      {
+        id: created.id,
+        gradeId: grade.id,
+        gradeName: "Grade 6",
+        section: "B",
+        academicYearId: year.id,
+        archived: false,
+        capacity: null,
+        room: null,
+        enrolledCount: 0,
+      },
     ]);
+  });
+
+  it("creates a class with capacity and room", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const year = await createActiveYear(prisma, school.id);
+    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 7" } });
+
+    const postRequest = new Request("http://localhost/api/classes", {
+      method: "POST",
+      body: JSON.stringify({ gradeId: grade.id, section: "A", academicYearId: year.id, capacity: 40, room: "B-204" }),
+      headers: { "content-type": "application/json" },
+    });
+    const postResponse = await postClasses(postRequest);
+    expect(postResponse.status).toBe(201);
+    const created = await postResponse.json();
+    expect(created).toMatchObject({ capacity: 40, room: "B-204" });
+
+    const stored = await prisma.class.findUniqueOrThrow({ where: { id: created.id } });
+    expect(stored.capacity).toBe(40);
+    expect(stored.room).toBe("B-204");
   });
 
   it("rejects a duplicate grade+section+year with 409", async () => {
@@ -120,7 +151,17 @@ describe("/api/classes", () => {
     const defaultResponse = await getClasses(new Request("http://localhost/api/classes"));
     const defaultList = await defaultResponse.json();
     expect(defaultList).toEqual([
-      { id: active.id, gradeId: active.gradeId, gradeName: "Grade 9", section: "A", academicYearId: year.id, archived: false, capacity: null, room: null },
+      {
+        id: active.id,
+        gradeId: active.gradeId,
+        gradeName: "Grade 9",
+        section: "A",
+        academicYearId: year.id,
+        archived: false,
+        capacity: null,
+        room: null,
+        enrolledCount: 0,
+      },
     ]);
 
     const allResponse = await getClasses(new Request("http://localhost/api/classes?includeArchived=true"));
@@ -164,6 +205,25 @@ describe("/api/classes/[id]", () => {
 
     const updated = await prisma.class.findUnique({ where: { id: klass.id } });
     expect(updated?.section).toBe("B");
+  });
+
+  it("edits a class's capacity and room", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
+
+    const request = new Request(`http://localhost/api/classes/${klass.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ capacity: 35, room: "Block C-201" }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchClass(request, { params: Promise.resolve({ id: String(klass.id) }) });
+    expect(response.status).toBe(200);
+
+    const updated = await prisma.class.findUnique({ where: { id: klass.id } });
+    expect(updated?.capacity).toBe(35);
+    expect(updated?.room).toBe("Block C-201");
   });
 
   it("rejects an edit that collides with another class's grade+section+year", async () => {
