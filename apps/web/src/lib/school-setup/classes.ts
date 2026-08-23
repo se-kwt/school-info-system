@@ -42,11 +42,19 @@ export async function listClasses(
     },
     include: {
       grade: true,
-      // A class's academicYearId is fixed at creation and every enrollment
-      // write path (createStudent/editStudent) validates classId against
-      // that same academicYearId before writing, so an "active" enrollment
-      // for this class can never belong to a different year — filtering on
-      // status alone already scopes the count to this class's own year.
+      // Every enrollment write path (createStudent/editStudent) validates
+      // classId against the target class's academicYearId before writing,
+      // so an "active" enrollment for this class is always created against
+      // that class's year. editClass additionally refuses to change a
+      // class's academicYearId while it has active enrollments (see the
+      // HAS_ACTIVE_ENROLLMENTS guard below), which is what actually keeps
+      // this invariant true for the *lifetime* of the class, not just at
+      // enrollment time — without that guard, an admin reassigning a
+      // class's year mid-year would leave stale-year enrollments here that
+      // this status-only filter would incorrectly count. Filtering on
+      // status alone is therefore safe: it scopes the count to this
+      // class's own year without needing to reference the parent row's own
+      // academicYearId (which Prisma's `_count.where` can't do anyway).
       _count: {
         select: {
           enrollments: { where: { status: "active" } },
@@ -101,7 +109,8 @@ export type EditClassResult =
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "DUPLICATE" }
   | { ok: false; error: "INVALID_GRADE" }
-  | { ok: false; error: "INVALID_YEAR" };
+  | { ok: false; error: "INVALID_YEAR" }
+  | { ok: false; error: "HAS_ACTIVE_ENROLLMENTS" };
 
 export async function editClass(
   prisma: PrismaClient,
@@ -117,6 +126,24 @@ export async function editClass(
   if (params.fields.academicYearId !== undefined) {
     const year = await prisma.academicYear.findFirst({ where: { id: params.fields.academicYearId, schoolId: params.schoolId } });
     if (!year) return { ok: false, error: "INVALID_YEAR" };
+
+    // Reassigning a class to a different academic year while it still has
+    // active enrollments would leave those enrollment rows pointing at a
+    // class whose academicYearId no longer matches the year the student was
+    // actually enrolled in. Beyond corrupting that per-class invariant,
+    // listClasses's enrolledCount (`_count` on `enrollments: { where: {
+    // status: "active" } }`, deliberately not re-filtered by academicYearId
+    // because a class's year was assumed immutable in practice) would start
+    // counting stale-year enrollments as if they belonged to the new year.
+    // Rather than special-case that display path, block the reassignment
+    // outright so the "a class's academicYearId doesn't change under active
+    // enrollments" invariant actually holds.
+    if (params.fields.academicYearId !== klass.academicYearId) {
+      const activeEnrollmentCount = await prisma.enrollment.count({
+        where: { classId: params.classId, status: "active" },
+      });
+      if (activeEnrollmentCount > 0) return { ok: false, error: "HAS_ACTIVE_ENROLLMENTS" };
+    }
   }
 
   const nextGradeId = params.fields.gradeId ?? klass.gradeId;

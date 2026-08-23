@@ -93,6 +93,57 @@ describe("classes lib", () => {
     expect(result).toEqual({ ok: false, error: "HAS_HISTORY" });
   });
 
+  it("rejects changing a class's academicYearId while it has an active enrollment", async () => {
+    const created = await createClass(prisma, schoolId, { gradeId, section: "A", academicYearId: yearId });
+    if (!created.ok) throw new Error("setup failed");
+    const nextYear = await prisma.academicYear.create({
+      data: { schoolId, name: "2027-28", startDate: new Date("2027-06-01"), endDate: new Date("2028-04-30"), status: "upcoming" },
+    });
+
+    const student = await prisma.student.create({
+      data: { schoolId, name: "Enrolled Student", dob: new Date("2015-01-01"), admissionNo: "GUARD-1" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: student.id, classId: created.class.id, academicYearId: yearId, status: "active" },
+    });
+
+    const result = await editClass(prisma, {
+      classId: created.class.id,
+      schoolId,
+      fields: { academicYearId: nextYear.id },
+    });
+    expect(result).toEqual({ ok: false, error: "HAS_ACTIVE_ENROLLMENTS" });
+
+    const stillOriginalYear = await prisma.class.findUniqueOrThrow({ where: { id: created.class.id } });
+    expect(stillOriginalYear.academicYearId).toBe(yearId);
+  });
+
+  it("allows changing a class's academicYearId when it has no active enrollments", async () => {
+    const created = await createClass(prisma, schoolId, { gradeId, section: "A", academicYearId: yearId });
+    if (!created.ok) throw new Error("setup failed");
+    const nextYear = await prisma.academicYear.create({
+      data: { schoolId, name: "2027-28", startDate: new Date("2027-06-01"), endDate: new Date("2028-04-30"), status: "upcoming" },
+    });
+
+    // A "left" enrollment is not active, so it shouldn't block the reassignment.
+    const student = await prisma.student.create({
+      data: { schoolId, name: "Departed Student", dob: new Date("2015-01-01"), admissionNo: "GUARD-2" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: student.id, classId: created.class.id, academicYearId: yearId, status: "left" },
+    });
+
+    const result = await editClass(prisma, {
+      classId: created.class.id,
+      schoolId,
+      fields: { academicYearId: nextYear.id },
+    });
+    expect(result).toEqual({ ok: true });
+
+    const updated = await prisma.class.findUniqueOrThrow({ where: { id: created.class.id } });
+    expect(updated.academicYearId).toBe(nextYear.id);
+  });
+
   it("reports enrolledCount from active enrollments only", async () => {
     const created = await createClass(prisma, schoolId, { gradeId, section: "A", academicYearId: yearId });
     if (!created.ok) throw new Error("setup failed");

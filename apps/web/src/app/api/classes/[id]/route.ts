@@ -41,6 +41,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       if (result.error === "INVALID_YEAR") {
         return NextResponse.json({ error: "The selected academic year does not exist" }, { status: 400 });
       }
+      if (result.error === "HAS_ACTIVE_ENROLLMENTS") {
+        return NextResponse.json(
+          { error: "This class has active enrollments and cannot be moved to a different academic year" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json({ error: "A class with this grade, section, and year already exists" }, { status: 409 });
     }
 

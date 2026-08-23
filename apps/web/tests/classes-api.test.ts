@@ -226,6 +226,37 @@ describe("/api/classes/[id]", () => {
     expect(updated?.room).toBe("Block C-201");
   });
 
+  it("rejects moving a class to a different academic year while it has an active enrollment, with a 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 9", section: "A" });
+    await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Enrolled Student",
+      dob: new Date("2015-01-01"),
+      admissionNo: "SCH-GUARD-1",
+    });
+    const nextYear = await prisma.academicYear.create({
+      data: { schoolId: school.id, name: "2027-28", startDate: new Date("2027-06-01"), endDate: new Date("2028-04-30"), status: "upcoming" },
+    });
+
+    const request = new Request(`http://localhost/api/classes/${klass.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ academicYearId: nextYear.id }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await patchClass(request, { params: Promise.resolve({ id: String(klass.id) }) });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("This class has active enrollments and cannot be moved to a different academic year");
+
+    const stillOriginalYear = await prisma.class.findUnique({ where: { id: klass.id } });
+    expect(stillOriginalYear?.academicYearId).toBe(year.id);
+  });
+
   it("rejects an edit that collides with another class's grade+section+year", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await loginAsAdmin(school.id);
