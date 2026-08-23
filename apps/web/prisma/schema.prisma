@@ -396,6 +396,7 @@ model Assignment {
   @@index([subjectId])
   @@index([createdById])
   @@index([academicYearId])
+  @@index([dueDate])
 }
 
 model AssignmentStatus {
