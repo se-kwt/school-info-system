@@ -26,7 +26,7 @@ describe("students.ts scalar fields", () => {
       gender: "female",
       studentIdNumber: "STU-100",
       dateOfJoin: "2026-06-01",
-      parents: [{ relationship: "Mother", name: "A Parent", phone: "+15550001000" }],
+      parents: [{ relationship: "mother", name: "A Parent", phone: "+15550001000" }],
     });
     expect(result.ok).toBe(true);
 
@@ -49,7 +49,7 @@ describe("students.ts scalar fields", () => {
       classId: klass.id,
       admissionNo: "SCH-101",
       studentIdNumber: "STU-DUP",
-      parents: [{ relationship: "Mother", name: "A Parent", phone: "+15550001001" }],
+      parents: [{ relationship: "mother", name: "A Parent", phone: "+15550001001" }],
     });
 
     const result = await createStudent(prisma, school.id, year.id, {
@@ -58,7 +58,7 @@ describe("students.ts scalar fields", () => {
       classId: klass.id,
       admissionNo: "SCH-102",
       studentIdNumber: "STU-DUP",
-      parents: [{ relationship: "Mother", name: "Another Parent", phone: "+15550001002" }],
+      parents: [{ relationship: "mother", name: "Another Parent", phone: "+15550001002" }],
     });
     expect(result).toMatchObject({ ok: false, error: "DUPLICATE_STUDENT_ID" });
   });
@@ -99,7 +99,7 @@ describe("students.ts scalar fields", () => {
       classId: klass.id,
       admissionNo: "SCH-104",
       studentIdNumber: "STU-TAKEN",
-      parents: [{ relationship: "Mother", name: "A Parent", phone: "+15550001004" }],
+      parents: [{ relationship: "mother", name: "A Parent", phone: "+15550001004" }],
     });
     const student = await createEnrolledStudent(prisma, {
       schoolId: school.id,
@@ -141,8 +141,8 @@ describe("students.ts multiple parents", () => {
       classId: klass.id,
       admissionNo: "SCH-200",
       parents: [
-        { relationship: "Father", name: "Dad", phone: "+15550002000", email: "dad@example.com" },
-        { relationship: "Mother", name: "Mom", phone: "+15550002001" },
+        { relationship: "father", name: "Dad", phone: "+15550002000", email: "dad@example.com" },
+        { relationship: "mother", name: "Mom", phone: "+15550002001" },
       ],
     });
     expect(result.ok).toBe(true);
@@ -150,8 +150,8 @@ describe("students.ts multiple parents", () => {
     const list = await listStudents(prisma, school.id);
     const created = list.find((s) => s.admissionNo === "SCH-200");
     expect(created?.parents).toEqual([
-      { relationship: "Father", name: "Dad", phone: "+15550002000", email: "dad@example.com" },
-      { relationship: "Mother", name: "Mom", phone: "+15550002001", email: null },
+      { relationship: "father", name: "Dad", phone: "+15550002000", email: "dad@example.com" },
+      { relationship: "mother", name: "Mom", phone: "+15550002001", email: null },
     ]);
   });
 
@@ -180,8 +180,8 @@ describe("students.ts multiple parents", () => {
       classId: klass.id,
       admissionNo: "SCH-202",
       parents: [
-        { relationship: "Father", name: "Dad", phone: "+15550002002" },
-        { relationship: "Mother", name: "Mom", phone: "+15550002003" },
+        { relationship: "father", name: "Dad", phone: "+15550002002" },
+        { relationship: "mother", name: "Mom", phone: "+15550002003" },
       ],
     });
     if (!createResult.ok) throw new Error("setup failed");
@@ -192,8 +192,8 @@ describe("students.ts multiple parents", () => {
       academicYearId: year.id,
       fields: {
         parents: [
-          { relationship: "Father", name: "Dad Updated", phone: "+15550002002", email: "dad@example.com" },
-          { relationship: "Guardian", name: "New Guardian", phone: "+15550002004" },
+          { relationship: "father", name: "Dad Updated", phone: "+15550002002", email: "dad@example.com" },
+          { relationship: "guardian", name: "New Guardian", phone: "+15550002004" },
         ],
       },
     });
@@ -202,8 +202,8 @@ describe("students.ts multiple parents", () => {
     const list = await listStudents(prisma, school.id);
     const edited = list.find((s) => s.admissionNo === "SCH-202");
     expect(edited?.parents).toEqual([
-      { relationship: "Father", name: "Dad Updated", phone: "+15550002002", email: "dad@example.com" },
-      { relationship: "Guardian", name: "New Guardian", phone: "+15550002004", email: null },
+      { relationship: "father", name: "Dad Updated", phone: "+15550002002", email: "dad@example.com" },
+      { relationship: "guardian", name: "New Guardian", phone: "+15550002004", email: null },
     ]);
   });
 });
@@ -236,7 +236,7 @@ describe("students.ts sibling links", () => {
       dob: "2016-01-01",
       classId: klass.id,
       admissionNo: "SCH-301",
-      parents: [{ relationship: "Mother", name: "A Parent", phone: "+15550003000" }],
+      parents: [{ relationship: "mother", name: "A Parent", phone: "+15550003000" }],
       siblingStudentIds: [existingSibling.id],
     });
     if (!result.ok) throw new Error("create failed");
@@ -366,7 +366,7 @@ describe("students.ts sibling links", () => {
       dob: "2016-01-01",
       classId: classA.id,
       admissionNo: "A-100",
-      parents: [{ relationship: "Mother", name: "Shared Parent", phone: "+15550009999" }],
+      parents: [{ relationship: "mother", name: "Shared Parent", phone: "+15550009999" }],
     });
 
     const result = await createStudent(prisma, schoolB.id, yearB.id, {
@@ -374,7 +374,7 @@ describe("students.ts sibling links", () => {
       dob: "2016-01-01",
       classId: classB.id,
       admissionNo: "B-100",
-      parents: [{ relationship: "Mother", name: "Shared Parent", phone: "+15550009999" }],
+      parents: [{ relationship: "mother", name: "Shared Parent", phone: "+15550009999" }],
     });
 
     expect(result).toMatchObject({ ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" });
@@ -393,7 +393,7 @@ describe("students.ts sibling links", () => {
       dob: "2016-01-01",
       classId: classA.id,
       admissionNo: "A-101",
-      parents: [{ relationship: "Mother", name: "Shared Parent", phone: "+15550008888" }],
+      parents: [{ relationship: "mother", name: "Shared Parent", phone: "+15550008888" }],
     });
 
     const studentB = await createEnrolledStudent(prisma, {
@@ -409,7 +409,7 @@ describe("students.ts sibling links", () => {
       studentId: studentB.id,
       schoolId: schoolB.id,
       academicYearId: yearB.id,
-      fields: { parents: [{ relationship: "Father", name: "Shared Parent", phone: "+15550008888" }] },
+      fields: { parents: [{ relationship: "father", name: "Shared Parent", phone: "+15550008888" }] },
     });
 
     expect(result).toMatchObject({ ok: false, error: "PHONE_BELONGS_TO_ANOTHER_SCHOOL" });
@@ -437,7 +437,7 @@ describe("students.ts sibling links", () => {
       studentId: student.id,
       schoolId: school.id,
       academicYearId: year.id,
-      fields: { parents: [{ relationship: "Father", name: teacher.name, phone: teacher.phone }] },
+      fields: { parents: [{ relationship: "father", name: teacher.name, phone: teacher.phone }] },
     });
 
     expect(result).toMatchObject({ ok: false, error: "PHONE_WRONG_ROLE" });
@@ -456,7 +456,7 @@ describe("students.ts sibling links", () => {
       dob: "2016-01-01",
       classId: klass.id,
       admissionNo: "SCH-INVALID-PHONE",
-      parents: [{ relationship: "Mother", name: "A Parent", phone: "not-a-phone" }],
+      parents: [{ relationship: "mother", name: "A Parent", phone: "not-a-phone" }],
     });
 
     expect(result).toMatchObject({ ok: false, error: "INVALID_PHONE" });
@@ -480,7 +480,7 @@ describe("students.ts sibling links", () => {
       studentId: student.id,
       schoolId: school.id,
       academicYearId: year.id,
-      fields: { parents: [{ relationship: "Father", name: "Bad Phone Parent", phone: "not-a-phone" }] },
+      fields: { parents: [{ relationship: "father", name: "Bad Phone Parent", phone: "not-a-phone" }] },
     });
 
     expect(result).toMatchObject({ ok: false, error: "INVALID_PHONE" });
@@ -517,7 +517,7 @@ describe("students.ts admission record fields", () => {
       emergencyContactPhone: "+919876543210",
       category: "General",
       admissionDate: "2026-04-01",
-      parents: [{ relationship: "Guardian", name: "Parent", phone: "+10000000060" }],
+      parents: [{ relationship: "guardian", name: "Parent", phone: "+10000000060" }],
     });
 
     expect(result.ok).toBe(true);
@@ -541,7 +541,7 @@ describe("students.ts admission record fields", () => {
       dob: "2015-01-01",
       classId: klass.id,
       admissionNo: "MIN-001",
-      parents: [{ relationship: "Guardian", name: "Parent", phone: "+10000000061" }],
+      parents: [{ relationship: "guardian", name: "Parent", phone: "+10000000061" }],
     });
 
     expect(result.ok).toBe(true);
@@ -582,7 +582,7 @@ describe("students.ts year scope on class validation", () => {
       dob: "2015-01-01",
       classId: staleClass.id,
       admissionNo: "GHOST-001",
-      parents: [{ relationship: "Guardian", name: "Parent", phone: "+10000000042" }],
+      parents: [{ relationship: "guardian", name: "Parent", phone: "+10000000042" }],
     });
 
     expect(result).toEqual({ ok: false, error: "INVALID_CLASS" });
@@ -617,7 +617,7 @@ describe("students.ts year scope on class validation", () => {
       dob: "2015-01-01",
       classId: activeClass.id,
       admissionNo: "REAL-001",
-      parents: [{ relationship: "Guardian", name: "Parent", phone: "+10000000043" }],
+      parents: [{ relationship: "guardian", name: "Parent", phone: "+10000000043" }],
     });
     expect(created.ok).toBe(true);
     if (!created.ok) return;
@@ -659,7 +659,7 @@ describe("students.ts class capacity", () => {
       dob: "2015-01-01",
       classId: klass.id,
       admissionNo: "CAP-001",
-      parents: [{ relationship: "Guardian", name: "P", phone: "+10000000080" }],
+      parents: [{ relationship: "guardian", name: "P", phone: "+10000000080" }],
     });
 
     const result = await createStudent(prisma, school.id, year.id, {
@@ -667,7 +667,7 @@ describe("students.ts class capacity", () => {
       dob: "2015-01-01",
       classId: klass.id,
       admissionNo: "CAP-002",
-      parents: [{ relationship: "Guardian", name: "P", phone: "+10000000081" }],
+      parents: [{ relationship: "guardian", name: "P", phone: "+10000000081" }],
     });
 
     expect(result).toEqual({ ok: false, error: "CLASS_FULL" });
@@ -684,7 +684,7 @@ describe("students.ts class capacity", () => {
       dob: "2015-01-01",
       classId: klass.id,
       admissionNo: "CAP-003",
-      parents: [{ relationship: "Guardian", name: "P", phone: "+10000000082" }],
+      parents: [{ relationship: "guardian", name: "P", phone: "+10000000082" }],
     });
 
     expect(result.ok).toBe(true);
@@ -702,7 +702,7 @@ describe("students.ts class capacity", () => {
       dob: "2015-01-01",
       classId: fullClass.id,
       admissionNo: "CAP-010",
-      parents: [{ relationship: "Guardian", name: "P", phone: "+10000000090" }],
+      parents: [{ relationship: "guardian", name: "P", phone: "+10000000090" }],
     });
     const mover = await createEnrolledStudent(prisma, {
       schoolId: school.id,
@@ -770,7 +770,7 @@ describe("students.ts pagination", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: `PAGE-${i}`,
-        parents: [{ relationship: "Mother", name: "A Parent", phone: `+1555000${1000 + i}` }],
+        parents: [{ relationship: "mother", name: "A Parent", phone: `+1555000${1000 + i}` }],
       });
     }
 
@@ -801,7 +801,7 @@ describe("students.ts pagination", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: `SIB-${i}`,
-        parents: [{ relationship: "Mother", name: "A Parent", phone: `+1555001${1000 + i}` }],
+        parents: [{ relationship: "mother", name: "A Parent", phone: `+1555001${1000 + i}` }],
       });
       if (!result.ok) throw new Error("create failed");
       created.push({ id: result.student.id, admissionNo: result.student.admissionNo });
@@ -822,5 +822,74 @@ describe("students.ts pagination", () => {
     const echoOnPage3 = thirdPage.find((s) => s.admissionNo === echo.admissionNo);
     expect(echoOnPage3).toBeDefined();
     expect(echoOnPage3?.siblings.map((s) => s.admissionNo)).toEqual([alpha.admissionNo]);
+  });
+});
+
+describe("students.ts gender and relationship enums", () => {
+  let schoolId: number;
+  let activeYearId: number;
+  let classId: number;
+  let parentUserId: number;
+  let studentId: number;
+
+  beforeEach(async () => {
+    await resetDb();
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+    schoolId = school.id;
+    activeYearId = year.id;
+    classId = klass.id;
+
+    const parent = await prisma.user.create({
+      data: { schoolId, phone: "+10000000099", name: "Existing Parent", role: "parent" },
+    });
+    parentUserId = parent.id;
+    const student = await createEnrolledStudent(prisma, {
+      schoolId,
+      classId,
+      academicYearId: activeYearId,
+      name: "Existing Student",
+      dob: new Date("2015-01-01"),
+      admissionNo: "ENUM-000",
+    });
+    studentId = student.id;
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  it("accepts a third gender value", async () => {
+    const result = await createStudent(prisma, schoolId, activeYearId, {
+      name: "Third", dob: "2015-01-01", classId, admissionNo: "G-001", gender: "other",
+      parents: [{ relationship: "guardian", name: "P", phone: "+10000000090" }],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const student = await prisma.student.findUniqueOrThrow({ where: { id: result.student.id } });
+    expect(student.gender).toBe("other");
+  });
+
+  it("rejects a relationship outside the enum", async () => {
+    await expect(
+      prisma.parentStudent.create({
+        data: { parentUserId, studentId, relationship: "Uncle's Neighbour" as never },
+      })
+    ).rejects.toThrow();
+  });
+
+  it("accepts each enum relationship", async () => {
+    const result = await createStudent(prisma, schoolId, activeYearId, {
+      name: "Rel", dob: "2015-01-01", classId, admissionNo: "R-001",
+      parents: [
+        { relationship: "father", name: "Dad", phone: "+10000000091" },
+        { relationship: "mother", name: "Mum", phone: "+10000000092" },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
   });
 });

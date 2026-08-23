@@ -13,7 +13,7 @@ export interface SaveStudentFields {
   rollNumber: string;
   classId: number | null;
   photoFile: File | null;
-  gender: "male" | "female" | "";
+  gender: "male" | "female" | "other" | "";
   studentIdNumber: string;
   dateOfJoin: string;
   siblingStudentIds: number[];
@@ -51,7 +51,7 @@ export function StudentDetailModal({
     id: number;
     name: string;
     admissionNo: string;
-    gender: "male" | "female" | null;
+    gender: "male" | "female" | "other" | null;
     class: { gradeName: string; section: string } | null;
   }[];
   isAdmin: boolean;
@@ -74,7 +74,7 @@ export function StudentDetailModal({
     mode === "create" ? String(defaultClassId ?? classes[0]?.id ?? "") : ""
   );
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [gender, setGender] = useState<"male" | "female" | "">(student?.gender ?? "");
+  const [gender, setGender] = useState<"male" | "female" | "other" | "">(student?.gender ?? "");
   const [studentIdNumber, setStudentIdNumber] = useState(student?.studentIdNumber ?? "");
   const [dateOfJoin, setDateOfJoin] = useState(student?.dateOfJoin ?? "");
   const [siblingIds, setSiblingIds] = useState<(number | null)[]>(
@@ -121,7 +121,7 @@ export function StudentDetailModal({
   }
 
   function addParentRow() {
-    setParentRows((rows) => [...rows, { relationship: "Father", firstName: "", lastName: "", phone: "", email: "" }]);
+    setParentRows((rows) => [...rows, { relationship: "father", firstName: "", lastName: "", phone: "", email: "" }]);
   }
 
   function updateParentRow(index: number, field: keyof ParentRow, value: string) {
@@ -257,13 +257,14 @@ export function StudentDetailModal({
               id="gender"
               aria-label="Gender"
               value={gender}
-              onChange={(event) => setGender(event.target.value as "male" | "female" | "")}
+              onChange={(event) => setGender(event.target.value as "male" | "female" | "other" | "")}
               disabled={!isAdmin}
               className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
             >
               <option value="">Select gender</option>
               <option value="male">Male</option>
               <option value="female">Female</option>
+              <option value="other">Other</option>
             </select>
           </Field>
           {mode === "edit" && (
@@ -424,10 +425,12 @@ export function StudentDetailModal({
                       disabled={!isAdmin}
                       className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
                     >
-                      <option value="Father">Father</option>
-                      <option value="Mother">Mother</option>
-                      <option value="Guardian">Guardian</option>
-                      <option value="Other">Other</option>
+                      <option value="father">Father</option>
+                      <option value="mother">Mother</option>
+                      <option value="guardian">Guardian</option>
+                      <option value="grandparent">Grandparent</option>
+                      <option value="sibling">Sibling</option>
+                      <option value="other">Other</option>
                     </select>
                   </Field>
                   <div />

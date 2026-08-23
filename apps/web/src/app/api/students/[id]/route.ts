@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { GuardianRelationship } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
@@ -21,10 +22,10 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       classId?: number;
       rollNumber?: string;
       photoUrl?: string;
-      gender?: "male" | "female";
+      gender?: "male" | "female" | "other";
       studentIdNumber?: string;
       dateOfJoin?: string;
-      parents?: { relationship: string; name: string; phone: string; email?: string }[];
+      parents?: { relationship: GuardianRelationship; name: string; phone: string; email?: string }[];
       siblingStudentIds?: number[];
     };
     try {

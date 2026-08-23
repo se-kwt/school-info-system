@@ -7,7 +7,7 @@ export interface StudentRow {
   rollNumber: string | null;
   photoUrl: string | null;
   status: "active" | "left" | "transferred" | "graduated" | "inactive";
-  gender: "male" | "female" | null;
+  gender: "male" | "female" | "other" | null;
   studentIdNumber: string | null;
   dateOfJoin: string | null;
   class: { gradeName: string; section: string } | null;
@@ -16,7 +16,7 @@ export interface StudentRow {
     id: number;
     name: string;
     admissionNo: string;
-    gender: "male" | "female" | null;
+    gender: "male" | "female" | "other" | null;
     class: { gradeName: string; section: string } | null;
   }[];
 }

@@ -52,7 +52,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-001",
-        parents: [{ relationship: "Guardian", name: "Existing Parent", phone: parent.phone }],
+        parents: [{ relationship: "guardian", name: "Existing Parent", phone: parent.phone }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -76,7 +76,7 @@ describe("/api/students", () => {
         dob: "2015-06-15",
         classId: klass.id,
         admissionNo: "SCH-002",
-        parents: [{ relationship: "Guardian", name: "Brand New Parent", phone: "+15558880002" }],
+        parents: [{ relationship: "guardian", name: "Brand New Parent", phone: "+15558880002" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -91,7 +91,7 @@ describe("/api/students", () => {
     const list = await getResponse.json();
     const created = list.find((entry: { admissionNo: string }) => entry.admissionNo === "SCH-002");
     expect(created.parents).toEqual([
-      { relationship: "Guardian", name: "Brand New Parent", phone: "+15558880002", email: null },
+      { relationship: "guardian", name: "Brand New Parent", phone: "+15558880002", email: null },
     ]);
   });
 
@@ -116,7 +116,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-003",
-        parents: [{ relationship: "Guardian", name: "Some Parent", phone: "+15558880003" }],
+        parents: [{ relationship: "guardian", name: "Some Parent", phone: "+15558880003" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -140,7 +140,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: klass.id,
         admissionNo: "SCH-004",
-        parents: [{ relationship: "Guardian", name: "A Teacher", phone: teacher.phone }],
+        parents: [{ relationship: "guardian", name: "A Teacher", phone: teacher.phone }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -184,7 +184,7 @@ describe("/api/students", () => {
         dob: "2016-01-01",
         classId: otherClass.id,
         admissionNo: "SCH-999",
-        parents: [{ relationship: "Guardian", name: "Some Parent", phone: "+15558889999" }],
+        parents: [{ relationship: "guardian", name: "Some Parent", phone: "+15558889999" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -207,7 +207,7 @@ describe("/api/students", () => {
         admissionNo: "SCH-ROLL-1",
         rollNumber: "5",
         photoUrl: "/uploads/students/x.png",
-        parents: [{ relationship: "Guardian", name: "Some Parent", phone: "+15558880010" }],
+        parents: [{ relationship: "guardian", name: "Some Parent", phone: "+15558880010" }],
       }),
       headers: { "content-type": "application/json" },
     });
@@ -247,7 +247,7 @@ describe("/api/students", () => {
         classId: klass.id,
         admissionNo: "SCH-ROLL-3",
         rollNumber: "7",
-        parents: [{ relationship: "Guardian", name: "Some Parent", phone: "+15558880011" }],
+        parents: [{ relationship: "guardian", name: "Some Parent", phone: "+15558880011" }],
       }),
       headers: { "content-type": "application/json" },
     });

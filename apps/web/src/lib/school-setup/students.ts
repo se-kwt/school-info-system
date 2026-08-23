@@ -1,4 +1,4 @@
-import type { PrismaClient, StudentStatus } from "@prisma/client";
+import type { GuardianRelationship, PrismaClient, StudentStatus } from "@prisma/client";
 import { isUniqueConstraintViolation, uniqueConstraintTarget } from "./prisma-errors";
 import { isValidPhone, normalizePhone } from "../phone";
 
@@ -9,12 +9,12 @@ export interface StudentSummary {
   rollNumber: string | null;
   photoUrl: string | null;
   status: StudentStatus;
-  gender: "male" | "female" | null;
+  gender: "male" | "female" | "other" | null;
   studentIdNumber: string | null;
   dateOfJoin: string | null;
   class: { gradeName: string; section: string } | null;
-  parents: { relationship: string; name: string; phone: string; email: string | null }[];
-  siblings: { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { gradeName: string; section: string } | null }[];
+  parents: { relationship: GuardianRelationship; name: string; phone: string; email: string | null }[];
+  siblings: { id: number; name: string; admissionNo: string; gender: "male" | "female" | "other" | null; class: { gradeName: string; section: string } | null }[];
 }
 
 export async function listStudents(
@@ -150,7 +150,7 @@ export async function createStudent(
     admissionNo: string;
     rollNumber?: string;
     photoUrl?: string;
-    gender?: "male" | "female";
+    gender?: "male" | "female" | "other";
     studentIdNumber?: string;
     dateOfJoin?: string;
     address?: string;
@@ -162,7 +162,7 @@ export async function createStudent(
     emergencyContactPhone?: string;
     category?: string;
     admissionDate?: string;
-    parents: { relationship: string; name: string; phone: string; email?: string }[];
+    parents: { relationship: GuardianRelationship; name: string; phone: string; email?: string }[];
     siblingStudentIds?: number[];
   }
 ): Promise<CreateStudentResult> {
@@ -313,7 +313,7 @@ export async function editStudent(
       classId?: number;
       rollNumber?: string;
       photoUrl?: string;
-      gender?: "male" | "female";
+      gender?: "male" | "female" | "other";
       studentIdNumber?: string;
       dateOfJoin?: string;
       address?: string;
@@ -325,7 +325,7 @@ export async function editStudent(
       emergencyContactPhone?: string;
       category?: string;
       admissionDate?: string;
-      parents?: { relationship: string; name: string; phone: string; email?: string }[];
+      parents?: { relationship: GuardianRelationship; name: string; phone: string; email?: string }[];
       siblingStudentIds?: number[];
     };
   }
@@ -413,7 +413,7 @@ export async function editStudent(
         dob?: Date;
         admissionNo?: string;
         photoUrl?: string;
-        gender?: "male" | "female";
+        gender?: "male" | "female" | "other";
         studentIdNumber?: string;
         dateOfJoin?: Date;
         address?: string;

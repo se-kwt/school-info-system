@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { GuardianRelationship } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
@@ -40,10 +41,10 @@ export async function POST(request: Request) {
     let admissionNo: string | undefined;
     let rollNumber: string | undefined;
     let photoUrl: string | undefined;
-    let gender: "male" | "female" | undefined;
+    let gender: "male" | "female" | "other" | undefined;
     let studentIdNumber: string | undefined;
     let dateOfJoin: string | undefined;
-    let parents: { relationship: string; name: string; phone: string; email?: string }[] | undefined;
+    let parents: { relationship: GuardianRelationship; name: string; phone: string; email?: string }[] | undefined;
     let siblingStudentIds: number[] | undefined;
     try {
       ({

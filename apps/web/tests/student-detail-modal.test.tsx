@@ -76,7 +76,7 @@ describe("StudentDetailModal", () => {
         classId: 2,
         photoFile: null,
         parents: [
-          { relationship: "Mother", firstName: "A", lastName: "Parent", phone: "+15550009999", email: "" },
+          { relationship: "mother", firstName: "A", lastName: "Parent", phone: "+15550009999", email: "" },
         ],
       })
     );
@@ -120,7 +120,7 @@ describe("StudentDetailModal", () => {
         mode="edit"
         student={{
           ...existingStudent,
-          parents: [{ relationship: "Father", name: "Suresh Sharma", phone: "+15551234567", email: null }],
+          parents: [{ relationship: "father", name: "Suresh Sharma", phone: "+15551234567", email: null }],
         }}
         classes={classes}
         allStudents={allStudents}

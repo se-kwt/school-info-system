@@ -75,6 +75,16 @@ enum StudentStatus {
 enum Gender {
   male
   female
+  other
+}
+
+enum GuardianRelationship {
+  father
+  mother
+  guardian
+  grandparent
+  sibling
+  other
 }
 
 model School {
@@ -282,7 +292,7 @@ model ParentStudent {
   parentUserId Int
   student      Student  @relation(fields: [studentId], references: [id])
   studentId    Int
-  relationship String   @default("Guardian")
+  relationship GuardianRelationship @default(guardian)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

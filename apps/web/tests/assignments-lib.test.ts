@@ -220,7 +220,7 @@ describe("assignments lib subjectId", () => {
       data: { schoolId, name: "Enrolled Student", dob: new Date("2015-01-01"), admissionNo: "NOTIF-1" },
     });
     await prisma.enrollment.create({ data: { studentId: student.id, classId, academicYearId: yearId, status: "active" } });
-    await prisma.parentStudent.create({ data: { parentUserId: parent.id, studentId: student.id, relationship: "Guardian" } });
+    await prisma.parentStudent.create({ data: { parentUserId: parent.id, studentId: student.id, relationship: "guardian" } });
 
     const created = await createAssignment(prisma, {
       classId,

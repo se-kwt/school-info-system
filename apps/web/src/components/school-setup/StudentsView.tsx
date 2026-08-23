@@ -118,7 +118,7 @@ export function StudentsView({
         classId?: number;
         rollNumber?: string;
         photoUrl?: string;
-        gender?: "male" | "female";
+        gender?: "male" | "female" | "other";
         studentIdNumber?: string;
         dateOfJoin?: string;
         parents?: { relationship: string; name: string; phone: string; email?: string }[];
