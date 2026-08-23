@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "./auth/jwt";
 import { getEnrolledStudents } from "./enrollment";
+import { recordMarkChange } from "./audit";
 
 export interface MarkCell {
   marksObtained: number;
@@ -119,35 +120,45 @@ export async function enterMarks(
   );
   if (!allValid) return { ok: false, error: "INVALID_MARKS_RANGE" };
 
-  await prisma.$transaction(
-    params.entries.map((entry) =>
-      prisma.mark.upsert({
+  await prisma.$transaction(async (tx) => {
+    for (const entry of params.entries) {
+      const existing = await tx.mark.findUnique({
         where: { examId_studentId_subjectId: { examId: params.examId, studentId: entry.studentId, subjectId: params.subjectId } },
-        create: {
-          examId: params.examId,
+      });
+
+      const data = {
+        marksObtained: entry.isAbsent ? 0 : entry.marksObtained,
+        maxMarks: exam.maxMarks,
+        grade: entry.isAbsent ? "AB" : computeGrade(entry.marksObtained, exam.maxMarks),
+        isAbsent: entry.isAbsent ?? false,
+        remarks: entry.remarks ?? null,
+        enteredById: params.teacherUserId,
+        enteredAt: new Date(),
+      };
+
+      if (existing) {
+        await tx.mark.update({ where: { id: existing.id }, data });
+        await recordMarkChange(tx as PrismaClient, {
           studentId: entry.studentId,
+          examId: params.examId,
           subjectId: params.subjectId,
-          academicYearId: params.academicYearId,
-          marksObtained: entry.isAbsent ? 0 : entry.marksObtained,
-          maxMarks: exam.maxMarks,
-          grade: entry.isAbsent ? "AB" : computeGrade(entry.marksObtained, exam.maxMarks),
-          isAbsent: entry.isAbsent ?? false,
-          remarks: entry.remarks ?? null,
-          enteredById: params.teacherUserId,
-          enteredAt: new Date(),
-        },
-        update: {
-          marksObtained: entry.isAbsent ? 0 : entry.marksObtained,
-          maxMarks: exam.maxMarks,
-          grade: entry.isAbsent ? "AB" : computeGrade(entry.marksObtained, exam.maxMarks),
-          isAbsent: entry.isAbsent ?? false,
-          remarks: entry.remarks ?? null,
-          enteredById: params.teacherUserId,
-          enteredAt: new Date(),
-        },
-      })
-    )
-  );
+          fromValue: existing.marksObtained,
+          toValue: data.marksObtained,
+          actorUserId: params.teacherUserId,
+        });
+      } else {
+        await tx.mark.create({
+          data: {
+            examId: params.examId,
+            studentId: entry.studentId,
+            subjectId: params.subjectId,
+            academicYearId: params.academicYearId,
+            ...data,
+          },
+        });
+      }
+    }
+  });
 
   return { ok: true };
 }

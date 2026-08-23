@@ -20,6 +20,7 @@ export async function resetDb(): Promise<void> {
   await prisma.promotionMapping.deleteMany();
   await prisma.promotionRun.deleteMany();
   await prisma.enrollment.deleteMany();
+  await prisma.recordCorrection.deleteMany();
   await prisma.student.deleteMany();
   await prisma.syllabusVersion.deleteMany();
   await prisma.subject.deleteMany();

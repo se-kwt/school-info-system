@@ -3,6 +3,7 @@ import type { SessionClaims } from "./auth/jwt";
 import { getEnrolledStudents } from "./enrollment";
 import { getSchoolLocalToday } from "./date-utils";
 import { attendancePercent } from "./attendance-status";
+import { recordAttendanceChange } from "./audit";
 
 export interface RosterEntry {
   studentId: number;
@@ -149,30 +150,52 @@ export async function markAttendance(
   if (enrolledCount !== params.entries.length) return { ok: false, error: "STUDENT_MISMATCH" };
 
   const targetDate = new Date(params.date);
-  await prisma.$transaction(
-    params.entries.map((entry) =>
-      entry.status === null
-        ? prisma.attendance.deleteMany({
-            where: { studentId: entry.studentId, date: targetDate },
-          })
-        : prisma.attendance.upsert({
-            where: { studentId_date: { studentId: entry.studentId, date: targetDate } },
-            create: {
-              studentId: entry.studentId,
-              academicYearId: params.academicYearId,
-              date: targetDate,
-              status: entry.status,
-              markedById: params.teacherUserId,
-              note: entry.note ?? null,
-            },
-            update: {
-              status: entry.status,
-              markedById: params.teacherUserId,
-              note: entry.note ?? null,
-            },
-          })
-    )
-  );
+  await prisma.$transaction(async (tx) => {
+    for (const entry of params.entries) {
+      const existing = await tx.attendance.findUnique({
+        where: { studentId_date: { studentId: entry.studentId, date: targetDate } },
+      });
+
+      if (entry.status === null) {
+        if (existing) {
+          await tx.attendance.delete({ where: { id: existing.id } });
+          await recordAttendanceChange(tx as PrismaClient, {
+            studentId: entry.studentId,
+            date: targetDate,
+            fromStatus: existing.status,
+            toStatus: "cleared",
+            actorUserId: params.teacherUserId,
+          });
+        }
+        continue;
+      }
+
+      if (existing) {
+        await tx.attendance.update({
+          where: { id: existing.id },
+          data: { status: entry.status, markedById: params.teacherUserId, note: entry.note ?? null },
+        });
+        await recordAttendanceChange(tx as PrismaClient, {
+          studentId: entry.studentId,
+          date: targetDate,
+          fromStatus: existing.status,
+          toStatus: entry.status,
+          actorUserId: params.teacherUserId,
+        });
+      } else {
+        await tx.attendance.create({
+          data: {
+            studentId: entry.studentId,
+            academicYearId: params.academicYearId,
+            date: targetDate,
+            status: entry.status,
+            markedById: params.teacherUserId,
+            note: entry.note ?? null,
+          },
+        });
+      }
+    }
+  });
 
   return { ok: true };
 }

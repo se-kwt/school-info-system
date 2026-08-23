@@ -195,6 +195,7 @@ model User {
   promotionRunsRun    PromotionRun[]
   syllabusVersions    SyllabusVersion[]
   marksEntered        Mark[]            @relation("MarksEnteredBy")
+  recordCorrections   RecordCorrection[] @relation("CorrectionActor")
 
   @@index([schoolId])
 }
@@ -223,6 +224,7 @@ model Student {
   promotionLogEntries PromotionLogEntry[]
   siblingLinks        StudentSibling[]    @relation("StudentSiblingA")
   siblingOfLinks      StudentSibling[]    @relation("StudentSiblingB")
+  recordCorrections   RecordCorrection[]
 
   @@index([schoolId])
 }
@@ -409,6 +411,37 @@ model Mark {
   @@index([studentId])
   @@index([subjectId])
   @@index([academicYearId])
+}
+
+enum CorrectionEntity {
+  attendance
+  mark
+}
+
+model RecordCorrection {
+  id        Int              @id @default(autoincrement())
+  entity    CorrectionEntity
+  student   Student          @relation(fields: [studentId], references: [id])
+  studentId Int
+
+  /// For attendance: the date marked. For marks: null.
+  date      DateTime?
+  /// For marks: the exam and subject. For attendance: both null.
+  examId    Int?
+  subjectId Int?
+
+  fromValue String
+  toValue   String
+
+  actor       User     @relation("CorrectionActor", fields: [actorUserId], references: [id])
+  actorUserId Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([entity, studentId])
+  @@index([actorUserId])
 }
 
 model TimetableEntry {
