@@ -60,7 +60,19 @@ export async function createStaff(
   prisma: PrismaClient,
   schoolId: number,
   academicYearId: number,
-  input: { name: string; phone: string; role: Role; classId?: number; subjectId?: number }
+  input: {
+    name: string;
+    phone: string;
+    role: Role;
+    classId?: number;
+    subjectId?: number;
+    qualification?: string;
+    designation?: string;
+    joiningDate?: string;
+    salary?: number;
+    address?: string;
+    photoUrl?: string;
+  }
 ): Promise<CreateStaffResult> {
   if (!isValidPhone(input.phone)) return { ok: false, error: "INVALID_PHONE" };
   const phone = normalizePhone(input.phone);
@@ -81,7 +93,18 @@ export async function createStaff(
   try {
     const staff = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
-        data: { schoolId, name: input.name, phone, role: input.role },
+        data: {
+          schoolId,
+          name: input.name,
+          phone,
+          role: input.role,
+          qualification: input.qualification,
+          designation: input.designation,
+          joiningDate: input.joiningDate ? new Date(input.joiningDate) : null,
+          salary: input.salary ?? null,
+          address: input.address,
+          photoUrl: input.photoUrl,
+        },
       });
 
       if (input.role === "teacher" && input.classId && input.subjectId) {
@@ -129,6 +152,12 @@ export async function editStaff(
       role?: Role;
       classId?: number | null;
       subjectId?: number | null;
+      qualification?: string;
+      designation?: string;
+      joiningDate?: string;
+      salary?: number;
+      address?: string;
+      photoUrl?: string;
     };
   }
 ): Promise<EditStaffResult> {
@@ -161,10 +190,26 @@ export async function editStaff(
   }
 
   await prisma.$transaction(async (tx) => {
-    const data: { name?: string; phone?: string; role?: Role } = {};
+    const data: {
+      name?: string;
+      phone?: string;
+      role?: Role;
+      qualification?: string;
+      designation?: string;
+      joiningDate?: Date | null;
+      salary?: number | null;
+      address?: string;
+      photoUrl?: string;
+    } = {};
     if (params.fields.name !== undefined) data.name = params.fields.name;
     if (normalizedPhone !== undefined) data.phone = normalizedPhone;
     if (params.fields.role !== undefined) data.role = params.fields.role;
+    if (params.fields.qualification !== undefined) data.qualification = params.fields.qualification;
+    if (params.fields.designation !== undefined) data.designation = params.fields.designation;
+    if (params.fields.joiningDate !== undefined) data.joiningDate = params.fields.joiningDate ? new Date(params.fields.joiningDate) : null;
+    if (params.fields.salary !== undefined) data.salary = params.fields.salary ?? null;
+    if (params.fields.address !== undefined) data.address = params.fields.address;
+    if (params.fields.photoUrl !== undefined) data.photoUrl = params.fields.photoUrl;
     if (Object.keys(data).length > 0) {
       await tx.user.update({ where: { id: params.userId }, data });
     }

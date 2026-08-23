@@ -225,3 +225,43 @@ describe("staff lib pagination", () => {
     expect(allStaff.length).toBeGreaterThanOrEqual(5);
   });
 });
+
+describe("staff lib HR fields", () => {
+  let schoolId: number;
+  let yearId: number;
+
+  beforeEach(async () => {
+    await resetDb();
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    schoolId = school.id;
+    const year = await prisma.academicYear.create({
+      data: { schoolId, name: "2026-27", startDate: new Date(), endDate: new Date(), status: "active" },
+    });
+    yearId = year.id;
+  });
+
+  it("stores the full staff record", async () => {
+    const result = await createStaff(prisma, schoolId, yearId, {
+      name: "Full Staff",
+      phone: "+10000000070",
+      role: "teacher",
+      qualification: "M.Sc. Mathematics, B.Ed.",
+      designation: "Senior Teacher",
+      joiningDate: "2020-06-01",
+      salary: 45000,
+      address: "5 Example Lane",
+      photoUrl: "https://example.test/photo.jpg",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: result.staff.id } });
+    expect(user.qualification).toBe("M.Sc. Mathematics, B.Ed.");
+    expect(user.designation).toBe("Senior Teacher");
+    expect(Number(user.salary)).toBe(45000);
+    expect(user.joiningDate?.toISOString().slice(0, 10)).toBe("2020-06-01");
+    expect(user.address).toBe("5 Example Lane");
+    expect(user.photoUrl).toBe("https://example.test/photo.jpg");
+  });
+});

@@ -191,6 +191,14 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
+  // HR record fields for staff
+  qualification String?
+  designation   String?
+  joiningDate   DateTime?
+  salary        Decimal?  @db.Decimal(12, 2)
+  address       String?
+  photoUrl      String?
+
   parentLinks         ParentStudent[]
   classesTaught       ClassTeacher[]
   attendanceMarked    Attendance[]      @relation("MarkedBy")
