@@ -7,6 +7,18 @@ import { StaffDetailModal, type SaveStaffFields } from "./StaffDetailModal";
 type Role = "teacher" | "admin" | "accountant";
 type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
 
+async function uploadPhoto(file: File): Promise<{ ok: true; photoUrl: string } | { ok: false; error: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/api/staff/upload-photo", { method: "POST", body: formData });
+  if (!response.ok) {
+    const body = await response.json();
+    return { ok: false, error: body.error };
+  }
+  const body = await response.json();
+  return { ok: true, photoUrl: body.photoUrl };
+}
+
 export function StaffView({
   initialStaff,
   classes,
@@ -51,6 +63,17 @@ export function StaffView({
 
   async function handleSave(fields: SaveStaffFields) {
     setError(null);
+
+    let photoUrl: string | undefined;
+    if (fields.photoFile) {
+      const uploadResult = await uploadPhoto(fields.photoFile);
+      if (!uploadResult.ok) {
+        setError(uploadResult.error);
+        return;
+      }
+      photoUrl = uploadResult.photoUrl;
+    }
+
     if (modalState?.mode === "create") {
       const response = await fetch("/api/staff", {
         method: "POST",
@@ -61,6 +84,13 @@ export function StaffView({
           role: fields.role,
           classId: fields.classId ?? undefined,
           subjectId: fields.subjectId ?? undefined,
+          email: fields.email || undefined,
+          qualification: fields.qualification || undefined,
+          designation: fields.designation || undefined,
+          joiningDate: fields.joiningDate || undefined,
+          salary: fields.salary !== "" ? Number(fields.salary) : undefined,
+          address: fields.address || undefined,
+          photoUrl,
         }),
       });
       if (response.status === 201) {
@@ -73,16 +103,38 @@ export function StaffView({
     }
 
     if (modalState?.mode === "edit") {
+      const body: {
+        name: string;
+        phone: string;
+        role: Role;
+        classId: number | null;
+        subjectId: number | null;
+        email?: string;
+        qualification?: string;
+        designation?: string;
+        joiningDate?: string;
+        salary?: number;
+        address?: string;
+        photoUrl?: string;
+      } = {
+        name: fields.name,
+        phone: fields.phone,
+        role: fields.role,
+        classId: fields.classId,
+        subjectId: fields.subjectId,
+      };
+      if (fields.email) body.email = fields.email;
+      if (fields.qualification) body.qualification = fields.qualification;
+      if (fields.designation) body.designation = fields.designation;
+      if (fields.joiningDate) body.joiningDate = fields.joiningDate;
+      if (fields.salary !== "") body.salary = Number(fields.salary);
+      if (fields.address) body.address = fields.address;
+      if (photoUrl) body.photoUrl = photoUrl;
+
       const response = await fetch(`/api/staff/${modalState.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name: fields.name,
-          phone: fields.phone,
-          role: fields.role,
-          classId: fields.classId,
-          subjectId: fields.subjectId,
-        }),
+        body: JSON.stringify(body),
       });
       if (response.ok) {
         await refresh();

@@ -9,6 +9,13 @@ export interface StaffRow {
   role: Role;
   status: "active" | "inactive";
   classAssignment: { gradeName: string; section: string; subjectName: string } | null;
+  email?: string | null;
+  qualification?: string | null;
+  designation?: string | null;
+  joiningDate?: string | null;
+  salary?: number | null;
+  address?: string | null;
+  photoUrl?: string | null;
 }
 
 function initials(name: string): string {
@@ -32,6 +39,9 @@ export function StaffCard({ member, onClick }: { member: StaffRow; onClick: () =
         {initials(member.name)}
       </span>
       <span className="text-xs font-semibold text-neutral-800">{member.name}</span>
+      {member.designation && (
+        <span className="text-[11px] text-neutral-500">{member.designation}</span>
+      )}
       <span className="text-[11px] capitalize text-neutral-400">{member.role}</span>
       {member.role === "teacher" && member.classAssignment && (
         <span className="text-[11px] text-neutral-400">

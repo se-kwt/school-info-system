@@ -46,8 +46,28 @@ export async function POST(request: Request) {
     let role: unknown;
     let classId: number | undefined;
     let subjectId: number | undefined;
+    let email: string | undefined;
+    let qualification: string | undefined;
+    let designation: string | undefined;
+    let joiningDate: string | undefined;
+    let salary: number | undefined;
+    let address: string | undefined;
+    let photoUrl: string | undefined;
     try {
-      ({ name, phone, role, classId, subjectId } = await request.json());
+      ({
+        name,
+        phone,
+        role,
+        classId,
+        subjectId,
+        email,
+        qualification,
+        designation,
+        joiningDate,
+        salary,
+        address,
+        photoUrl,
+      } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -74,6 +94,13 @@ export async function POST(request: Request) {
       role,
       classId,
       subjectId,
+      email,
+      qualification,
+      designation,
+      joiningDate,
+      salary,
+      address,
+      photoUrl,
     });
     if (!result.ok) {
       if (result.error === "INVALID_CLASS") {

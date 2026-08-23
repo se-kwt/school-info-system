@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { Modal } from "./Modal";
 import type { StaffRow } from "./StaffCard";
+import { FormSection } from "./FormSection";
+import { Field } from "./Field";
+import { formatMoney } from "@/lib/money";
 
 type Role = "teacher" | "admin" | "accountant";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface SaveStaffFields {
   name: string;
@@ -12,6 +17,13 @@ export interface SaveStaffFields {
   role: Role;
   classId: number | null;
   subjectId: number | null;
+  email: string;
+  qualification: string;
+  designation: string;
+  joiningDate: string;
+  salary: string;
+  address: string;
+  photoFile: File | null;
 }
 
 export function StaffDetailModal({
@@ -48,17 +60,41 @@ export function StaffDetailModal({
   const [role, setRole] = useState<Role>(staff?.role ?? "teacher");
   const [classId, setClassId] = useState("");
   const [subjectId, setSubjectId] = useState("");
+  const [email, setEmail] = useState(staff?.email ?? "");
+  const [qualification, setQualification] = useState(staff?.qualification ?? "");
+  const [designation, setDesignation] = useState(staff?.designation ?? "");
+  const [joiningDate, setJoiningDate] = useState(staff?.joiningDate ?? "");
+  const [salary, setSalary] = useState(staff?.salary != null ? String(staff.salary) : "");
+  const [address, setAddress] = useState(staff?.address ?? "");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const selectedClass = classes.find((klass) => String(klass.id) === classId);
   const availableSubjects = selectedClass ? subjects.filter((s) => s.gradeId === selectedClass.gradeId) : [];
 
   function handleSave() {
+    if (email && !EMAIL_PATTERN.test(email)) {
+      setFormError("Enter a valid email address");
+      return;
+    }
+    if (salary !== "" && Number(salary) < 0) {
+      setFormError("Salary cannot be negative");
+      return;
+    }
+    setFormError(null);
     onSave({
       name,
       phone,
       role,
       classId: role === "teacher" && classId ? Number(classId) : null,
       subjectId: role === "teacher" && classId && subjectId ? Number(subjectId) : null,
+      email,
+      qualification,
+      designation,
+      joiningDate,
+      salary,
+      address,
+      photoFile,
     });
   }
 
@@ -67,6 +103,17 @@ export function StaffDetailModal({
       <h2 className="text-sm font-bold text-neutral-800">
         {mode === "create" ? "Add new staff" : staff?.name}
       </h2>
+
+      {mode === "edit" && staff && (
+        <div className="flex flex-col gap-1 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600">
+          {staff.email && <p>Email: {staff.email}</p>}
+          {staff.qualification && <p>Qualification: {staff.qualification}</p>}
+          {staff.designation && <p>Designation: {staff.designation}</p>}
+          {staff.joiningDate && <p>Joining date: {staff.joiningDate}</p>}
+          {staff.salary != null && <p>Salary: {formatMoney(staff.salary)}</p>}
+          {staff.address && <p>Address: {staff.address}</p>}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <input
@@ -127,7 +174,87 @@ export function StaffDetailModal({
         )}
       </div>
 
-      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <FormSection number={1} title="Employment details">
+        <Field label="Email" htmlFor="email">
+          <input
+            id="email"
+            type="email"
+            aria-label="Email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+            placeholder="Email"
+          />
+        </Field>
+        <Field label="Qualification" htmlFor="qualification">
+          <input
+            id="qualification"
+            type="text"
+            aria-label="Qualification"
+            value={qualification}
+            onChange={(event) => setQualification(event.target.value)}
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+            placeholder="Qualification"
+          />
+        </Field>
+        <Field label="Designation" htmlFor="designation">
+          <input
+            id="designation"
+            type="text"
+            aria-label="Designation"
+            value={designation}
+            onChange={(event) => setDesignation(event.target.value)}
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+            placeholder="Designation"
+          />
+        </Field>
+        <Field label="Joining date" htmlFor="joiningDate">
+          <input
+            id="joiningDate"
+            type="date"
+            aria-label="Joining date"
+            value={joiningDate}
+            onChange={(event) => setJoiningDate(event.target.value)}
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+          />
+        </Field>
+        <Field label="Salary" htmlFor="salary">
+          <input
+            id="salary"
+            type="number"
+            min="0"
+            step="1"
+            aria-label="Salary"
+            value={salary}
+            onChange={(event) => setSalary(event.target.value)}
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+            placeholder="Salary"
+          />
+        </Field>
+        <Field label="Address" htmlFor="address">
+          <input
+            id="address"
+            type="text"
+            aria-label="Address"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+            placeholder="Address"
+          />
+        </Field>
+        <Field label="Photo" htmlFor="photo" className="col-span-2">
+          <input
+            id="photo"
+            type="file"
+            aria-label="Photo"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+          />
+        </Field>
+      </FormSection>
+
+      {(formError || serverError) && <p className="text-sm text-red-600">{formError ?? serverError}</p>}
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex gap-2">

@@ -20,6 +20,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       role?: "teacher" | "admin" | "accountant";
       classId?: number | null;
       subjectId?: number | null;
+      email?: string;
+      qualification?: string;
+      designation?: string;
+      joiningDate?: string;
+      salary?: number;
+      address?: string;
+      photoUrl?: string;
     };
     try {
       body = await request.json();

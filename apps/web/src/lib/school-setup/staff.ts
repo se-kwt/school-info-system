@@ -1,6 +1,7 @@
 import type { PrismaClient, Role } from "@prisma/client";
 import { isUniqueConstraintViolation } from "./prisma-errors";
 import { isValidPhone, normalizePhone } from "../phone";
+import { toNumber } from "../money";
 
 type StaffRole = Exclude<Role, "parent">;
 
@@ -11,6 +12,13 @@ export interface StaffSummary {
   role: StaffRole;
   status: "active" | "inactive";
   classAssignment: { gradeName: string; section: string; subjectName: string } | null;
+  email: string | null;
+  qualification: string | null;
+  designation: string | null;
+  joiningDate: string | null;
+  salary: number | null;
+  address: string | null;
+  photoUrl: string | null;
 }
 
 export async function listStaff(
@@ -45,6 +53,13 @@ export async function listStaff(
       classAssignment: assignment
         ? { gradeName: assignment.class.grade.name, section: assignment.class.section, subjectName: assignment.subject.name }
         : null,
+      email: user.email,
+      qualification: user.qualification,
+      designation: user.designation,
+      joiningDate: user.joiningDate ? user.joiningDate.toISOString().slice(0, 10) : null,
+      salary: user.salary !== null ? toNumber(user.salary) : null,
+      address: user.address,
+      photoUrl: user.photoUrl,
     };
   });
 }
@@ -66,6 +81,7 @@ export async function createStaff(
     role: Role;
     classId?: number;
     subjectId?: number;
+    email?: string;
     qualification?: string;
     designation?: string;
     joiningDate?: string;
@@ -98,6 +114,7 @@ export async function createStaff(
           name: input.name,
           phone,
           role: input.role,
+          email: input.email,
           qualification: input.qualification,
           designation: input.designation,
           joiningDate: input.joiningDate ? new Date(input.joiningDate) : null,
@@ -152,6 +169,7 @@ export async function editStaff(
       role?: Role;
       classId?: number | null;
       subjectId?: number | null;
+      email?: string;
       qualification?: string;
       designation?: string;
       joiningDate?: string;
@@ -194,6 +212,7 @@ export async function editStaff(
       name?: string;
       phone?: string;
       role?: Role;
+      email?: string;
       qualification?: string;
       designation?: string;
       joiningDate?: Date | null;
@@ -204,6 +223,7 @@ export async function editStaff(
     if (params.fields.name !== undefined) data.name = params.fields.name;
     if (normalizedPhone !== undefined) data.phone = normalizedPhone;
     if (params.fields.role !== undefined) data.role = params.fields.role;
+    if (params.fields.email !== undefined) data.email = params.fields.email;
     if (params.fields.qualification !== undefined) data.qualification = params.fields.qualification;
     if (params.fields.designation !== undefined) data.designation = params.fields.designation;
     if (params.fields.joiningDate !== undefined) data.joiningDate = params.fields.joiningDate ? new Date(params.fields.joiningDate) : null;

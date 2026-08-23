@@ -53,6 +53,13 @@ describe("StaffDetailModal", () => {
       role: "teacher",
       classId: 1,
       subjectId: 1,
+      email: "",
+      qualification: "",
+      designation: "",
+      joiningDate: "",
+      salary: "",
+      address: "",
+      photoFile: null,
     });
   });
 
@@ -87,6 +94,13 @@ describe("StaffDetailModal", () => {
       role: "admin",
       classId: null,
       subjectId: null,
+      email: "",
+      qualification: "",
+      designation: "",
+      joiningDate: "",
+      salary: "",
+      address: "",
+      photoFile: null,
     });
   });
 
