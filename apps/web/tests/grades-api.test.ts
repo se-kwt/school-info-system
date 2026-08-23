@@ -11,7 +11,7 @@ vi.mock("next/headers", () => ({
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
 import { signSessionToken } from "../src/lib/auth/jwt";
-import { GET as getGrades } from "../src/app/api/grades/route";
+import { GET as getGrades, POST as postGrades } from "../src/app/api/grades/route";
 
 describe("/api/grades", () => {
   beforeEach(async () => {
@@ -58,5 +58,39 @@ describe("/api/grades", () => {
     cookieStore.get.mockReturnValue(undefined);
     const response = await getGrades(new Request("http://localhost/api/grades"));
     expect(response.status).toBe(401);
+  });
+
+  it("does not lose a grade's sortOrder when two POSTs race in the same school", async () => {
+    // Regression guard for the auto-assigned sortOrder race: `createGrade`
+    // computes sortOrder as (max existing sortOrder) + 1 inside a
+    // Serializable transaction, and this route retries once on Prisma's
+    // P2034 serialization-failure code (see createGradeWithRetry in
+    // src/app/api/grades/route.ts). Without that, two concurrent creates
+    // with no explicit sortOrder can both read the same max and only one
+    // would survive the unique constraint. Firing two concurrent POSTs (no
+    // sortOrder given, so both go through the auto-assign/retry path) and
+    // asserting both succeed with distinct sortOrders is evidence the retry
+    // path actually works, not just that the unique constraint blocks
+    // corruption.
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await loginAsAdmin(school.id);
+
+    function createNamedGrade(name: string) {
+      const request = new Request("http://localhost/api/grades", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+        headers: { "content-type": "application/json" },
+      });
+      return postGrades(request);
+    }
+
+    const [r1, r2] = await Promise.all([createNamedGrade("Grade A"), createNamedGrade("Grade B")]);
+
+    expect(r1.status).toBe(201);
+    expect(r2.status).toBe(201);
+
+    const grades = await prisma.grade.findMany({ where: { schoolId: school.id } });
+    expect(grades).toHaveLength(2);
+    expect(new Set(grades.map((g) => g.sortOrder)).size).toBe(2);
   });
 });

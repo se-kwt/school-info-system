@@ -4,6 +4,13 @@ export async function createClass(
   prisma: PrismaClient,
   params: { schoolId: number; academicYearId: number; name?: string; section?: string; gradeId?: number }
 ) {
+  // This read-then-create max+1 has the same theoretical race as the
+  // pre-fix `createGrade` in src/lib/school-setup/grades.ts (which now
+  // wraps it in a Serializable transaction — see the comment there). It's
+  // intentionally not duplicated here: every test in this suite calls
+  // `resetDb()` in `beforeEach` and awaits helpers sequentially rather than
+  // firing concurrent grade-creating calls, so there's no genuine race to
+  // guard against in this file.
   let gradeId = params.gradeId;
   if (gradeId === undefined) {
     const highest = await prisma.grade.findFirst({
