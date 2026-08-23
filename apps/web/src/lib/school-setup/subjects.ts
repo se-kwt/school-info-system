@@ -137,7 +137,7 @@ export interface SubjectWithGrade {
 export async function listAllSubjects(prisma: PrismaClient, schoolId: number): Promise<SubjectWithGrade[]> {
   const subjects = await prisma.subject.findMany({
     where: { grade: { schoolId } },
-    orderBy: [{ grade: { name: "asc" } }, { name: "asc" }],
+    orderBy: [{ grade: { sortOrder: "asc" } }, { name: "asc" }],
   });
   return subjects.map((s) => ({ id: s.id, name: s.name, gradeId: s.gradeId }));
 }

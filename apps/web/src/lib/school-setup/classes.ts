@@ -33,7 +33,7 @@ export async function listClasses(
       ...(options?.academicYearId ? { academicYearId: options.academicYearId } : {}),
     },
     include: { grade: true },
-    orderBy: [{ grade: { name: "asc" } }, { section: "asc" }],
+    orderBy: [{ grade: { sortOrder: "asc" } }, { section: "asc" }],
   });
   return classes.map(toSummary);
 }

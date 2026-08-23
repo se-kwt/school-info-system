@@ -123,4 +123,29 @@ describe("grades lib", () => {
     const result = await createGrade(prisma, school2.id, { name: "Grade 1" });
     expect(result.ok).toBe(true);
   });
+
+  it("orders grades numerically, not alphabetically", async () => {
+    await createGrade(prisma, schoolId, { name: "Grade 2", sortOrder: 2 });
+    await createGrade(prisma, schoolId, { name: "Grade 10", sortOrder: 10 });
+    await createGrade(prisma, schoolId, { name: "Grade 1", sortOrder: 1 });
+
+    const grades = await listGrades(prisma, schoolId);
+
+    expect(grades.map((g) => g.name)).toEqual(["Grade 1", "Grade 2", "Grade 10"]);
+  });
+
+  it("refuses a duplicate sort order within a school", async () => {
+    await createGrade(prisma, schoolId, { name: "Grade 1", sortOrder: 1 });
+    const result = await createGrade(prisma, schoolId, { name: "Grade One", sortOrder: 1 });
+
+    expect(result).toEqual({ ok: false, error: "DUPLICATE_SORT_ORDER" });
+  });
+
+  it("allows the same sort order in different schools", async () => {
+    const other = await prisma.school.create({ data: { name: "Other" } });
+    await createGrade(prisma, schoolId, { name: "Grade 1", sortOrder: 1 });
+    const result = await createGrade(prisma, other.id, { name: "Grade 1", sortOrder: 1 });
+
+    expect(result.ok).toBe(true);
+  });
 });

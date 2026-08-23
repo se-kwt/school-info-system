@@ -12,7 +12,7 @@ describe("staff lib subject assignment", () => {
     await resetDb();
     const school = await prisma.school.create({ data: { name: "Test School" } });
     schoolId = school.id;
-    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1", sortOrder: 1 } });
     const subject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Mathematics" } });
     subjectId = subject.id;
     const year = await prisma.academicYear.create({
@@ -35,7 +35,7 @@ describe("staff lib subject assignment", () => {
   });
 
   it("rejects a subject that doesn't belong to the target class's grade", async () => {
-    const otherGrade = await prisma.grade.create({ data: { schoolId, name: "Grade 2" } });
+    const otherGrade = await prisma.grade.create({ data: { schoolId, name: "Grade 2", sortOrder: 2 } });
     const otherSubject = await prisma.subject.create({ data: { gradeId: otherGrade.id, name: "Science" } });
     const result = await createStaff(prisma, schoolId, yearId, {
       name: "Teacher Two", phone: "+10000000010", role: "teacher", classId, subjectId: otherSubject.id,

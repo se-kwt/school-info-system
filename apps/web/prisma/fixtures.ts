@@ -14,7 +14,7 @@ export async function createSeedFixtures(prisma: PrismaClient) {
   });
 
   const grade = await prisma.grade.create({
-    data: { schoolId: school.id, name: "Grade 5" },
+    data: { schoolId: school.id, name: "Grade 5", sortOrder: 5 },
   });
 
   const subject = await prisma.subject.create({

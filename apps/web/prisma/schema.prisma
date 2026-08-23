@@ -99,12 +99,18 @@ model Grade {
   school    School    @relation(fields: [schoolId], references: [id])
   schoolId  Int
   name      String
+  // Requires distinct sortOrder per school. Existing grades all default to 0, so
+  // this migration fails on any school with 2+ grades. No live data as of
+  // 2026-08-22; run `prisma migrate reset` and reseed. A real backfill would
+  // assign sortOrder by parsing the numeric part of each grade name.
+  sortOrder Int       @default(0)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   subjects  Subject[]
   classes   Class[]
 
   @@unique([schoolId, name])
+  @@unique([schoolId, sortOrder])
 }
 
 model Subject {

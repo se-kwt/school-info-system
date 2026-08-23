@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { isUniqueConstraintViolation } from "./prisma-errors";
+import { isUniqueConstraintViolation, uniqueConstraintTarget } from "./prisma-errors";
 
 export interface GradeSummary {
   id: number;
@@ -25,7 +25,7 @@ export async function listGrades(
       },
       subjects: { select: { name: true }, orderBy: { name: "asc" } },
     },
-    orderBy: { name: "asc" },
+    orderBy: { sortOrder: "asc" },
   });
   return grades.map((grade) => ({
     id: grade.id,
@@ -36,24 +36,37 @@ export async function listGrades(
   }));
 }
 
-export type CreateGradeResult = { ok: true; grade: { id: number; name: string } } | { ok: false; error: "DUPLICATE" };
+export type CreateGradeResult =
+  | { ok: true; grade: { id: number; name: string } }
+  | { ok: false; error: "DUPLICATE" }
+  | { ok: false; error: "DUPLICATE_SORT_ORDER" };
 
 export async function createGrade(
   prisma: PrismaClient,
   schoolId: number,
-  input: { name: string }
+  input: { name: string; sortOrder?: number }
 ): Promise<CreateGradeResult> {
   const existing = await prisma.grade.findFirst({ where: { schoolId, name: input.name } });
   if (existing) return { ok: false, error: "DUPLICATE" };
 
+  let sortOrder = input.sortOrder;
+  if (sortOrder === undefined) {
+    const highest = await prisma.grade.findFirst({ where: { schoolId }, orderBy: { sortOrder: "desc" } });
+    sortOrder = (highest?.sortOrder ?? 0) + 1;
+  }
+
   try {
     const created = await prisma.grade.create({
-      data: { schoolId, name: input.name },
+      data: { schoolId, name: input.name, sortOrder },
       select: { id: true, name: true },
     });
     return { ok: true, grade: created };
   } catch (err) {
-    if (isUniqueConstraintViolation(err)) return { ok: false, error: "DUPLICATE" };
+    if (isUniqueConstraintViolation(err)) {
+      const target = uniqueConstraintTarget(err);
+      if (target?.includes("sortOrder")) return { ok: false, error: "DUPLICATE_SORT_ORDER" };
+      return { ok: false, error: "DUPLICATE" };
+    }
     throw err;
   }
 }

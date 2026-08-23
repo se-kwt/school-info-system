@@ -4,13 +4,18 @@ export async function createClass(
   prisma: PrismaClient,
   params: { schoolId: number; academicYearId: number; name?: string; section?: string; gradeId?: number }
 ) {
-  const gradeId =
-    params.gradeId ??
-    (
-      await prisma.grade.create({
-        data: { schoolId: params.schoolId, name: params.name ?? `Grade ${Math.floor(Math.random() * 100000)}` },
-      })
-    ).id;
+  let gradeId = params.gradeId;
+  if (gradeId === undefined) {
+    const highest = await prisma.grade.findFirst({
+      where: { schoolId: params.schoolId },
+      orderBy: { sortOrder: "desc" },
+    });
+    const sortOrder = (highest?.sortOrder ?? 0) + 1;
+    const grade = await prisma.grade.create({
+      data: { schoolId: params.schoolId, name: params.name ?? `Grade ${Math.floor(Math.random() * 100000)}`, sortOrder },
+    });
+    gradeId = grade.id;
+  }
   return prisma.class.create({
     data: {
       schoolId: params.schoolId,
