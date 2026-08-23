@@ -38,6 +38,12 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
           { status: 400 }
         );
       }
+      if (result.error === "INVALID_GRADE_PROGRESSION") {
+        return NextResponse.json(
+          { error: "A class can only be promoted into the next grade up, or retained in the same grade" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         { error: "One or more classes are not part of this promotion run" },
         { status: 400 }

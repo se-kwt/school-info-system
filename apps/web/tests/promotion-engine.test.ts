@@ -561,6 +561,153 @@ describe("updateMappings", () => {
   });
 });
 
+describe("grade progression validation", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  async function seedGradedSchool() {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const fromYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2026-27",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2027-04-30"),
+        status: "active",
+      },
+    });
+    const toYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2027-28",
+        startDate: new Date("2027-06-01"),
+        endDate: new Date("2028-04-30"),
+        status: "upcoming",
+      },
+    });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550977777", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+
+    const grade1 = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 1", sortOrder: 1 } });
+    const grade3 = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 3", sortOrder: 3 } });
+    const grade4 = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 4", sortOrder: 4 } });
+    const grade10 = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 10", sortOrder: 10 } });
+
+    // The only class with an active enrollment, so it's the only mapping row
+    // startOrResumePromotionRun creates.
+    const fromClass = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: grade3.id, section: "A", academicYearId: fromYear.id },
+    });
+    const student = await prisma.student.create({
+      data: { schoolId: school.id, name: "Test Student", dob: new Date("2016-01-01"), admissionNo: "SCH-GP" },
+    });
+    await prisma.enrollment.create({
+      data: { studentId: student.id, classId: fromClass.id, academicYearId: fromYear.id, status: "active" },
+    });
+
+    const grade1Class = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: grade1.id, section: "A", academicYearId: toYear.id },
+    });
+    const grade3NextYearClass = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: grade3.id, section: "A", academicYearId: toYear.id },
+    });
+    const grade4Class = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: grade4.id, section: "A", academicYearId: toYear.id },
+    });
+    const grade10Class = await prisma.class.create({
+      data: { schoolId: school.id, gradeId: grade10.id, section: "A", academicYearId: toYear.id },
+    });
+
+    const { startOrResumePromotionRun } = await import("../src/lib/promotion");
+    const started = await startOrResumePromotionRun(prisma, {
+      schoolId: school.id,
+      initiatedById: admin.id,
+      toAcademicYearId: toYear.id,
+    });
+    if (!started.ok) throw new Error("setup failed: " + started.error);
+
+    return {
+      school,
+      fromYear,
+      toYear,
+      admin,
+      runId: started.id,
+      mappings: started.mappings,
+      fromClassId: fromClass.id,
+      grade1ClassId: grade1Class.id,
+      grade3NextYearClassId: grade3NextYearClass.id,
+      grade4ClassId: grade4Class.id,
+      grade10ClassId: grade10Class.id,
+    };
+  }
+
+  it("refuses a mapping that promotes into a lower grade", async () => {
+    const { updateMappings } = await import("../src/lib/promotion");
+    const { runId, school, fromClassId, grade1ClassId } = await seedGradedSchool();
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: runId,
+      schoolId: school.id,
+      mappings: [{ fromClassId, toClassId: grade1ClassId }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_GRADE_PROGRESSION" });
+  });
+
+  it("refuses a mapping that skips more than one grade", async () => {
+    const { updateMappings } = await import("../src/lib/promotion");
+    const { runId, school, fromClassId, grade10ClassId } = await seedGradedSchool();
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: runId,
+      schoolId: school.id,
+      mappings: [{ fromClassId, toClassId: grade10ClassId }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "INVALID_GRADE_PROGRESSION" });
+  });
+
+  it("accepts promotion into the next grade up", async () => {
+    const { updateMappings } = await import("../src/lib/promotion");
+    const { runId, school, fromClassId, grade4ClassId } = await seedGradedSchool();
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: runId,
+      schoolId: school.id,
+      mappings: [{ fromClassId, toClassId: grade4ClassId }],
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("accepts retention in the same grade", async () => {
+    const { updateMappings } = await import("../src/lib/promotion");
+    const { runId, school, fromClassId, grade3NextYearClassId } = await seedGradedSchool();
+
+    const result = await updateMappings(prisma, {
+      promotionRunId: runId,
+      schoolId: school.id,
+      mappings: [{ fromClassId, toClassId: grade3NextYearClassId }],
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("pre-fills each mapping with the next grade's class when one exists", async () => {
+    const { fromClassId, grade4ClassId, mappings } = await seedGradedSchool();
+
+    const mapping = mappings.find((m) => m.fromClassId === fromClassId);
+    expect(mapping?.toClassId).toBe(grade4ClassId);
+  });
+});
+
 describe("getRosterForReview / setStudentDecisions / getRunSummary", () => {
   beforeEach(async () => {
     await resetDb();

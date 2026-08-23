@@ -47,7 +47,20 @@ export async function startOrResumePromotionRun(
       schoolId: params.schoolId,
       enrollments: { some: { academicYearId: fromYear.id, status: "active" } },
     },
+    include: { grade: true },
   });
+
+  const targetClasses = await prisma.class.findMany({
+    where: { schoolId: params.schoolId, academicYearId: toYear.id, archived: false },
+    include: { grade: true },
+  });
+
+  function inferTarget(klass: (typeof classesWithEnrollments)[number]): number | null {
+    const match = targetClasses.find(
+      (c) => c.grade.sortOrder === klass.grade.sortOrder + 1 && c.section === klass.section
+    );
+    return match?.id ?? null;
+  }
 
   const run = await prisma.$transaction(async (tx) => {
     const created = await tx.promotionRun.create({
@@ -63,7 +76,7 @@ export async function startOrResumePromotionRun(
     const mappingData = classesWithEnrollments.map((klass) => ({
       promotionRunId: created.id,
       fromClassId: klass.id,
-      toClassId: null,
+      toClassId: inferTarget(klass),
     }));
     if (mappingData.length > 0) {
       await tx.promotionMapping.createMany({ data: mappingData });
@@ -87,24 +100,49 @@ export type UpdateMappingsResult =
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "ALREADY_CONFIRMED" }
   | { ok: false; error: "INVALID_MAPPING" }
-  | { ok: false; error: "INVALID_TARGET_CLASS" };
+  | { ok: false; error: "INVALID_TARGET_CLASS" }
+  | { ok: false; error: "INVALID_GRADE_PROGRESSION" };
 
 async function validateTargetClasses(
   prisma: PrismaClient,
-  params: { schoolId: number; academicYearId: number; classIds: number[] }
-): Promise<boolean> {
-  const distinct = [...new Set(params.classIds)];
-  if (distinct.length === 0) return true;
+  params: {
+    schoolId: number;
+    academicYearId: number;
+    pairs: Array<{ fromClassId: number; toClassId: number }>;
+  }
+): Promise<{ ok: true } | { ok: false; error: "INVALID_TARGET_CLASS" | "INVALID_GRADE_PROGRESSION" }> {
+  if (params.pairs.length === 0) return { ok: true };
 
-  const found = await prisma.class.count({
+  const targetIds = [...new Set(params.pairs.map((p) => p.toClassId))];
+  const targets = await prisma.class.findMany({
     where: {
-      id: { in: distinct },
+      id: { in: targetIds },
       schoolId: params.schoolId,
       academicYearId: params.academicYearId,
       archived: false,
     },
+    include: { grade: true },
   });
-  return found === distinct.length;
+  if (targets.length !== targetIds.length) return { ok: false, error: "INVALID_TARGET_CLASS" };
+  const targetById = new Map(targets.map((c) => [c.id, c]));
+
+  const sourceIds = [...new Set(params.pairs.map((p) => p.fromClassId))];
+  const sources = await prisma.class.findMany({
+    where: { id: { in: sourceIds }, schoolId: params.schoolId },
+    include: { grade: true },
+  });
+  const sourceById = new Map(sources.map((c) => [c.id, c]));
+
+  for (const pair of params.pairs) {
+    const from = sourceById.get(pair.fromClassId);
+    const to = targetById.get(pair.toClassId);
+    if (!from || !to) return { ok: false, error: "INVALID_TARGET_CLASS" };
+
+    const step = to.grade.sortOrder - from.grade.sortOrder;
+    if (step < 0 || step > 1) return { ok: false, error: "INVALID_GRADE_PROGRESSION" };
+  }
+
+  return { ok: true };
 }
 
 export async function updateMappings(
@@ -129,15 +167,15 @@ export async function updateMappings(
     }
   }
 
-  const targetIds = params.mappings
-    .map((mapping) => mapping.toClassId)
-    .filter((id): id is number => id !== null);
+  const pairs = params.mappings
+    .filter((mapping): mapping is { fromClassId: number; toClassId: number } => mapping.toClassId !== null)
+    .map((mapping) => ({ fromClassId: mapping.fromClassId, toClassId: mapping.toClassId }));
   const targetsValid = await validateTargetClasses(prisma, {
     schoolId: params.schoolId,
     academicYearId: run.toAcademicYearId,
-    classIds: targetIds,
+    pairs,
   });
-  if (!targetsValid) return { ok: false, error: "INVALID_TARGET_CLASS" };
+  if (!targetsValid.ok) return targetsValid;
 
   await prisma.$transaction(
     params.mappings.map((mapping) =>
@@ -231,7 +269,8 @@ export type SetDecisionsResult =
   | { ok: false; error: "ALREADY_CONFIRMED" }
   | { ok: false; error: "STUDENT_NOT_IN_RUN" }
   | { ok: false; error: "MISSING_TARGET_CLASS" }
-  | { ok: false; error: "INVALID_TARGET_CLASS" };
+  | { ok: false; error: "INVALID_TARGET_CLASS" }
+  | { ok: false; error: "INVALID_GRADE_PROGRESSION" };
 
 export async function setStudentDecisions(
   prisma: PrismaClient,
@@ -288,16 +327,15 @@ export async function setStudentDecisions(
     });
   }
 
-  const resolvedTargets = resolved
-    .filter((entry) => entry.action === "promoted")
-    .map((entry) => entry.toClassId)
-    .filter((id): id is number => id !== null);
+  const resolvedPairs = resolved
+    .filter((entry): entry is typeof entry & { toClassId: number } => entry.action === "promoted" && entry.toClassId !== null)
+    .map((entry) => ({ fromClassId: entry.fromClassId, toClassId: entry.toClassId }));
   const decisionTargetsValid = await validateTargetClasses(prisma, {
     schoolId: params.schoolId,
     academicYearId: run.toAcademicYearId,
-    classIds: resolvedTargets,
+    pairs: resolvedPairs,
   });
-  if (!decisionTargetsValid) return { ok: false, error: "INVALID_TARGET_CLASS" };
+  if (!decisionTargetsValid.ok) return decisionTargetsValid;
 
   await prisma.$transaction(
     resolved.map((entry) =>
