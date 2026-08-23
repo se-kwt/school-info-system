@@ -1,6 +1,7 @@
-import type { PrismaClient, Student } from "@prisma/client";
+import { Prisma, type PrismaClient, type Student } from "@prisma/client";
 import { displayStatus } from "../assignments";
 import { attendancePercent } from "../attendance-status";
+import { toNumber } from "../money";
 
 export async function getParentChildren(
   prisma: PrismaClient,
@@ -153,17 +154,20 @@ export async function getParentOverview(
       include: { payments: { where: { studentId: params.studentId } } },
       orderBy: { dueDate: "asc" },
     });
-    let totalOutstanding = 0;
+    let totalOutstanding = new Prisma.Decimal(0);
     let nearestDueDate: string | null = null;
     for (const structure of feeStructures) {
-      const paid = structure.payments.reduce((sum, p) => sum + p.amountPaid, 0);
-      const outstanding = Math.max(0, structure.amount - paid);
-      totalOutstanding += outstanding;
-      if (outstanding > 0 && nearestDueDate === null) {
+      const paid = structure.payments.reduce(
+        (sum, p) => sum.add(p.amountPaid),
+        new Prisma.Decimal(0)
+      );
+      const outstanding = Prisma.Decimal.max(0, structure.amount.sub(paid));
+      totalOutstanding = totalOutstanding.add(outstanding);
+      if (outstanding.greaterThan(0) && nearestDueDate === null) {
         nearestDueDate = structure.dueDate.toISOString().slice(0, 10);
       }
     }
-    feesOutstanding = { amount: totalOutstanding, nearestDueDate };
+    feesOutstanding = { amount: toNumber(totalOutstanding), nearestDueDate };
   }
 
   const latestMark = await prisma.mark.findFirst({

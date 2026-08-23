@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { toNumber } from "./money";
 
 export interface FeeStructureSummary {
   id: number;
@@ -30,7 +31,7 @@ export async function listFeeStructures(
     feeStructures: feeStructures.map((fs) => ({
       id: fs.id,
       term: fs.term,
-      amount: fs.amount,
+      amount: toNumber(fs.amount),
       dueDate: fs.dueDate.toISOString().slice(0, 10),
     })),
   };

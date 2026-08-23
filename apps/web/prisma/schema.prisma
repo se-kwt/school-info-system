@@ -406,7 +406,7 @@ model FeeStructure {
   class          Class        @relation(fields: [classId], references: [id])
   classId        Int
   term           String
-  amount         Float
+  amount         Decimal      @db.Decimal(12, 2)
   dueDate        DateTime
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
@@ -433,7 +433,7 @@ model FeePayment {
   studentId      Int
   feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
   feeStructureId Int
-  amountPaid     Float
+  amountPaid     Decimal      @db.Decimal(12, 2)
   paidDate       DateTime
   mode           PaymentMode
   receiptNo      String

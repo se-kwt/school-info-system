@@ -13,7 +13,7 @@ import { prisma, resetDb } from "./helpers/db";
 import { createActiveYear, createClass, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getFeePayments, POST as postFeePayments } from "../src/app/api/fee-payments/route";
-import { recordPayment, listPaymentsForStudent } from "../src/lib/fee-payments";
+import { recordPayment, listPaymentsForStudent, getFeeRoster } from "../src/lib/fee-payments";
 import { Prisma } from "@prisma/client";
 
 describe("GET /api/fee-payments", () => {
@@ -214,7 +214,8 @@ describe("POST /api/fee-payments", () => {
     expect(body).toMatchObject({ amountPaid: 2000, status: "partial" });
 
     const payment = await prisma.feePayment.findFirst({ where: { studentId: student.id } });
-    expect(payment).toMatchObject({ amountPaid: 2000, mode: "cash" });
+    expect(payment).toMatchObject({ mode: "cash" });
+    expect(Number(payment?.amountPaid)).toBe(2000);
   });
 
   it("adds cumulatively and recomputes status through unpaid to partial to paid, keeping each instalment as its own row", async () => {
@@ -244,8 +245,8 @@ describe("POST /api/fee-payments", () => {
       orderBy: { createdAt: "asc" },
     });
     expect(rows).toHaveLength(2);
-    expect(rows[0].amountPaid).toBe(2000);
-    expect(rows[1].amountPaid).toBe(3000);
+    expect(Number(rows[0].amountPaid)).toBe(2000);
+    expect(Number(rows[1].amountPaid)).toBe(3000);
   });
 
   it("rejects a payment that would exceed the amount due with 400, no row created", async () => {
@@ -289,7 +290,7 @@ describe("POST /api/fee-payments", () => {
 
     const rows = await prisma.feePayment.findMany({ where: { studentId: student.id } });
     expect(rows).toHaveLength(1);
-    expect(rows[0].amountPaid).toBe(4000);
+    expect(Number(rows[0].amountPaid)).toBe(4000);
   });
 
   it("rejects a POST missing mode with 400", async () => {
@@ -425,7 +426,8 @@ describe("POST /api/fee-payments", () => {
     expect(body).toMatchObject({ amountPaid: 5000, status: "paid" });
 
     const payment = await prisma.feePayment.findFirst({ where: { studentId: student.id } });
-    expect(payment).toMatchObject({ amountPaid: 5000, mode: "upi", reference: "UPI-1234" });
+    expect(payment).toMatchObject({ mode: "upi", reference: "UPI-1234" });
+    expect(Number(payment?.amountPaid)).toBe(5000);
   });
 
   it("does not lose a payment when two POSTs race on the same student/fee", async () => {
@@ -457,9 +459,9 @@ describe("POST /api/fee-payments", () => {
 
     const rows = await prisma.feePayment.findMany({ where: { studentId: student.id } });
     expect(rows).toHaveLength(2); // both payments must be reflected, not just the last writer's
-    const total = rows.reduce((sum, r) => sum + r.amountPaid, 0);
+    const total = rows.reduce((sum, r) => sum + Number(r.amountPaid), 0);
     expect(total).toBe(5000);
-    expect(new Set(rows.map((r) => r.amountPaid))).toEqual(new Set([2000, 3000]));
+    expect(new Set(rows.map((r) => Number(r.amountPaid)))).toEqual(new Set([2000, 3000]));
     // Receipt numbering (`tx.feePayment.count()` inside the same Serializable
     // transaction) races exactly like the amount check does. If two concurrent
     // transactions both computed the same `priorCount` and thus the same
@@ -484,7 +486,7 @@ describe("recordPayment / listPaymentsForStudent (ledger)", () => {
     await prisma.$disconnect();
   });
 
-  async function seedFixtures() {
+  async function seedFixtures(amount: number = 5000) {
     const school = await prisma.school.create({ data: { name: "Ledger Test School" } });
     const year = await createActiveYear(prisma, school.id);
     const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
@@ -502,7 +504,7 @@ describe("recordPayment / listPaymentsForStudent (ledger)", () => {
         academicYearId: year.id,
         classId: klass.id,
         term: "Term 1",
-        amount: 5000,
+        amount,
         dueDate: new Date("2026-09-01"),
       },
     });
@@ -666,5 +668,41 @@ describe("recordPayment / listPaymentsForStudent (ledger)", () => {
     if (!result.ok) return;
     expect(result.payments).toHaveLength(2);
     expect(result.payments[1].reference).toBe("CHQ-4412");
+  });
+
+  it("reconciles instalments exactly against the fee total", async () => {
+    // feeStructure.amount is 3000 in this fixture
+    const { feeStructureId, studentId, schoolId, accountantId } = await seedFixtures(3000);
+
+    await recordPayment(prisma, { feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 1000, mode: "cash" });
+    await recordPayment(prisma, { feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 1000, mode: "cash" });
+    const third = await recordPayment(prisma, { feeStructureId, studentId, schoolId, recordedById: accountantId, amount: 1000, mode: "cash" });
+
+    expect(third).toMatchObject({ ok: true, status: "paid" });
+
+    const roster = await getFeeRoster(prisma, { feeStructureId, schoolId });
+    expect(roster.ok).toBe(true);
+    if (!roster.ok) return;
+    const row = roster.students.find((s) => s.studentId === studentId)!;
+    expect(row.amountPaid).toBe(3000);
+    expect(row.status).toBe("paid");
+  });
+
+  it("reconciles amounts with paise exactly", async () => {
+    // a fee structure of 3300.30, paid as three instalments of 1100.10.
+    // Verified against `Number` before writing this test: under binary
+    // floating point, 0 + 1100.10 + 1100.10 + 1100.10 === 3300.2999999999997,
+    // which is strictly LESS than 3300.3000000000002 (the Float
+    // representation of the fee total) — so on a `Float` column the third
+    // instalment would be misreported as "partial" on a fully-paid fee,
+    // exactly the "float tail" bug this task fixes. `Decimal(12, 2)`
+    // reconciles the three instalments to precisely the fee total.
+    const { feeStructureId: pennyFeeId, studentId, schoolId, accountantId } = await seedFixtures(3300.3);
+
+    await recordPayment(prisma, { feeStructureId: pennyFeeId, studentId, schoolId, recordedById: accountantId, amount: 1100.1, mode: "cash" });
+    await recordPayment(prisma, { feeStructureId: pennyFeeId, studentId, schoolId, recordedById: accountantId, amount: 1100.1, mode: "cash" });
+    const third = await recordPayment(prisma, { feeStructureId: pennyFeeId, studentId, schoolId, recordedById: accountantId, amount: 1100.1, mode: "cash" });
+
+    expect(third).toMatchObject({ ok: true, status: "paid" });
   });
 });

@@ -1,10 +1,11 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { SessionClaims } from "@/lib/auth/jwt";
 import { getClassesForTeacher } from "@/lib/data/scoped-queries";
 import { listClasses } from "@/lib/school-setup/classes";
 import { getActiveAcademicYear } from "@/lib/academic-years";
 import { getSchoolLocalTodayStart } from "@/lib/date-utils";
 import { attendancePercent } from "@/lib/attendance-status";
+import { toNumber } from "@/lib/money";
 
 export interface ClassPerformanceEntry {
   classId: number;
@@ -168,12 +169,14 @@ async function getAcademicOverview(
   const feesCollectedThisTerm =
     currentTermStructureIds.length === 0
       ? 0
-      : ((
-          await prisma.feePayment.aggregate({
-            where: { feeStructureId: { in: currentTermStructureIds } },
-            _sum: { amountPaid: true },
-          })
-        )._sum.amountPaid ?? 0);
+      : toNumber(
+          (
+            await prisma.feePayment.aggregate({
+              where: { feeStructureId: { in: currentTermStructureIds } },
+              _sum: { amountPaid: true },
+            })
+          )._sum.amountPaid ?? new Prisma.Decimal(0)
+        );
 
   const thirtyDaysAgo = addDays(todayStart, -30);
   const classIdSet = new Set(classes.map((k) => k.id));
@@ -379,10 +382,12 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
   const currentTermStructures = feeStructures.filter(
     (fs) => latestDueDate && fs.dueDate.getTime() === latestDueDate.getTime()
   );
-  const feesCollectedThisTerm = currentTermStructures.reduce(
-    (sum, fs) => sum + fs.payments.reduce((s, p) => s + p.amountPaid, 0),
-    0
+  const feesCollectedThisTermDecimal = currentTermStructures.reduce(
+    (sum, fs) =>
+      sum.add(fs.payments.reduce((s, p) => s.add(p.amountPaid), new Prisma.Decimal(0))),
+    new Prisma.Decimal(0)
   );
+  const feesCollectedThisTerm = toNumber(feesCollectedThisTermDecimal);
 
   // FeeStructure.amount is a per-student amount, so the true amount due for a
   // fee structure is that amount multiplied by the number of students in its
@@ -399,22 +404,30 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
     studentCounts.map((row) => [row.classId, row._count])
   );
 
-  const outstandingAmount = feeStructures.reduce((sum, fs) => {
-    const paid = fs.payments.reduce((s, p) => s + p.amountPaid, 0);
-    const totalDue = fs.amount * (studentCountByClassId.get(fs.classId) ?? 0);
-    return sum + Math.max(0, totalDue - paid);
-  }, 0);
+  const outstandingAmountDecimal = feeStructures.reduce((sum, fs) => {
+    const paid = fs.payments.reduce((s, p) => s.add(p.amountPaid), new Prisma.Decimal(0));
+    const totalDue = fs.amount.mul(studentCountByClassId.get(fs.classId) ?? 0);
+    return sum.add(Prisma.Decimal.max(0, totalDue.sub(paid)));
+  }, new Prisma.Decimal(0));
+  const outstandingAmount = toNumber(outstandingAmountDecimal);
 
   const feeStructureCollection: FeeStructureCollectionEntry[] = feeStructures.map((fs) => {
-    const totalPaid = fs.payments.reduce((s, p) => s + p.amountPaid, 0);
-    const totalDue = fs.amount * (studentCountByClassId.get(fs.classId) ?? 0);
+    const totalPaidDecimal = fs.payments.reduce(
+      (s, p) => s.add(p.amountPaid),
+      new Prisma.Decimal(0)
+    );
+    const totalDueDecimal = fs.amount.mul(studentCountByClassId.get(fs.classId) ?? 0);
+    const totalPaid = toNumber(totalPaidDecimal);
+    const totalDue = toNumber(totalDueDecimal);
     return {
       id: fs.id,
       term: fs.term,
       className: `${fs.class.grade.name} ${fs.class.section}`,
       totalDue,
       totalPaid,
-      collectionPercent: totalDue === 0 ? 0 : Math.round((totalPaid / totalDue) * 100),
+      collectionPercent: totalDueDecimal.isZero()
+        ? 0
+        : Math.round(totalPaidDecimal.div(totalDueDecimal).mul(100).toNumber()),
     };
   });
 
@@ -434,7 +447,7 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
     id: payment.id,
     studentName: payment.student.name,
     className: `${payment.feeStructure.class.grade.name} ${payment.feeStructure.class.section}`,
-    amountPaid: payment.amountPaid,
+    amountPaid: toNumber(payment.amountPaid),
     paidDate: payment.paidDate ? payment.paidDate.toISOString().slice(0, 10) : null,
   }));
 

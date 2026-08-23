@@ -1,5 +1,6 @@
-import type { PaymentMode, PrismaClient } from "@prisma/client";
+import { Prisma, type PaymentMode, type PrismaClient } from "@prisma/client";
 import { getEnrolledStudents } from "./enrollment";
+import { toNumber } from "./money";
 
 // `FeeStatus` used to be a stored enum column on `FeePayment`. Status is now
 // derived from the ledger (see `computeFeeStatus`) rather than persisted, so
@@ -40,38 +41,40 @@ export async function getFeeRoster(
     },
     _sum: { amountPaid: true },
   });
-  const paidByStudent = new Map(payments.map((p) => [p.studentId, p._sum.amountPaid ?? 0]));
+  const paidByStudent = new Map(
+    payments.map((p) => [p.studentId, p._sum.amountPaid ?? new Prisma.Decimal(0)])
+  );
 
   return {
     ok: true,
     students: enrolled.map((student) => {
-      const amountPaid = paidByStudent.get(student.id) ?? 0;
+      const amountPaid = paidByStudent.get(student.id) ?? new Prisma.Decimal(0);
       return {
         studentId: student.id,
         name: student.name,
-        amountPaid,
-        amount: feeStructure.amount,
+        amountPaid: toNumber(amountPaid),
+        amount: toNumber(feeStructure.amount),
         status: computeFeeStatus(amountPaid, feeStructure.amount),
       };
     }),
   };
 }
 
-export function computeFeeStatus(amountPaid: number, amount: number): FeeStatus {
-  if (amountPaid <= 0) return "unpaid";
-  if (amountPaid < amount) return "partial";
+export function computeFeeStatus(amountPaid: Prisma.Decimal, amount: Prisma.Decimal): FeeStatus {
+  if (amountPaid.lessThanOrEqualTo(0)) return "unpaid";
+  if (amountPaid.lessThan(amount)) return "partial";
   return "paid";
 }
 
 async function sumPaid(
   prisma: PrismaClient,
   params: { studentId: number; feeStructureId: number }
-): Promise<number> {
+): Promise<Prisma.Decimal> {
   const result = await prisma.feePayment.aggregate({
     where: { studentId: params.studentId, feeStructureId: params.feeStructureId },
     _sum: { amountPaid: true },
   });
-  return result._sum.amountPaid ?? 0;
+  return result._sum.amountPaid ?? new Prisma.Decimal(0);
 }
 
 export type RecordPaymentResult =
@@ -119,9 +122,11 @@ export async function recordPayment(
         studentId: params.studentId,
         feeStructureId: params.feeStructureId,
       });
-      const newAmountPaid = priorTotal + params.amount;
+      const newAmountPaid = priorTotal.add(new Prisma.Decimal(params.amount));
 
-      if (newAmountPaid > feeStructure.amount) return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
+      if (newAmountPaid.greaterThan(feeStructure.amount)) {
+        return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
+      }
 
       const priorCount = await tx.feePayment.count({
         where: { feeStructureId: params.feeStructureId },
@@ -143,7 +148,7 @@ export async function recordPayment(
 
       return {
         ok: true,
-        amountPaid: newAmountPaid,
+        amountPaid: toNumber(newAmountPaid),
         status: computeFeeStatus(newAmountPaid, feeStructure.amount),
         receiptNo,
       };
@@ -185,7 +190,7 @@ export async function listPaymentsForStudent(
     ok: true,
     payments: payments.map((p) => ({
       id: p.id,
-      amountPaid: p.amountPaid,
+      amountPaid: toNumber(p.amountPaid),
       paidDate: p.paidDate.toISOString().slice(0, 10),
       mode: p.mode,
       receiptNo: p.receiptNo,
