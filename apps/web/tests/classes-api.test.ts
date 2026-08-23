@@ -57,7 +57,7 @@ describe("/api/classes", () => {
     expect(getResponse.status).toBe(200);
     const list = await getResponse.json();
     expect(list).toEqual([
-      { id: created.id, gradeId: grade.id, gradeName: "Grade 6", section: "B", academicYearId: year.id, archived: false },
+      { id: created.id, gradeId: grade.id, gradeName: "Grade 6", section: "B", academicYearId: year.id, archived: false, capacity: null, room: null },
     ]);
   });
 
@@ -120,7 +120,7 @@ describe("/api/classes", () => {
     const defaultResponse = await getClasses(new Request("http://localhost/api/classes"));
     const defaultList = await defaultResponse.json();
     expect(defaultList).toEqual([
-      { id: active.id, gradeId: active.gradeId, gradeName: "Grade 9", section: "A", academicYearId: year.id, archived: false },
+      { id: active.id, gradeId: active.gradeId, gradeName: "Grade 9", section: "A", academicYearId: year.id, archived: false, capacity: null, room: null },
     ]);
 
     const allResponse = await getClasses(new Request("http://localhost/api/classes?includeArchived=true"));

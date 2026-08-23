@@ -112,4 +112,61 @@ describe("subjects lib", () => {
     const result = await deleteSubject(prisma, { subjectId: created.subject.id, schoolId });
     expect(result).toEqual({ ok: false, error: "HAS_HISTORY" });
   });
+
+  it("marks the newest syllabus version as current and clears the previous one", async () => {
+    const created = await createSubject(prisma, { gradeId, schoolId, name: "Mathematics" });
+    if (!created.ok) throw new Error("setup failed");
+    const subjectId = created.subject.id;
+
+    const first = await createSyllabusVersion(prisma, { subjectId, schoolId, title: "V1", content: "...", createdById: adminId });
+    expect(first.ok).toBe(true);
+
+    const second = await createSyllabusVersion(prisma, { subjectId, schoolId, title: "V2", content: "...", createdById: adminId });
+    expect(second.ok).toBe(true);
+
+    const versions = await prisma.syllabusVersion.findMany({ where: { subjectId }, orderBy: { versionNum: "asc" } });
+    expect(versions[0].isCurrent).toBe(false);
+    expect(versions[1].isCurrent).toBe(true);
+  });
+
+  it("stores and reads back code, creditHours, weeklyPeriods, isPractical, isElective on a subject", async () => {
+    const created = await createSubject(prisma, {
+      gradeId,
+      schoolId,
+      name: "Physics Lab",
+      code: "PHY-LAB",
+      creditHours: 2.5,
+      weeklyPeriods: 3,
+      isPractical: true,
+      isElective: true,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const stored = await prisma.subject.findUniqueOrThrow({ where: { id: created.subject.id } });
+    expect(stored.code).toBe("PHY-LAB");
+    expect(stored.creditHours).toBe(2.5);
+    expect(stored.weeklyPeriods).toBe(3);
+    expect(stored.isPractical).toBe(true);
+    expect(stored.isElective).toBe(true);
+  });
+
+  it("stores and reads back effectiveFrom on a syllabus version", async () => {
+    const created = await createSubject(prisma, { gradeId, schoolId, name: "Mathematics" });
+    if (!created.ok) throw new Error("setup failed");
+
+    const version = await createSyllabusVersion(prisma, {
+      subjectId: created.subject.id,
+      schoolId,
+      title: "v1",
+      content: "Numbers",
+      createdById: adminId,
+      effectiveFrom: "2026-06-01",
+    });
+    expect(version.ok).toBe(true);
+    if (!version.ok) return;
+
+    const stored = await prisma.syllabusVersion.findUniqueOrThrow({ where: { id: version.id } });
+    expect(stored.effectiveFrom?.toISOString().slice(0, 10)).toBe("2026-06-01");
+  });
 });

@@ -81,6 +81,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       if (result.error === "INVALID_SIBLING") {
         return NextResponse.json({ error: "One of the selected siblings is invalid" }, { status: 400 });
       }
+      if (result.error === "CLASS_FULL") {
+        return NextResponse.json({ error: "The selected class has reached its capacity" }, { status: 400 });
+      }
       return NextResponse.json(
         { error: "This student has no active enrollment to reassign" },
         { status: 400 }

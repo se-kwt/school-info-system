@@ -8,9 +8,11 @@ export interface ClassSummary {
   section: string;
   academicYearId: number;
   archived: boolean;
+  capacity: number | null;
+  room: string | null;
 }
 
-function toSummary(klass: { id: number; gradeId: number; section: string; academicYearId: number; archived: boolean; grade: { name: string } }): ClassSummary {
+function toSummary(klass: { id: number; gradeId: number; section: string; academicYearId: number; archived: boolean; capacity: number | null; room: string | null; grade: { name: string } }): ClassSummary {
   return {
     id: klass.id,
     gradeId: klass.gradeId,
@@ -18,6 +20,8 @@ function toSummary(klass: { id: number; gradeId: number; section: string; academ
     section: klass.section,
     academicYearId: klass.academicYearId,
     archived: klass.archived,
+    capacity: klass.capacity,
+    room: klass.room,
   };
 }
 
@@ -43,7 +47,7 @@ export type CreateClassResult = { ok: true; class: ClassSummary } | { ok: false;
 export async function createClass(
   prisma: PrismaClient,
   schoolId: number,
-  input: { gradeId: number; section: string; academicYearId: number }
+  input: { gradeId: number; section: string; academicYearId: number; capacity?: number; room?: string }
 ): Promise<CreateClassResult> {
   const [grade, year] = await Promise.all([
     prisma.grade.findFirst({ where: { id: input.gradeId, schoolId } }),
@@ -59,7 +63,14 @@ export async function createClass(
 
   try {
     const created = await prisma.class.create({
-      data: { schoolId, gradeId: input.gradeId, section: input.section, academicYearId: input.academicYearId },
+      data: {
+        schoolId,
+        gradeId: input.gradeId,
+        section: input.section,
+        academicYearId: input.academicYearId,
+        capacity: input.capacity ?? null,
+        room: input.room ?? null,
+      },
       include: { grade: true },
     });
     return { ok: true, class: toSummary(created) };
@@ -78,7 +89,7 @@ export type EditClassResult =
 
 export async function editClass(
   prisma: PrismaClient,
-  params: { classId: number; schoolId: number; fields: { gradeId?: number; section?: string; academicYearId?: number } }
+  params: { classId: number; schoolId: number; fields: { gradeId?: number; section?: string; academicYearId?: number; capacity?: number; room?: string } }
 ): Promise<EditClassResult> {
   const klass = await prisma.class.findFirst({ where: { id: params.classId, schoolId: params.schoolId } });
   if (!klass) return { ok: false, error: "NOT_FOUND" };
@@ -103,7 +114,13 @@ export async function editClass(
   try {
     await prisma.class.update({
       where: { id: params.classId },
-      data: { gradeId: params.fields.gradeId, section: params.fields.section, academicYearId: params.fields.academicYearId },
+      data: {
+        gradeId: params.fields.gradeId,
+        section: params.fields.section,
+        academicYearId: params.fields.academicYearId,
+        capacity: params.fields.capacity,
+        room: params.fields.room,
+      },
     });
     return { ok: true };
   } catch (err) {

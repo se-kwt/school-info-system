@@ -114,6 +114,7 @@ export async function createAssignment(
     academicYearId: number;
     attachmentUrl?: string;
     attachmentName?: string;
+    maxMarks?: number;
   }
 ): Promise<CreateAssignmentResult> {
   const owns = await assertTeacherOwnsSubject(prisma, {
@@ -134,6 +135,7 @@ export async function createAssignment(
         dueDate: new Date(params.dueDate),
         attachmentUrl: params.attachmentUrl ?? null,
         attachmentName: params.attachmentName ?? null,
+        maxMarks: params.maxMarks ?? null,
         createdById: params.teacherUserId,
         academicYearId: params.academicYearId,
       },
@@ -194,6 +196,10 @@ export async function editAssignment(
       dueDate?: string;
       attachmentUrl?: string;
       attachmentName?: string;
+      maxMarks?: number;
+      submissionUrl?: string;
+      submissionName?: string;
+      gradedScore?: number;
     };
   }
 ): Promise<EditAssignmentResult> {
@@ -221,6 +227,10 @@ export async function editAssignment(
     dueDate?: Date;
     attachmentUrl?: string;
     attachmentName?: string;
+    maxMarks?: number;
+    submissionUrl?: string;
+    submissionName?: string;
+    gradedScore?: number;
   } = {};
   if (params.fields.subjectId !== undefined) data.subjectId = params.fields.subjectId;
   if (params.fields.title !== undefined) data.title = params.fields.title;
@@ -228,6 +238,10 @@ export async function editAssignment(
   if (params.fields.dueDate !== undefined) data.dueDate = new Date(params.fields.dueDate);
   if (params.fields.attachmentUrl !== undefined) data.attachmentUrl = params.fields.attachmentUrl;
   if (params.fields.attachmentName !== undefined) data.attachmentName = params.fields.attachmentName;
+  if (params.fields.maxMarks !== undefined) data.maxMarks = params.fields.maxMarks;
+  if (params.fields.submissionUrl !== undefined) data.submissionUrl = params.fields.submissionUrl;
+  if (params.fields.submissionName !== undefined) data.submissionName = params.fields.submissionName;
+  if (params.fields.gradedScore !== undefined) data.gradedScore = params.fields.gradedScore;
 
   await prisma.assignment.update({ where: { id: params.assignmentId }, data });
   return { ok: true };

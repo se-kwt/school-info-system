@@ -81,6 +81,10 @@ model School {
   id            Int            @id @default(autoincrement())
   name          String
   logoUrl       String?
+  address       String?
+  phone         String?
+  email         String?
+  principalName String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   users         User[]
@@ -114,12 +118,17 @@ model Grade {
 }
 
 model Subject {
-  id        Int      @id @default(autoincrement())
-  grade     Grade    @relation(fields: [gradeId], references: [id])
-  gradeId   Int
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  grade         Grade    @relation(fields: [gradeId], references: [id])
+  gradeId       Int
+  name          String
+  code          String?
+  creditHours   Float?
+  weeklyPeriods Int?
+  isPractical   Boolean  @default(false)
+  isElective    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   versions         SyllabusVersion[]
   classTeachers    ClassTeacher[]
@@ -131,18 +140,20 @@ model Subject {
 }
 
 model SyllabusVersion {
-  id          Int      @id @default(autoincrement())
-  subject     Subject  @relation(fields: [subjectId], references: [id])
-  subjectId   Int
-  versionNum  Int
-  title       String
-  content     String
-  fileUrl     String?
-  fileName    String?
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdById Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            Int       @id @default(autoincrement())
+  subject       Subject   @relation(fields: [subjectId], references: [id])
+  subjectId     Int
+  versionNum    Int
+  title         String
+  content       String
+  fileUrl       String?
+  fileName      String?
+  effectiveFrom DateTime?
+  isCurrent     Boolean   @default(false)
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  createdById   Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([subjectId, versionNum])
   @@index([createdById])
@@ -289,6 +300,8 @@ model Class {
   gradeId        Int
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
+  capacity       Int?
+  room           String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -356,6 +369,10 @@ model Assignment {
   dueDate        DateTime
   attachmentUrl  String?
   attachmentName String?
+  maxMarks       Float?
+  submissionUrl  String?
+  submissionName String?
+  gradedScore    Float?
   createdBy      User         @relation(fields: [createdById], references: [id])
   createdById    Int
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
@@ -547,16 +564,18 @@ model FeePayment {
 }
 
 model Notification {
-  id        Int       @id @default(autoincrement())
-  user      User      @relation(fields: [userId], references: [id])
-  userId    Int
-  type      String
-  title     String
-  body      String
-  relatedId Int?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             Int       @id @default(autoincrement())
+  user           User      @relation(fields: [userId], references: [id])
+  userId         Int
+  type           String
+  title          String
+  body           String
+  relatedId      Int?
+  readAt         DateTime?
+  channel        String    @default("in_app")
+  deliveryStatus String    @default("created")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([userId])
 }

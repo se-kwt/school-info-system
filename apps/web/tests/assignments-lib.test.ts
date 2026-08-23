@@ -183,4 +183,57 @@ describe("assignments lib subjectId", () => {
 
     expect(result).toEqual({ ok: false, error: "NOT_ASSIGNED" });
   });
+
+  it("stores and reads back maxMarks on create, then submissionUrl/submissionName/gradedScore on edit", async () => {
+    const created = await createAssignment(prisma, {
+      classId,
+      teacherUserId: teacherId,
+      subjectId,
+      title: "Graded HW",
+      dueDate: "2026-09-01",
+      academicYearId: yearId,
+      maxMarks: 100,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const stored = await prisma.assignment.findUniqueOrThrow({ where: { id: created.id } });
+    expect(stored.maxMarks).toBe(100);
+
+    const edited = await editAssignment(prisma, {
+      assignmentId: created.id,
+      teacherUserId: teacherId,
+      schoolId,
+      fields: { submissionUrl: "/uploads/hw.pdf", submissionName: "hw.pdf", gradedScore: 87.5 },
+    });
+    expect(edited).toEqual({ ok: true });
+
+    const updated = await prisma.assignment.findUniqueOrThrow({ where: { id: created.id } });
+    expect(updated.submissionUrl).toBe("/uploads/hw.pdf");
+    expect(updated.submissionName).toBe("hw.pdf");
+    expect(updated.gradedScore).toBe(87.5);
+  });
+
+  it("creates the assignment-published notification with the default channel and deliveryStatus", async () => {
+    const parent = await prisma.user.create({ data: { schoolId, phone: "+10000000098", role: "parent", name: "A Parent" } });
+    const student = await prisma.student.create({
+      data: { schoolId, name: "Enrolled Student", dob: new Date("2015-01-01"), admissionNo: "NOTIF-1" },
+    });
+    await prisma.enrollment.create({ data: { studentId: student.id, classId, academicYearId: yearId, status: "active" } });
+    await prisma.parentStudent.create({ data: { parentUserId: parent.id, studentId: student.id, relationship: "Guardian" } });
+
+    const created = await createAssignment(prisma, {
+      classId,
+      teacherUserId: teacherId,
+      subjectId,
+      title: "Notify HW",
+      dueDate: "2026-09-01",
+      academicYearId: yearId,
+    });
+    expect(created.ok).toBe(true);
+
+    const notification = await prisma.notification.findFirstOrThrow({ where: { userId: parent.id, type: "assignment_published" } });
+    expect(notification.channel).toBe("in_app");
+    expect(notification.deliveryStatus).toBe("created");
+  });
 });

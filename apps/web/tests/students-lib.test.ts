@@ -638,6 +638,118 @@ describe("students.ts year scope on class validation", () => {
   });
 });
 
+describe("students.ts class capacity", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  afterAll(async () => {
+    await resetDb();
+    await prisma.$disconnect();
+  });
+
+  it("refuses to enrol a student beyond the class capacity", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+
+    await prisma.class.update({ where: { id: klass.id }, data: { capacity: 1 } });
+    await createStudent(prisma, school.id, year.id, {
+      name: "First",
+      dob: "2015-01-01",
+      classId: klass.id,
+      admissionNo: "CAP-001",
+      parents: [{ relationship: "Guardian", name: "P", phone: "+10000000080" }],
+    });
+
+    const result = await createStudent(prisma, school.id, year.id, {
+      name: "Second",
+      dob: "2015-01-01",
+      classId: klass.id,
+      admissionNo: "CAP-002",
+      parents: [{ relationship: "Guardian", name: "P", phone: "+10000000081" }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "CLASS_FULL" });
+  });
+
+  it("allows enrolment when no capacity is set", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+
+    // capacity is null by default -- no limit
+    const result = await createStudent(prisma, school.id, year.id, {
+      name: "Unlimited",
+      dob: "2015-01-01",
+      classId: klass.id,
+      admissionNo: "CAP-003",
+      parents: [{ relationship: "Guardian", name: "P", phone: "+10000000082" }],
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("refuses to reassign a student into a class that is already full", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const fullClass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+    const otherClass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 4", section: "A" });
+    await prisma.class.update({ where: { id: fullClass.id }, data: { capacity: 1 } });
+
+    await createStudent(prisma, school.id, year.id, {
+      name: "Existing",
+      dob: "2015-01-01",
+      classId: fullClass.id,
+      admissionNo: "CAP-010",
+      parents: [{ relationship: "Guardian", name: "P", phone: "+10000000090" }],
+    });
+    const mover = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: otherClass.id,
+      academicYearId: year.id,
+      name: "Mover",
+      dob: new Date("2015-01-01"),
+      admissionNo: "CAP-011",
+    });
+
+    const result = await editStudent(prisma, {
+      studentId: mover.id,
+      schoolId: school.id,
+      academicYearId: year.id,
+      fields: { classId: fullClass.id },
+    });
+
+    expect(result).toEqual({ ok: false, error: "CLASS_FULL" });
+  });
+
+  it("allows a class reassignment when the target class has room", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const roomyClass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 3", section: "A" });
+    const otherClass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 4", section: "A" });
+    await prisma.class.update({ where: { id: roomyClass.id }, data: { capacity: 5 } });
+
+    const mover = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: otherClass.id,
+      academicYearId: year.id,
+      name: "Mover",
+      dob: new Date("2015-01-01"),
+      admissionNo: "CAP-012",
+    });
+
+    const result = await editStudent(prisma, {
+      studentId: mover.id,
+      schoolId: school.id,
+      academicYearId: year.id,
+      fields: { classId: roomyClass.id },
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
+});
+
 describe("students.ts pagination", () => {
   beforeEach(async () => {
     await resetDb();

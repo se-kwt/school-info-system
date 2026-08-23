@@ -136,7 +136,8 @@ export type CreateStudentResult =
   | { ok: false; error: "INVALID_PHONE" }
   | { ok: false; error: "PARENT_REQUIRED" }
   | { ok: false; error: "INVALID_CLASS" }
-  | { ok: false; error: "INVALID_SIBLING" };
+  | { ok: false; error: "INVALID_SIBLING" }
+  | { ok: false; error: "CLASS_FULL" };
 
 export async function createStudent(
   prisma: PrismaClient,
@@ -201,6 +202,13 @@ export async function createStudent(
     where: { id: input.classId, schoolId, academicYearId },
   });
   if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
+
+  if (targetClass.capacity !== null) {
+    const enrolled = await prisma.enrollment.count({
+      where: { classId: targetClass.id, academicYearId, status: "active" },
+    });
+    if (enrolled >= targetClass.capacity) return { ok: false, error: "CLASS_FULL" };
+  }
 
   try {
     const student = await prisma.$transaction(async (tx) => {
@@ -289,7 +297,8 @@ export type EditStudentResult =
   | { ok: false; error: "INVALID_PHONE" }
   | { ok: false; error: "INVALID_CLASS" }
   | { ok: false; error: "INVALID_SIBLING" }
-  | { ok: false; error: "NO_ACTIVE_ENROLLMENT" };
+  | { ok: false; error: "NO_ACTIVE_ENROLLMENT" }
+  | { ok: false; error: "CLASS_FULL" };
 
 export async function editStudent(
   prisma: PrismaClient,
@@ -374,6 +383,13 @@ export async function editStudent(
         },
       });
       if (!targetClass) return { ok: false, error: "INVALID_CLASS" };
+
+      if (targetClass.id !== enrollment.classId && targetClass.capacity !== null) {
+        const enrolled = await prisma.enrollment.count({
+          where: { classId: targetClass.id, academicYearId: params.academicYearId, status: "active" },
+        });
+        if (enrolled >= targetClass.capacity) return { ok: false, error: "CLASS_FULL" };
+      }
     }
 
     if (params.fields.rollNumber) {

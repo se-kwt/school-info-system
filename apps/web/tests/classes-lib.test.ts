@@ -25,7 +25,7 @@ describe("classes lib", () => {
 
     const classes = await listClasses(prisma, schoolId);
     expect(classes).toEqual([
-      { id: expect.any(Number), gradeId, gradeName: "Grade 1", section: "A", academicYearId: yearId, archived: false },
+      { id: expect.any(Number), gradeId, gradeName: "Grade 1", section: "A", academicYearId: yearId, archived: false, capacity: null, room: null },
     ]);
   });
 
@@ -81,5 +81,22 @@ describe("classes lib", () => {
 
     const result = await deleteClass(prisma, { classId: created.class.id, schoolId });
     expect(result).toEqual({ ok: false, error: "HAS_HISTORY" });
+  });
+
+  it("stores and reads back capacity and room on create and edit", async () => {
+    const created = await createClass(prisma, schoolId, { gradeId, section: "A", academicYearId: yearId, capacity: 30, room: "Block B-101" });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const stored = await prisma.class.findUniqueOrThrow({ where: { id: created.class.id } });
+    expect(stored.capacity).toBe(30);
+    expect(stored.room).toBe("Block B-101");
+
+    const edited = await editClass(prisma, { classId: created.class.id, schoolId, fields: { capacity: 35, room: "Block C-201" } });
+    expect(edited).toEqual({ ok: true });
+
+    const updated = await prisma.class.findUniqueOrThrow({ where: { id: created.class.id } });
+    expect(updated.capacity).toBe(35);
+    expect(updated.room).toBe("Block C-201");
   });
 });

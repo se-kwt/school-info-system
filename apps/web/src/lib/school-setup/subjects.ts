@@ -35,7 +35,16 @@ export type CreateSubjectResult =
 
 export async function createSubject(
   prisma: PrismaClient,
-  params: { gradeId: number; schoolId: number; name: string }
+  params: {
+    gradeId: number;
+    schoolId: number;
+    name: string;
+    code?: string;
+    creditHours?: number;
+    weeklyPeriods?: number;
+    isPractical?: boolean;
+    isElective?: boolean;
+  }
 ): Promise<CreateSubjectResult> {
   const grade = await prisma.grade.findFirst({ where: { id: params.gradeId, schoolId: params.schoolId } });
   if (!grade) return { ok: false, error: "INVALID_GRADE" };
@@ -45,7 +54,15 @@ export async function createSubject(
 
   try {
     const created = await prisma.subject.create({
-      data: { gradeId: params.gradeId, name: params.name },
+      data: {
+        gradeId: params.gradeId,
+        name: params.name,
+        code: params.code ?? null,
+        creditHours: params.creditHours ?? null,
+        weeklyPeriods: params.weeklyPeriods ?? null,
+        isPractical: params.isPractical ?? false,
+        isElective: params.isElective ?? false,
+      },
     });
     return { ok: true, subject: { id: created.id, name: created.name, gradeId: created.gradeId, versionCount: 0 } };
   } catch (err) {
@@ -153,6 +170,7 @@ export async function createSyllabusVersion(
     content: string;
     fileUrl?: string;
     fileName?: string;
+    effectiveFrom?: string;
     createdById: number;
   }
 ): Promise<CreateSyllabusVersionResult> {
@@ -167,16 +185,25 @@ export async function createSyllabusVersion(
   });
   const nextVersionNum = (latest?.versionNum ?? 0) + 1;
 
-  const created = await prisma.syllabusVersion.create({
-    data: {
-      subjectId: params.subjectId,
-      versionNum: nextVersionNum,
-      title: params.title,
-      content: params.content,
-      fileUrl: params.fileUrl ?? null,
-      fileName: params.fileName ?? null,
-      createdById: params.createdById,
-    },
+  const created = await prisma.$transaction(async (tx) => {
+    await tx.syllabusVersion.updateMany({
+      where: { subjectId: params.subjectId, isCurrent: true },
+      data: { isCurrent: false },
+    });
+
+    return tx.syllabusVersion.create({
+      data: {
+        subjectId: params.subjectId,
+        versionNum: nextVersionNum,
+        title: params.title,
+        content: params.content,
+        fileUrl: params.fileUrl ?? null,
+        fileName: params.fileName ?? null,
+        effectiveFrom: params.effectiveFrom ? new Date(params.effectiveFrom) : null,
+        isCurrent: true,
+        createdById: params.createdById,
+      },
+    });
   });
 
   return { ok: true, id: created.id };
