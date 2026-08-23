@@ -901,6 +901,58 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
     expect(logEntries).toHaveLength(3);
   });
 
+  it("leaves the new year operational after a confirmed promotion with rollover", async () => {
+    const { confirmPromotionRun } = await import("../src/lib/promotion");
+    const { school, fromYear, toYear, gradeOne, runId } = await seedReadyRun();
+
+    const subject = await prisma.subject.create({ data: { gradeId: gradeOne.gradeId, name: "Mathematics" } });
+    const teacher = await prisma.user.create({
+      data: { schoolId: school.id, phone: "+15550963333", role: "teacher", name: "Rollover Teacher" },
+    });
+    await prisma.classTeacher.create({
+      data: {
+        classId: gradeOne.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: fromYear.id,
+        isClassTeacher: true,
+      },
+    });
+    const period = await prisma.period.create({
+      data: { schoolId: school.id, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
+    await prisma.timetableEntry.create({
+      data: {
+        classId: gradeOne.id,
+        academicYearId: fromYear.id,
+        dayOfWeek: 1,
+        periodId: period.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+      },
+    });
+
+    const result = await confirmPromotionRun(prisma, {
+      promotionRunId: runId,
+      schoolId: school.id,
+      rollover: { classes: true, faculty: true, timetable: true, feeStructures: true },
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(await prisma.class.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
+    expect(await prisma.classTeacher.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
+    expect(await prisma.timetableEntry.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
+  });
+
+  it("confirms without rollover when no options are passed", async () => {
+    const { confirmPromotionRun } = await import("../src/lib/promotion");
+    const { school, toYear, runId } = await seedReadyRun();
+
+    const result = await confirmPromotionRun(prisma, { promotionRunId: runId, schoolId: school.id });
+    expect(result).toEqual({ ok: true });
+    expect(await prisma.classTeacher.count({ where: { academicYearId: toYear.id } })).toBe(0);
+  });
+
   it("rejects confirming a run that is already confirmed", async () => {
     const { school, runId } = await seedReadyRun();
     const { confirmPromotionRun } = await import("../src/lib/promotion");

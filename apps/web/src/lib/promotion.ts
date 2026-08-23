@@ -1,4 +1,5 @@
 import type { EnrollmentStatus, PrismaClient } from "@prisma/client";
+import { runRollover, type RolloverOptions, type RolloverSummary } from "./promotion/rollover";
 
 export interface PromotionMappingRow {
   fromClassId: number;
@@ -376,7 +377,18 @@ export type ConfirmPromotionRunResult =
 
 export async function confirmPromotionRun(
   prisma: PrismaClient,
-  params: { promotionRunId: number; schoolId: number }
+  params: {
+    promotionRunId: number;
+    schoolId: number;
+    rollover?: RolloverOptions;
+    /**
+     * Optional escape hatch so a caller (e.g. the confirm API route) can read
+     * back what rollover actually did, without widening
+     * ConfirmPromotionRunResult's `{ ok: true }` shape -- existing callers and
+     * tests assert that shape with `toEqual`, rollover included.
+     */
+    onRolloverSummary?: (summary: RolloverSummary) => void;
+  }
 ): Promise<ConfirmPromotionRunResult> {
   const run = await prisma.promotionRun.findFirst({
     where: { id: params.promotionRunId, schoolId: params.schoolId },
@@ -405,6 +417,16 @@ export async function confirmPromotionRun(
       data: { status: "archived" },
     });
     await tx.academicYear.update({ where: { id: run.toAcademicYearId }, data: { status: "active" } });
+
+    if (params.rollover) {
+      const summary = await runRollover(tx as PrismaClient, {
+        schoolId: params.schoolId,
+        fromAcademicYearId: run.fromAcademicYearId,
+        toAcademicYearId: run.toAcademicYearId,
+        options: params.rollover,
+      });
+      params.onRolloverSummary?.(summary);
+    }
 
     for (const student of allStudents) {
       if (student.action === null) continue;
@@ -454,7 +476,7 @@ export async function confirmPromotionRun(
       where: { id: params.promotionRunId },
       data: { status: "confirmed", confirmedAt: new Date() },
     });
-  });
+  }, { timeout: 30_000 });
 
   return { ok: true };
 }

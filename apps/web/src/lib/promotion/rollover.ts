@@ -162,3 +162,123 @@ export async function cloneTimetable(
 
   return { cloned, skippedNoTeacher };
 }
+
+export async function cloneFeeStructures(
+  prisma: PrismaClient,
+  params: {
+    schoolId: number;
+    classMap: Map<number, number>;
+    fromAcademicYearId: number;
+    toAcademicYearId: number;
+  }
+): Promise<{ cloned: number }> {
+  const sourceStructures = await prisma.feeStructure.findMany({
+    where: {
+      academicYearId: params.fromAcademicYearId,
+      classId: { in: [...params.classMap.keys()] },
+    },
+  });
+
+  const existing = await prisma.feeStructure.findMany({
+    where: { academicYearId: params.toAcademicYearId },
+  });
+  const existingKeys = new Set(existing.map((f) => `${f.classId}:${f.term}`));
+
+  let cloned = 0;
+
+  for (const source of sourceStructures) {
+    const targetClassId = params.classMap.get(source.classId);
+    if (targetClassId === undefined) continue;
+
+    const key = `${targetClassId}:${source.term}`;
+    if (existingKeys.has(key)) continue;
+
+    const dueDate = new Date(source.dueDate);
+    dueDate.setFullYear(dueDate.getFullYear() + 1);
+
+    await prisma.feeStructure.create({
+      data: {
+        schoolId: params.schoolId,
+        academicYearId: params.toAcademicYearId,
+        classId: targetClassId,
+        term: source.term,
+        amount: source.amount,
+        discount: source.discount,
+        fineAmount: source.fineAmount,
+        dueDate,
+      },
+    });
+    existingKeys.add(key);
+    cloned += 1;
+  }
+
+  return { cloned };
+}
+
+export interface RolloverOptions {
+  classes: boolean;
+  faculty: boolean;
+  timetable: boolean;
+  feeStructures: boolean;
+}
+
+export interface RolloverSummary {
+  classes: number;
+  faculty: { cloned: number; skippedInactive: number };
+  timetable: { cloned: number; skippedNoTeacher: number };
+  feeStructures: number;
+}
+
+export async function runRollover(
+  prisma: PrismaClient,
+  params: {
+    schoolId: number;
+    fromAcademicYearId: number;
+    toAcademicYearId: number;
+    options: RolloverOptions;
+  }
+): Promise<RolloverSummary> {
+  const summary: RolloverSummary = {
+    classes: 0,
+    faculty: { cloned: 0, skippedInactive: 0 },
+    timetable: { cloned: 0, skippedNoTeacher: 0 },
+    feeStructures: 0,
+  };
+
+  if (!params.options.classes) return summary;
+
+  const classMap = await cloneClasses(prisma, {
+    schoolId: params.schoolId,
+    fromAcademicYearId: params.fromAcademicYearId,
+    toAcademicYearId: params.toAcademicYearId,
+  });
+  summary.classes = classMap.size;
+
+  if (params.options.faculty) {
+    summary.faculty = await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: params.fromAcademicYearId,
+      toAcademicYearId: params.toAcademicYearId,
+    });
+  }
+
+  if (params.options.timetable) {
+    summary.timetable = await cloneTimetable(prisma, {
+      classMap,
+      fromAcademicYearId: params.fromAcademicYearId,
+      toAcademicYearId: params.toAcademicYearId,
+    });
+  }
+
+  if (params.options.feeStructures) {
+    const result = await cloneFeeStructures(prisma, {
+      schoolId: params.schoolId,
+      classMap,
+      fromAcademicYearId: params.fromAcademicYearId,
+      toAcademicYearId: params.toAcademicYearId,
+    });
+    summary.feeStructures = result.cloned;
+  }
+
+  return summary;
+}

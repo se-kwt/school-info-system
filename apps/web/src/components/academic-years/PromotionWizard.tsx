@@ -30,6 +30,34 @@ const ACTIONS: NonNullable<RosterStudent["action"]>[] = [
   "inactive",
 ];
 
+interface RolloverOptions {
+  classes: boolean;
+  faculty: boolean;
+  timetable: boolean;
+  feeStructures: boolean;
+}
+
+interface RolloverSummary {
+  classes: number;
+  faculty: { cloned: number; skippedInactive: number };
+  timetable: { cloned: number; skippedNoTeacher: number };
+  feeStructures: number;
+}
+
+function formatRolloverSummary(summary: RolloverSummary): string {
+  const parts = [
+    `${summary.classes} classes`,
+    summary.faculty.skippedInactive > 0
+      ? `${summary.faculty.cloned} faculty assignments (${summary.faculty.skippedInactive} skipped: teacher inactive)`
+      : `${summary.faculty.cloned} faculty assignments`,
+    summary.timetable.skippedNoTeacher > 0
+      ? `${summary.timetable.cloned} timetable entries (${summary.timetable.skippedNoTeacher} unstaffed)`
+      : `${summary.timetable.cloned} timetable entries`,
+    `${summary.feeStructures} fee structures`,
+  ];
+  return parts.join(", ");
+}
+
 export function PromotionWizard({
   upcomingYears,
   classes,
@@ -49,6 +77,22 @@ export function PromotionWizard({
   } | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rollover, setRollover] = useState<RolloverOptions>({
+    classes: true,
+    faculty: true,
+    timetable: true,
+    feeStructures: true,
+  });
+  const [rolloverSummary, setRolloverSummary] = useState<RolloverSummary | null>(null);
+
+  function handleRolloverChange(key: keyof RolloverOptions, value: boolean) {
+    setRollover((prev) => {
+      if (key === "classes" && !value) {
+        return { classes: false, faculty: false, timetable: false, feeStructures: false };
+      }
+      return { ...prev, [key]: value };
+    });
+  }
 
   function classLabel(classId: number) {
     const klass = classes.find((c) => c.id === classId);
@@ -131,10 +175,18 @@ export function PromotionWizard({
   async function handleConfirm() {
     if (!runId) return;
     setError(null);
-    const response = await fetch(`/api/promotion-runs/${runId}/confirm`, { method: "POST" });
+    const response = await fetch(`/api/promotion-runs/${runId}/confirm`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ rollover }),
+    });
     if (!response.ok) {
       setError((await response.json()).error);
       return;
+    }
+    const body = await response.json();
+    if (body.rollover) {
+      setRolloverSummary(body.rollover);
     }
     setConfirmed(true);
   }
@@ -258,9 +310,51 @@ export function PromotionWizard({
                   {summary.undecidedStudentIds.length} student(s) still need a decision.
                 </p>
               ) : (
-                <button type="button" onClick={handleConfirm} className="mt-2 rounded bg-green-700 px-3 py-1 text-white">
-                  Confirm Promotion
-                </button>
+                <>
+                  <fieldset className="mt-3 space-y-1">
+                    <legend className="text-sm font-medium text-gray-700">
+                      Also set up the new year
+                    </legend>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={rollover.classes}
+                        onChange={(event) => handleRolloverChange("classes", event.target.checked)}
+                      />
+                      Classes
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={rollover.faculty}
+                        disabled={!rollover.classes}
+                        onChange={(event) => handleRolloverChange("faculty", event.target.checked)}
+                      />
+                      Faculty assignments
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={rollover.timetable}
+                        disabled={!rollover.classes}
+                        onChange={(event) => handleRolloverChange("timetable", event.target.checked)}
+                      />
+                      Timetable
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={rollover.feeStructures}
+                        disabled={!rollover.classes}
+                        onChange={(event) => handleRolloverChange("feeStructures", event.target.checked)}
+                      />
+                      Fee structures
+                    </label>
+                  </fieldset>
+                  <button type="button" onClick={handleConfirm} className="mt-2 rounded bg-green-700 px-3 py-1 text-white">
+                    Confirm Promotion
+                  </button>
+                </>
               )}
             </section>
           )}
@@ -270,6 +364,9 @@ export function PromotionWizard({
       {confirmed && (
         <div>
           <p className="text-sm text-green-700">Promotion complete.</p>
+          {rolloverSummary && (
+            <p className="mt-1 text-sm text-gray-600">{formatRolloverSummary(rolloverSummary)}</p>
+          )}
           <button type="button" onClick={handleUndo} className="mt-2 rounded bg-red-600 px-3 py-1 text-white">
             Undo
           </button>

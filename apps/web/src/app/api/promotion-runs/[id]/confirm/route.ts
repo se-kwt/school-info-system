@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
 import { confirmPromotionRun } from "@/lib/promotion";
+import type { RolloverSummary } from "@/lib/promotion/rollover";
 
-export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
     const claims = await requireApiRole(["admin"]);
@@ -13,7 +14,20 @@ export async function POST(_request: Request, props: { params: Promise<{ id: str
       return NextResponse.json({ error: "Promotion run not found" }, { status: 404 });
     }
 
-    const result = await confirmPromotionRun(prisma, { promotionRunId, schoolId: claims.schoolId });
+    const body = await request.json().catch(() => ({}));
+    const rollover = body?.rollover as
+      | { classes: boolean; faculty: boolean; timetable: boolean; feeStructures: boolean }
+      | undefined;
+
+    let rolloverSummary: RolloverSummary | undefined;
+    const result = await confirmPromotionRun(prisma, {
+      promotionRunId,
+      schoolId: claims.schoolId,
+      rollover,
+      onRolloverSummary: (summary) => {
+        rolloverSummary = summary;
+      },
+    });
     if (!result.ok) {
       if (result.error === "NOT_FOUND") {
         return NextResponse.json({ error: "Promotion run not found" }, { status: 404 });
@@ -29,7 +43,7 @@ export async function POST(_request: Request, props: { params: Promise<{ id: str
         { status: 400 }
       );
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, rollover: rolloverSummary });
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
