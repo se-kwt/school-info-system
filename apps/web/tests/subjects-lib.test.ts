@@ -127,6 +127,12 @@ describe("subjects lib", () => {
     const versions = await prisma.syllabusVersion.findMany({ where: { subjectId }, orderBy: { versionNum: "asc" } });
     expect(versions[0].isCurrent).toBe(false);
     expect(versions[1].isCurrent).toBe(true);
+
+    const listed = await listSyllabusVersions(prisma, { subjectId, schoolId });
+    if (!listed.ok) throw new Error("expected ok");
+    const listedByVersionNum = new Map(listed.versions.map((v) => [v.versionNum, v.isCurrent]));
+    expect(listedByVersionNum.get(1)).toBe(false);
+    expect(listedByVersionNum.get(2)).toBe(true);
   });
 
   it("stores and reads back code, creditHours, weeklyPeriods, isPractical, isElective on a subject", async () => {

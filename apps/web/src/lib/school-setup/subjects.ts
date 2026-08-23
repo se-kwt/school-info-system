@@ -107,6 +107,7 @@ export interface SyllabusVersionSummary {
   content: string;
   fileUrl: string | null;
   fileName: string | null;
+  isCurrent: boolean;
   createdByName: string;
   createdAt: string;
 }
@@ -139,6 +140,7 @@ export async function listSyllabusVersions(
       content: v.content,
       fileUrl: v.fileUrl,
       fileName: v.fileName,
+      isCurrent: v.isCurrent,
       createdByName: v.createdBy.name,
       createdAt: v.createdAt.toISOString(),
     })),
