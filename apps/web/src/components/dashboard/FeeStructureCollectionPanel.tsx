@@ -1,4 +1,5 @@
 import type { FeeStructureCollectionEntry } from "@/lib/dashboard/overview";
+import { formatMoney } from "@/lib/money";
 
 const BAR_COLORS = ["#8B5CF6", "#EC4899", "#10B981", "#F59E0B", "#3B82F6"];
 
@@ -37,7 +38,7 @@ export function FeeStructureCollectionPanel({
                 />
               </div>
               <p className="mt-0.5 text-[10px] text-neutral-400">
-                ₹{fs.totalPaid} of ₹{fs.totalDue} collected
+                {formatMoney(fs.totalPaid)} of {formatMoney(fs.totalDue)} collected
               </p>
             </div>
           ))}

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireDashboardRole } from "@/lib/auth/require-dashboard-role";
 import { getDashboardOverview } from "@/lib/dashboard/overview";
+import { formatMoney } from "@/lib/money";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { ClassPerformancePanel } from "@/components/dashboard/ClassPerformancePanel";
 import { StaffOverviewPanel } from "@/components/dashboard/StaffOverviewPanel";
@@ -21,13 +22,13 @@ export default async function DashboardHomePage() {
           <KpiCard
             icon={Wallet}
             colorClassName="border-emerald-100 bg-emerald-50 text-emerald-600"
-            value={`₹${overview.feesCollectedThisTerm}`}
+            value={formatMoney(overview.feesCollectedThisTerm)}
             label="Collected This Term"
           />
           <KpiCard
             icon={PiggyBank}
             colorClassName="border-red-100 bg-red-50 text-red-500"
-            value={`₹${overview.outstandingAmount}`}
+            value={formatMoney(overview.outstandingAmount)}
             label="Outstanding Amount"
           />
           <KpiCard
@@ -69,7 +70,7 @@ export default async function DashboardHomePage() {
         <KpiCard
           icon={Wallet}
           colorClassName="border-amber-100 bg-amber-50 text-amber-600"
-          value={`₹${overview.feesCollectedThisTerm}`}
+          value={formatMoney(overview.feesCollectedThisTerm)}
           label="Fees Collected This Term"
         />
         <KpiCard

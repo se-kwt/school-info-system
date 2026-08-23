@@ -248,7 +248,7 @@ export function FeesView({
         >
           {feeStructures.map((fs) => (
             <option key={fs.id} value={fs.id}>
-              {fs.term} — ₹{fs.amount}, due {fs.dueDate}
+              {fs.term} — {formatMoney(fs.amount)}, due {fs.dueDate}
             </option>
           ))}
         </select>

@@ -119,4 +119,31 @@ describe("FeesView", () => {
     expect(screen.getByText("Priya Iyer")).toBeInTheDocument();
     expect(screen.getByText("₹2,000.00")).toBeInTheDocument();
   });
+
+  it("renders roster amounts with separators and two decimals", async () => {
+    stubRosterFetch({
+      record: (url) => {
+        if (url.startsWith("/api/fee-payments") && !url.includes("history")) {
+          return jsonResponse({
+            students: [
+              {
+                studentId: 100,
+                name: "Asha Rao",
+                amountPaid: 1234567.5,
+                amount: 2000000,
+                status: "partial" as const,
+              },
+            ],
+          });
+        }
+        return undefined;
+      },
+    });
+
+    render(<FeesView classes={classes} role="accountant" />);
+
+    await waitFor(() => expect(screen.getByText("Asha Rao")).toBeInTheDocument());
+    expect(screen.getByText("₹12,34,567.50")).toBeInTheDocument();
+    expect(screen.getByText("₹20,00,000.00")).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,7 @@
 import type { ParentAssignmentEntry, ParentAttendanceDay, ParentOverview } from "@/lib/parent/overview";
 import { MonthCalendar } from "./MonthCalendar";
 import { ExamBreakdown } from "./ExamBreakdown";
+import { formatMoney } from "@/lib/money";
 
 const cardClass =
   "rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]";
@@ -66,7 +67,7 @@ export function FeesCard({ fees }: { fees: ParentOverview["feesOutstanding"] }) 
       ) : (
         <div>
           <span className="block text-2xl font-bold leading-none tracking-tight text-neutral-800">
-            ₹{fees.amount}
+            {formatMoney(fees.amount)}
           </span>
           {fees.nearestDueDate && (
             <span className="text-[11px] font-semibold text-amber-600">Due {fees.nearestDueDate}</span>

@@ -1,4 +1,5 @@
 import type { RecentPaymentEntry } from "@/lib/dashboard/overview";
+import { formatMoney } from "@/lib/money";
 
 export function RecentPaymentsTable({ recentPayments }: { recentPayments: RecentPaymentEntry[] }) {
   return (
@@ -20,7 +21,7 @@ export function RecentPaymentsTable({ recentPayments }: { recentPayments: Recent
                 </p>
               </div>
               <span className="shrink-0 font-mono font-bold text-emerald-600">
-                ₹{payment.amountPaid}
+                {formatMoney(payment.amountPaid)}
               </span>
             </li>
           ))}

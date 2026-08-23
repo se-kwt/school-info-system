@@ -99,7 +99,7 @@ describe("FeesCard", () => {
 
   it("shows the outstanding amount and nearest due date", () => {
     render(<FeesCard fees={{ amount: 3000, nearestDueDate: "2026-09-01" }} />);
-    expect(screen.getByText("₹3000")).toBeInTheDocument();
+    expect(screen.getByText("₹3,000.00")).toBeInTheDocument();
     expect(screen.getByText("Due 2026-09-01")).toBeInTheDocument();
   });
 });

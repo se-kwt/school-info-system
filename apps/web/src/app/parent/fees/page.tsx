@@ -5,6 +5,7 @@ import { getParentChildren } from "@/lib/parent/overview";
 import { resolveActiveChild } from "@/lib/parent/resolve-child";
 import { getParentFeesHistory } from "@/lib/parent/fees-history";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
+import { formatMoney } from "@/lib/money";
 
 const STATUS_CLASS: Record<"paid" | "partial" | "unpaid" | "overdue", string> = {
   paid: "text-emerald-600",
@@ -59,7 +60,7 @@ export default async function ParentFeesPage(
                   {fee.term} · {fee.className} · {fee.academicYearName}
                 </p>
                 <p className={STATUS_CLASS[fee.status]}>
-                  ₹{fee.amountPaid}/₹{fee.amount} · {fee.status} · Due {fee.dueDate}
+                  {formatMoney(fee.amountPaid)}/{formatMoney(fee.amount)} · {fee.status} · Due {fee.dueDate}
                 </p>
               </li>
             ))}
