@@ -94,4 +94,45 @@ describe("getParentFeesHistory", () => {
 
     expect(history).toEqual([]);
   });
+
+  it("reports the net-of-discount amount rather than the sticker amount", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const structure = await prisma.feeStructure.create({
+      data: {
+        schoolId: fixtures.school.id,
+        classId: fixtures.classA.id,
+        term: "Term 1",
+        amount: 5000,
+        discount: 500,
+        dueDate: new Date("2026-12-01"),
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+
+    const history = await getParentFeesHistory(prisma, fixtures.student.id);
+
+    const entry = history.find((h) => h.id === structure.id);
+    expect(entry?.amount).toBe(4500);
+  });
+
+  it("includes the fine in the reported amount once the due date has passed", async () => {
+    const fixtures = await createSeedFixtures(prisma);
+    const structure = await prisma.feeStructure.create({
+      data: {
+        schoolId: fixtures.school.id,
+        classId: fixtures.classA.id,
+        term: "Term 1",
+        amount: 5000,
+        fineAmount: 200,
+        dueDate: new Date("2020-01-01"),
+        academicYearId: fixtures.academicYear.id,
+      },
+    });
+
+    const history = await getParentFeesHistory(prisma, fixtures.student.id);
+
+    const entry = history.find((h) => h.id === structure.id);
+    expect(entry?.amount).toBe(5200);
+    expect(entry?.status).toBe("overdue");
+  });
 });
