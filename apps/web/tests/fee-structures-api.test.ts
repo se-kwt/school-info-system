@@ -82,6 +82,78 @@ describe("/api/fee-structures", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects a negative discount with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550092223", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/fee-structures", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: "2026-09-01",
+        discount: -100,
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postFeeStructures(request);
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a negative fine amount with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550092224", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/fee-structures", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: "2026-09-01",
+        fineAmount: -50,
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postFeeStructures(request);
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a discount greater than the amount with 400", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const admin = await prisma.user.create({
+      data: { phone: "+15550092225", role: "admin", name: "Test Admin", schoolId: school.id },
+    });
+    loginAs(admin.id, "admin", school.id);
+
+    const request = new Request("http://localhost/api/fee-structures", {
+      method: "POST",
+      body: JSON.stringify({
+        classId: klass.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: "2026-09-01",
+        discount: 5001,
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const response = await postFeeStructures(request);
+    expect(response.status).toBe(400);
+  });
+
   it("rejects a classId from a different school with 400 on create", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     await createActiveYear(prisma, school.id);

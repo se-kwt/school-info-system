@@ -81,6 +81,12 @@ export async function POST(request: Request) {
     });
 
     if (!result.ok) {
+      if (result.error === "INVALID_DISCOUNT") {
+        return NextResponse.json(
+          { error: "Discount and fine amount must be non-negative, and discount cannot exceed the fee amount" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json({ error: "The selected class does not exist" }, { status: 400 });
     }
 

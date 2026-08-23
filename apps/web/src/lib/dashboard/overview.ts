@@ -5,6 +5,7 @@ import { listClasses } from "@/lib/school-setup/classes";
 import { getActiveAcademicYear } from "@/lib/academic-years";
 import { getSchoolLocalTodayStart } from "@/lib/date-utils";
 import { attendancePercent } from "@/lib/attendance-status";
+import { netAmountDue } from "@/lib/fee-payments";
 import { toNumber } from "@/lib/money";
 
 export interface ClassPerformanceEntry {
@@ -404,9 +405,10 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
     studentCounts.map((row) => [row.classId, row._count])
   );
 
+  const now = new Date();
   const outstandingAmountDecimal = feeStructures.reduce((sum, fs) => {
     const paid = fs.payments.reduce((s, p) => s.add(p.amountPaid), new Prisma.Decimal(0));
-    const totalDue = fs.amount.mul(studentCountByClassId.get(fs.classId) ?? 0);
+    const totalDue = netAmountDue(fs, now).mul(studentCountByClassId.get(fs.classId) ?? 0);
     return sum.add(Prisma.Decimal.max(0, totalDue.sub(paid)));
   }, new Prisma.Decimal(0));
   const outstandingAmount = toNumber(outstandingAmountDecimal);
@@ -416,7 +418,7 @@ async function getFeesOverview(prisma: PrismaClient, schoolId: number): Promise<
       (s, p) => s.add(p.amountPaid),
       new Prisma.Decimal(0)
     );
-    const totalDueDecimal = fs.amount.mul(studentCountByClassId.get(fs.classId) ?? 0);
+    const totalDueDecimal = netAmountDue(fs, now).mul(studentCountByClassId.get(fs.classId) ?? 0);
     const totalPaid = toNumber(totalPaidDecimal);
     const totalDue = toNumber(totalDueDecimal);
     return {

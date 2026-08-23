@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient, type Student } from "@prisma/client";
 import { displayStatus } from "../assignments";
 import { attendancePercent } from "../attendance-status";
+import { netAmountDue } from "../fee-payments";
 import { toNumber } from "../money";
 
 export async function getParentChildren(
@@ -156,12 +157,13 @@ export async function getParentOverview(
     });
     let totalOutstanding = new Prisma.Decimal(0);
     let nearestDueDate: string | null = null;
+    const now = new Date();
     for (const structure of feeStructures) {
       const paid = structure.payments.reduce(
         (sum, p) => sum.add(p.amountPaid),
         new Prisma.Decimal(0)
       );
-      const outstanding = Prisma.Decimal.max(0, structure.amount.sub(paid));
+      const outstanding = Prisma.Decimal.max(0, netAmountDue(structure, now).sub(paid));
       totalOutstanding = totalOutstanding.add(outstanding);
       if (outstanding.greaterThan(0) && nearestDueDate === null) {
         nearestDueDate = structure.dueDate.toISOString().slice(0, 10);

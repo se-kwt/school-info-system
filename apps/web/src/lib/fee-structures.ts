@@ -39,7 +39,8 @@ export async function listFeeStructures(
 
 export type CreateFeeStructureResult =
   | { ok: true; id: number }
-  | { ok: false; error: "INVALID_CLASS" };
+  | { ok: false; error: "INVALID_CLASS" }
+  | { ok: false; error: "INVALID_DISCOUNT" };
 
 export async function createFeeStructure(
   prisma: PrismaClient,
@@ -54,6 +55,12 @@ export async function createFeeStructure(
     fineAmount?: number;
   }
 ): Promise<CreateFeeStructureResult> {
+  const discount = input.discount ?? 0;
+  const fineAmount = input.fineAmount ?? 0;
+  if (discount < 0 || fineAmount < 0 || discount > input.amount) {
+    return { ok: false, error: "INVALID_DISCOUNT" };
+  }
+
   const klass = await prisma.class.findFirst({
     where: { id: input.classId, schoolId, academicYearId },
   });
@@ -66,8 +73,8 @@ export async function createFeeStructure(
       classId: input.classId,
       term: input.term,
       amount: input.amount,
-      discount: input.discount ?? 0,
-      fineAmount: input.fineAmount ?? 0,
+      discount,
+      fineAmount,
       dueDate: new Date(input.dueDate),
     },
   });

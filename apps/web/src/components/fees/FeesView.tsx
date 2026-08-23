@@ -191,6 +191,13 @@ export function FeesView({
       setPaymentEdits((prev) => ({ ...prev, [studentId]: "" }));
       setPaymentModeEdits((prev) => ({ ...prev, [studentId]: "" }));
       setPaymentReferenceEdits((prev) => ({ ...prev, [studentId]: "" }));
+      // Drop any cached history for this student so a collapsed-then-reopened
+      // row can't show a stale ledger from before this payment.
+      setHistoryByStudent((prev) => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
       if (expandedStudentId === studentId) {
         await loadHistory(studentId);
       }
@@ -280,6 +287,7 @@ export function FeesView({
             />
             <input
               type="number"
+              min="0"
               aria-label="New discount"
               placeholder="Discount"
               value={newDiscount}
@@ -288,6 +296,7 @@ export function FeesView({
             />
             <input
               type="number"
+              min="0"
               aria-label="New fine amount"
               placeholder="Fine"
               value={newFineAmount}
