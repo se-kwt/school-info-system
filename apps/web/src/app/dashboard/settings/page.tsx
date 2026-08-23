@@ -13,5 +13,14 @@ export default async function SettingsPage() {
 
   const school = await prisma.school.findUniqueOrThrow({ where: { id: claims.schoolId } });
 
-  return <SchoolProfileSettings initialLogoUrl={school.logoUrl} schoolName={school.name} />;
+  return (
+    <SchoolProfileSettings
+      initialLogoUrl={school.logoUrl}
+      schoolName={school.name}
+      initialAddress={school.address ?? ""}
+      initialPhone={school.phone ?? ""}
+      initialEmail={school.email ?? ""}
+      initialPrincipalName={school.principalName ?? ""}
+    />
+  );
 }
