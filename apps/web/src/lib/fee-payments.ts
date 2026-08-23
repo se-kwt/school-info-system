@@ -5,7 +5,7 @@ import { toNumber } from "./money";
 // `FeeStatus` used to be a stored enum column on `FeePayment`. Status is now
 // derived from the ledger (see `computeFeeStatus`) rather than persisted, so
 // this is a plain TS union rather than a Prisma-generated enum type.
-export type FeeStatus = "paid" | "partial" | "unpaid";
+export type FeeStatus = "paid" | "partial" | "unpaid" | "overdue";
 
 export interface FeeRosterEntry {
   studentId: number;
@@ -54,16 +54,22 @@ export async function getFeeRoster(
         name: student.name,
         amountPaid: toNumber(amountPaid),
         amount: toNumber(feeStructure.amount),
-        status: computeFeeStatus(amountPaid, feeStructure.amount),
+        status: computeFeeStatus(amountPaid, feeStructure.amount, feeStructure.dueDate),
       };
     }),
   };
 }
 
-export function computeFeeStatus(amountPaid: Prisma.Decimal, amount: Prisma.Decimal): FeeStatus {
+export function computeFeeStatus(
+  amountPaid: Prisma.Decimal,
+  amount: Prisma.Decimal,
+  dueDate: Date,
+  now: Date = new Date()
+): FeeStatus {
+  if (amountPaid.greaterThanOrEqualTo(amount)) return "paid";
+  if (now > dueDate) return "overdue";
   if (amountPaid.lessThanOrEqualTo(0)) return "unpaid";
-  if (amountPaid.lessThan(amount)) return "partial";
-  return "paid";
+  return "partial";
 }
 
 async function sumPaid(
@@ -149,7 +155,7 @@ export async function recordPayment(
       return {
         ok: true,
         amountPaid: toNumber(newAmountPaid),
-        status: computeFeeStatus(newAmountPaid, feeStructure.amount),
+        status: computeFeeStatus(newAmountPaid, feeStructure.amount, feeStructure.dueDate),
         receiptNo,
       };
     },

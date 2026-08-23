@@ -20,13 +20,14 @@ interface FeeRosterEntry {
   name: string;
   amountPaid: number;
   amount: number;
-  status: "paid" | "partial" | "unpaid";
+  status: "paid" | "partial" | "unpaid" | "overdue";
 }
 
 const STATUS_BADGE: Record<FeeRosterEntry["status"], string> = {
   paid: "bg-emerald-50 text-emerald-600",
   partial: "bg-amber-50 text-amber-600",
   unpaid: "bg-red-50 text-red-500",
+  overdue: "bg-red-100 text-red-700",
 };
 
 const inputClass =

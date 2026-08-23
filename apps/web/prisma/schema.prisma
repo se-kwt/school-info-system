@@ -39,6 +39,7 @@ enum FeeStatus {
   paid
   partial
   unpaid
+  overdue
 }
 
 enum AcademicYearStatus {

@@ -13,8 +13,50 @@ import { prisma, resetDb } from "./helpers/db";
 import { createActiveYear, createClass, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import { GET as getFeePayments, POST as postFeePayments } from "../src/app/api/fee-payments/route";
-import { recordPayment, listPaymentsForStudent, getFeeRoster } from "../src/lib/fee-payments";
+import { recordPayment, listPaymentsForStudent, getFeeRoster, computeFeeStatus } from "../src/lib/fee-payments";
 import { Prisma } from "@prisma/client";
+
+describe("computeFeeStatus", () => {
+  it("reports an unpaid fee past its due date as overdue", () => {
+    const status = computeFeeStatus(
+      new Prisma.Decimal(0),
+      new Prisma.Decimal(5000),
+      new Date("2026-01-01"),
+      new Date("2026-06-01")
+    );
+    expect(status).toBe("overdue");
+  });
+
+  it("reports a partly-paid fee past its due date as overdue", () => {
+    const status = computeFeeStatus(
+      new Prisma.Decimal(2000),
+      new Prisma.Decimal(5000),
+      new Date("2026-01-01"),
+      new Date("2026-06-01")
+    );
+    expect(status).toBe("overdue");
+  });
+
+  it("reports a fully-paid fee past its due date as paid", () => {
+    const status = computeFeeStatus(
+      new Prisma.Decimal(5000),
+      new Prisma.Decimal(5000),
+      new Date("2026-01-01"),
+      new Date("2026-06-01")
+    );
+    expect(status).toBe("paid");
+  });
+
+  it("reports an unpaid fee before its due date as unpaid", () => {
+    const status = computeFeeStatus(
+      new Prisma.Decimal(0),
+      new Prisma.Decimal(5000),
+      new Date("2026-12-01"),
+      new Date("2026-06-01")
+    );
+    expect(status).toBe("unpaid");
+  });
+});
 
 describe("GET /api/fee-payments", () => {
   beforeEach(async () => {

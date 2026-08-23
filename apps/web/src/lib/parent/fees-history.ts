@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { computeFeeStatus } from "../fee-payments";
+import { computeFeeStatus, type FeeStatus } from "../fee-payments";
 import { toNumber } from "../money";
 
 export interface ParentFeeHistoryEntry {
@@ -9,7 +9,7 @@ export interface ParentFeeHistoryEntry {
   academicYearName: string;
   amount: number;
   amountPaid: number;
-  status: "paid" | "partial" | "unpaid";
+  status: FeeStatus;
   dueDate: string;
 }
 
@@ -51,7 +51,7 @@ export async function getParentFeesHistory(
       academicYearName: structure.academicYear.name,
       amount: toNumber(structure.amount),
       amountPaid: toNumber(amountPaid),
-      status: computeFeeStatus(amountPaid, structure.amount),
+      status: computeFeeStatus(amountPaid, structure.amount, structure.dueDate),
       dueDate: structure.dueDate.toISOString().slice(0, 10),
     };
   });

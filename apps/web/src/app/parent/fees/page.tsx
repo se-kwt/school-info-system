@@ -6,10 +6,11 @@ import { resolveActiveChild } from "@/lib/parent/resolve-child";
 import { getParentFeesHistory } from "@/lib/parent/fees-history";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 
-const STATUS_CLASS: Record<"paid" | "partial" | "unpaid", string> = {
+const STATUS_CLASS: Record<"paid" | "partial" | "unpaid" | "overdue", string> = {
   paid: "text-emerald-600",
   partial: "text-amber-600",
   unpaid: "text-red-600",
+  overdue: "text-red-700 font-bold",
 };
 
 export default async function ParentFeesPage(
