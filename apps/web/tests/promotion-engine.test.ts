@@ -938,7 +938,15 @@ describe("confirmPromotionRun / revertPromotionRun", () => {
       rollover: { classes: true, faculty: true, timetable: true, feeStructures: true },
     });
 
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.rollover).toMatchObject({
+        classes: 1,
+        faculty: { cloned: 1, skippedInactive: 0 },
+        timetable: { cloned: 1, skippedNoTeacher: 0 },
+        feeStructures: 0,
+      });
+    }
     expect(await prisma.class.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
     expect(await prisma.classTeacher.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
     expect(await prisma.timetableEntry.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);

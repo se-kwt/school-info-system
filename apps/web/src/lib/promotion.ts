@@ -370,7 +370,7 @@ export async function getRunSummary(
 }
 
 export type ConfirmPromotionRunResult =
-  | { ok: true }
+  | { ok: true; rollover?: RolloverSummary }
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "ALREADY_CONFIRMED" }
   | { ok: false; error: "UNDECIDED_STUDENTS" };
@@ -381,13 +381,6 @@ export async function confirmPromotionRun(
     promotionRunId: number;
     schoolId: number;
     rollover?: RolloverOptions;
-    /**
-     * Optional escape hatch so a caller (e.g. the confirm API route) can read
-     * back what rollover actually did, without widening
-     * ConfirmPromotionRunResult's `{ ok: true }` shape -- existing callers and
-     * tests assert that shape with `toEqual`, rollover included.
-     */
-    onRolloverSummary?: (summary: RolloverSummary) => void;
   }
 ): Promise<ConfirmPromotionRunResult> {
   const run = await prisma.promotionRun.findFirst({
@@ -404,7 +397,7 @@ export async function confirmPromotionRun(
     return { ok: false, error: "UNDECIDED_STUDENTS" };
   }
 
-  await prisma.$transaction(async (tx) => {
+  const rolloverSummary = await prisma.$transaction(async (tx) => {
     // Demote whichever year is currently active for this school, not just
     // run.fromAcademicYearId specifically: an admin may have activated a
     // different (third) year via activateAcademicYear after this run was
@@ -418,14 +411,14 @@ export async function confirmPromotionRun(
     });
     await tx.academicYear.update({ where: { id: run.toAcademicYearId }, data: { status: "active" } });
 
+    let summary: RolloverSummary | undefined;
     if (params.rollover) {
-      const summary = await runRollover(tx as PrismaClient, {
+      summary = await runRollover(tx as PrismaClient, {
         schoolId: params.schoolId,
         fromAcademicYearId: run.fromAcademicYearId,
         toAcademicYearId: run.toAcademicYearId,
         options: params.rollover,
       });
-      params.onRolloverSummary?.(summary);
     }
 
     for (const student of allStudents) {
@@ -476,9 +469,11 @@ export async function confirmPromotionRun(
       where: { id: params.promotionRunId },
       data: { status: "confirmed", confirmedAt: new Date() },
     });
+
+    return summary;
   }, { timeout: 30_000 });
 
-  return { ok: true };
+  return { ok: true, rollover: rolloverSummary };
 }
 
 export type RevertPromotionRunResult =

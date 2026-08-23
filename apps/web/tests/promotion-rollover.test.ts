@@ -514,7 +514,13 @@ describe("rollover: revert interaction", () => {
       schoolId: school.id,
       rollover: { classes: true, faculty: true, timetable: true, feeStructures: true },
     });
-    expect(confirmResult).toEqual({ ok: true });
+    expect(confirmResult.ok).toBe(true);
+    if (confirmResult.ok) {
+      expect(confirmResult.rollover).toMatchObject({
+        classes: 1,
+        faculty: { cloned: 1 },
+      });
+    }
 
     // Rollover created faculty and timetable rows in the target year regardless
     // of the student decisions above.
