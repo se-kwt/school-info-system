@@ -51,6 +51,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       if (result.error === "INVALID_CLASS") {
         return NextResponse.json({ error: "Class not found" }, { status: 404 });
       }
+      if (result.error === "CLASS_ARCHIVED") {
+        return NextResponse.json({ error: "That class is archived" }, { status: 400 });
+      }
       if (result.error === "INVALID_SUBJECT") {
         return NextResponse.json({ error: "This subject does not belong to the class's grade" }, { status: 400 });
       }

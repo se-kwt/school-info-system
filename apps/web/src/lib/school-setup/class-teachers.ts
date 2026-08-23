@@ -38,6 +38,7 @@ export async function listClassFaculty(
 export type AssignResult =
   | { ok: true }
   | { ok: false; error: "INVALID_CLASS" }
+  | { ok: false; error: "CLASS_ARCHIVED" }
   | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "INVALID_TEACHER" }
   | { ok: false; error: "TEACHER_INACTIVE" }
@@ -49,6 +50,7 @@ export async function assignTeacherToSubject(
 ): Promise<AssignResult> {
   const klass = await prisma.class.findFirst({ where: { id: params.classId, schoolId: params.schoolId } });
   if (!klass) return { ok: false, error: "INVALID_CLASS" };
+  if (klass.archived) return { ok: false, error: "CLASS_ARCHIVED" };
 
   const subject = await prisma.subject.findFirst({ where: { id: params.subjectId, gradeId: klass.gradeId } });
   if (!subject) return { ok: false, error: "INVALID_SUBJECT" };

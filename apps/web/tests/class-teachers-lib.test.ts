@@ -13,6 +13,7 @@ describe("class-teachers lib", () => {
   let subjectId: number;
   let teacherId: number;
   let yearId: number;
+  let gradeId: number;
 
   beforeEach(async () => {
     await resetDb();
@@ -23,6 +24,7 @@ describe("class-teachers lib", () => {
     });
     teacherId = teacher.id;
     const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    gradeId = grade.id;
     const subject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Mathematics" } });
     subjectId = subject.id;
     const year = await prisma.academicYear.create({
@@ -31,7 +33,6 @@ describe("class-teachers lib", () => {
     yearId = year.id;
     const klass = await prisma.class.create({ data: { schoolId, section: "A", gradeId: grade.id, academicYearId: year.id } });
     classId = klass.id;
-    void yearId;
   });
 
   it("assigns a teacher to a subject and lists it", async () => {
@@ -124,5 +125,21 @@ describe("class-teachers lib", () => {
     });
 
     expect(result).toEqual({ ok: true });
+  });
+
+  it("refuses to staff an archived class", async () => {
+    const archived = await prisma.class.create({
+      data: { schoolId, gradeId, section: "Z", academicYearId: yearId, archived: true },
+    });
+
+    const result = await assignTeacherToSubject(prisma, {
+      classId: archived.id,
+      schoolId,
+      subjectId,
+      teacherUserId: teacherId,
+    });
+
+    expect(result).toEqual({ ok: false, error: "CLASS_ARCHIVED" });
+    expect(await prisma.classTeacher.count({ where: { classId: archived.id } })).toBe(0);
   });
 });
