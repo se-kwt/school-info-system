@@ -242,8 +242,13 @@ export async function deactivateStaff(
   await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: params.userId }, data: { status: "inactive" } });
     if (params.academicYearId) {
-      await tx.classTeacher.deleteMany({
+      // Faculty assignments are KEPT. `assignTeacherToSubject` already refuses to
+      // create new ones for an inactive teacher (Phase 1), and every read path that
+      // offers a teacher filters on status — so keeping the rows costs nothing and
+      // makes reactivation lossless.
+      await tx.timetableEntry.updateMany({
         where: { teacherUserId: params.userId, academicYearId: params.academicYearId },
+        data: { teacherUserId: null },
       });
     }
   });
@@ -255,11 +260,43 @@ export type ActivateStaffResult = { ok: true } | { ok: false; error: "NOT_FOUND"
 
 export async function activateStaff(
   prisma: PrismaClient,
-  params: { userId: number; schoolId: number }
+  params: { userId: number; schoolId: number; academicYearId?: number | null }
 ): Promise<ActivateStaffResult> {
   const user = await prisma.user.findFirst({ where: { id: params.userId, schoolId: params.schoolId } });
   if (!user) return { ok: false, error: "NOT_FOUND" };
 
-  await prisma.user.update({ where: { id: params.userId }, data: { status: "active" } });
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: params.userId }, data: { status: "active" } });
+
+    if (params.academicYearId) {
+      const links = await tx.classTeacher.findMany({
+        where: { teacherUserId: params.userId, academicYearId: params.academicYearId },
+      });
+
+      // Restore is deliberately conservative: it only fills slots that are still
+      // unstaffed for a class/subject this teacher is assigned to. If another
+      // teacher was put into the slot while this one was away, that assignment
+      // wins, and the restore can never violate the double-booking unique index
+      // because it never displaces an existing occupant.
+      //
+      // Accepted imprecision: if two teachers assigned to the same class and
+      // subject are both deactivated and both reactivated, the first to be
+      // reactivated takes all the unstaffed slots. Getting this exactly right
+      // would need a record of which teacher held which slot — a new table for
+      // a rare case — so it's left as-is.
+      for (const link of links) {
+        await tx.timetableEntry.updateMany({
+          where: {
+            classId: link.classId,
+            subjectId: link.subjectId,
+            academicYearId: params.academicYearId,
+            teacherUserId: null,
+          },
+          data: { teacherUserId: params.userId },
+        });
+      }
+    }
+  });
+
   return { ok: true };
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
-import { createStaff, editStaff, listStaff } from "../src/lib/school-setup/staff";
+import { createStaff, editStaff, listStaff, deactivateStaff, activateStaff } from "../src/lib/school-setup/staff";
 
 describe("staff lib subject assignment", () => {
   let schoolId: number;
@@ -99,6 +99,95 @@ describe("staff lib subject assignment", () => {
     const rows = await prisma.classTeacher.findMany({ where: { teacherUserId: activeTeacher.id } });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ classId, subjectId, academicYearId: yearId });
+  });
+});
+
+describe("staff lib deactivate/activate", () => {
+  let schoolId: number;
+  let classId: number;
+  let subjectId: number;
+  let yearId: number;
+  let teacherId: number;
+  let adminId: number;
+  let periodId: number;
+
+  beforeEach(async () => {
+    await resetDb();
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    schoolId = school.id;
+    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    const subject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Mathematics" } });
+    subjectId = subject.id;
+    const year = await prisma.academicYear.create({
+      data: { schoolId, name: "2026-27", startDate: new Date(), endDate: new Date(), status: "active" },
+    });
+    yearId = year.id;
+    const klass = await prisma.class.create({ data: { schoolId, section: "A", gradeId: grade.id, academicYearId: year.id } });
+    classId = klass.id;
+    const teacher = await prisma.user.create({
+      data: { schoolId, phone: "+10000000020", role: "teacher", name: "Teacher", status: "active" },
+    });
+    teacherId = teacher.id;
+    const admin = await prisma.user.create({
+      data: { schoolId, phone: "+10000000021", role: "admin", name: "Admin" },
+    });
+    adminId = admin.id;
+    const period = await prisma.period.create({
+      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
+    periodId = period.id;
+  });
+
+  it("preserves faculty assignments across deactivate and reactivate", async () => {
+    await prisma.classTeacher.create({
+      data: { classId, subjectId, teacherUserId: teacherId, academicYearId: yearId, isClassTeacher: true },
+    });
+
+    const off = await deactivateStaff(prisma, {
+      userId: teacherId,
+      schoolId,
+      requestingUserId: adminId,
+      academicYearId: yearId,
+    });
+    expect(off).toEqual({ ok: true });
+
+    const on = await activateStaff(prisma, { userId: teacherId, schoolId, academicYearId: yearId });
+    expect(on).toEqual({ ok: true });
+
+    const link = await prisma.classTeacher.findFirst({
+      where: { teacherUserId: teacherId, academicYearId: yearId },
+    });
+    expect(link).not.toBeNull();
+    expect(link?.isClassTeacher).toBe(true);
+  });
+
+  it("clears the teacher from their timetable rows on deactivation", async () => {
+    await prisma.classTeacher.create({
+      data: { classId, subjectId, teacherUserId: teacherId, academicYearId: yearId },
+    });
+    const entry = await prisma.timetableEntry.create({
+      data: { classId, academicYearId: yearId, dayOfWeek: 1, periodId, subjectId, teacherUserId: teacherId },
+    });
+
+    await deactivateStaff(prisma, { userId: teacherId, schoolId, requestingUserId: adminId, academicYearId: yearId });
+
+    const after = await prisma.timetableEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(after.teacherUserId).toBeNull();
+  });
+
+  it("restores the teacher onto their timetable rows on reactivation", async () => {
+    await prisma.classTeacher.create({
+      data: { classId, subjectId, teacherUserId: teacherId, academicYearId: yearId },
+    });
+    const entry = await prisma.timetableEntry.create({
+      data: { classId, academicYearId: yearId, dayOfWeek: 1, periodId, subjectId, teacherUserId: teacherId },
+    });
+
+    await deactivateStaff(prisma, { userId: teacherId, schoolId, requestingUserId: adminId, academicYearId: yearId });
+    await activateStaff(prisma, { userId: teacherId, schoolId, academicYearId: yearId });
+
+    const after = await prisma.timetableEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(after.teacherUserId).toBe(teacherId);
   });
 });
 

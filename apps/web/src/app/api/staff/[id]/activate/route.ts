@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
+import { getActiveAcademicYear } from "@/lib/academic-years";
 import { activateStaff } from "@/lib/school-setup/staff";
 
 export async function PATCH(_request: Request, props: { params: Promise<{ id: string }> }) {
@@ -13,7 +14,12 @@ export async function PATCH(_request: Request, props: { params: Promise<{ id: st
       return NextResponse.json({ error: "Staff member not found" }, { status: 404 });
     }
 
-    const result = await activateStaff(prisma, { userId, schoolId: claims.schoolId });
+    const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
+    const result = await activateStaff(prisma, {
+      userId,
+      schoolId: claims.schoolId,
+      academicYearId: activeYear?.id ?? null,
+    });
     if (!result.ok) {
       return NextResponse.json({ error: "Staff member not found" }, { status: 404 });
     }

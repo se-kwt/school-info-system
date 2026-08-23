@@ -356,7 +356,7 @@ describe("/api/staff/[id]", () => {
     expect(response.status).toBe(403);
   });
 
-  it("deactivates a staff member and clears their current-year assignment", async () => {
+  it("deactivates a staff member and preserves their current-year assignment", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);
     const { admin, teacher } = await seedAdminAndTeacher(school.id);
@@ -373,8 +373,10 @@ describe("/api/staff/[id]", () => {
 
     const updated = await prisma.user.findUnique({ where: { id: teacher.id } });
     expect(updated?.status).toBe("inactive");
+    // Deactivation clears the teacher off timetable rows but keeps the ClassTeacher
+    // assignment itself, so reactivation can restore it losslessly.
     const assignment = await prisma.classTeacher.findFirst({ where: { teacherUserId: teacher.id } });
-    expect(assignment).toBeNull();
+    expect(assignment).not.toBeNull();
   });
 
   it("rejects deactivating your own account with 403", async () => {
