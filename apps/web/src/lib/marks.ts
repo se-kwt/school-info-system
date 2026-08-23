@@ -30,39 +30,72 @@ export type GetMarksResult =
 
 export async function getMarksForClassExam(
   prisma: PrismaClient,
-  params: { classId: number; examId: number; schoolId: number; academicYearId: number; role: SessionClaims["role"]; userId: number }
+  params: {
+    classId: number;
+    examId: number;
+    schoolId: number;
+    academicYearId: number;
+    role: SessionClaims["role"];
+    userId: number;
+  },
 ): Promise<GetMarksResult> {
   if (params.role === "teacher") {
     const link = await prisma.classTeacher.findFirst({
-      where: { classId: params.classId, teacherUserId: params.userId, academicYearId: params.academicYearId },
+      where: {
+        classId: params.classId,
+        teacherUserId: params.userId,
+        academicYearId: params.academicYearId,
+      },
     });
     if (!link) return { ok: false, error: "NOT_ASSIGNED" };
   } else {
-    const klass = await prisma.class.findFirst({ where: { id: params.classId, schoolId: params.schoolId } });
+    const klass = await prisma.class.findFirst({
+      where: { id: params.classId, schoolId: params.schoolId },
+    });
     if (!klass) return { ok: false, error: "INVALID_CLASS" };
   }
 
   const exam = await prisma.exam.findFirst({
-    where: { id: params.examId, schoolId: params.schoolId, academicYearId: params.academicYearId },
+    where: {
+      id: params.examId,
+      schoolId: params.schoolId,
+      academicYearId: params.academicYearId,
+    },
   });
   if (!exam) return { ok: false, error: "INVALID_EXAM" };
 
-  const enrolled = await getEnrolledStudents(prisma, { classId: params.classId, academicYearId: params.academicYearId });
+  const enrolled = await getEnrolledStudents(prisma, {
+    classId: params.classId,
+    academicYearId: params.academicYearId,
+  });
   const marks = await prisma.mark.findMany({
-    where: { examId: params.examId, studentId: { in: enrolled.map((s) => s.id) } },
+    where: {
+      examId: params.examId,
+      studentId: { in: enrolled.map((s) => s.id) },
+    },
     include: { subject: true },
   });
 
   const subjectMap = new Map<number, string>();
   for (const mark of marks) subjectMap.set(mark.subjectId, mark.subject.name);
-  const subjects = [...subjectMap.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  const subjects = [...subjectMap.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const students = enrolled.map((student) => {
     const marksBySubject: Record<number, MarkCell | null> = {};
     for (const subject of subjects) {
-      const mark = marks.find((m) => m.studentId === student.id && m.subjectId === subject.id);
+      const mark = marks.find(
+        (m) => m.studentId === student.id && m.subjectId === subject.id,
+      );
       marksBySubject[subject.id] = mark
-        ? { marksObtained: mark.marksObtained, maxMarks: mark.maxMarks, grade: mark.grade, isAbsent: mark.isAbsent, remarks: mark.remarks }
+        ? {
+            marksObtained: mark.marksObtained,
+            maxMarks: mark.maxMarks,
+            grade: mark.grade,
+            isAbsent: mark.isAbsent,
+            remarks: mark.remarks,
+          }
         : null;
     }
     return { studentId: student.id, name: student.name, marks: marksBySubject };
@@ -97,68 +130,102 @@ export async function enterMarks(
     teacherUserId: number;
     schoolId: number;
     academicYearId: number;
-    entries: { studentId: number; marksObtained: number; isAbsent?: boolean; remarks?: string }[];
-  }
+    entries: {
+      studentId: number;
+      marksObtained: number;
+      isAbsent?: boolean;
+      remarks?: string;
+    }[];
+  },
 ): Promise<EnterMarksResult> {
   const exam = await prisma.exam.findFirst({
-    where: { id: params.examId, schoolId: params.schoolId, academicYearId: params.academicYearId },
+    where: {
+      id: params.examId,
+      schoolId: params.schoolId,
+      academicYearId: params.academicYearId,
+    },
   });
   if (!exam) return { ok: false, error: "INVALID_EXAM" };
 
   const link = await prisma.classTeacher.findFirst({
-    where: { classId: params.classId, subjectId: params.subjectId, teacherUserId: params.teacherUserId, academicYearId: params.academicYearId },
+    where: {
+      classId: params.classId,
+      subjectId: params.subjectId,
+      teacherUserId: params.teacherUserId,
+      academicYearId: params.academicYearId,
+    },
   });
   if (!link) return { ok: false, error: "NOT_ASSIGNED" };
 
-  const enrolled = await getEnrolledStudents(prisma, { classId: params.classId, academicYearId: params.academicYearId });
+  const enrolled = await getEnrolledStudents(prisma, {
+    classId: params.classId,
+    academicYearId: params.academicYearId,
+  });
   const enrolledIds = new Set(enrolled.map((s) => s.id));
   const allEnrolled = params.entries.every((e) => enrolledIds.has(e.studentId));
   if (!allEnrolled) return { ok: false, error: "STUDENT_MISMATCH" };
 
   const allValid = params.entries.every(
-    (e) => e.isAbsent || (e.marksObtained >= 0 && e.marksObtained <= exam.maxMarks)
+    (e) =>
+      e.isAbsent || (e.marksObtained >= 0 && e.marksObtained <= exam.maxMarks),
   );
   if (!allValid) return { ok: false, error: "INVALID_MARKS_RANGE" };
 
-  await prisma.$transaction(async (tx) => {
-    for (const entry of params.entries) {
-      const existing = await tx.mark.findUnique({
-        where: { examId_studentId_subjectId: { examId: params.examId, studentId: entry.studentId, subjectId: params.subjectId } },
-      });
-
-      const data = {
-        marksObtained: entry.isAbsent ? 0 : entry.marksObtained,
-        maxMarks: exam.maxMarks,
-        grade: entry.isAbsent ? "AB" : computeGrade(entry.marksObtained, exam.maxMarks),
-        isAbsent: entry.isAbsent ?? false,
-        remarks: entry.remarks ?? null,
-        enteredById: params.teacherUserId,
-        enteredAt: new Date(),
-      };
-
-      if (existing) {
-        await tx.mark.update({ where: { id: existing.id }, data });
-        await recordMarkChange(tx as PrismaClient, {
-          studentId: entry.studentId,
-          examId: params.examId,
-          subjectId: params.subjectId,
-          fromValue: existing.marksObtained,
-          toValue: data.marksObtained,
-          actorUserId: params.teacherUserId,
-        });
-      } else {
-        await tx.mark.create({
-          data: {
-            examId: params.examId,
-            studentId: entry.studentId,
-            subjectId: params.subjectId,
-            academicYearId: params.academicYearId,
-            ...data,
+  // Interactive transaction with a per-entry findUnique + write + optional
+  // audit-row write: for a large class (40-60 students) that's roughly
+  // 80-180 sequential round-trips inside one transaction, which can exceed
+  // Prisma's 5s interactive-transaction default under real load. Matches the
+  // { timeout: 30_000 } precedent in confirmPromotionRun (promotion.ts).
+  await prisma.$transaction(
+    async (tx) => {
+      for (const entry of params.entries) {
+        const existing = await tx.mark.findUnique({
+          where: {
+            examId_studentId_subjectId: {
+              examId: params.examId,
+              studentId: entry.studentId,
+              subjectId: params.subjectId,
+            },
           },
         });
+
+        const data = {
+          marksObtained: entry.isAbsent ? 0 : entry.marksObtained,
+          maxMarks: exam.maxMarks,
+          grade: entry.isAbsent
+            ? "AB"
+            : computeGrade(entry.marksObtained, exam.maxMarks),
+          isAbsent: entry.isAbsent ?? false,
+          remarks: entry.remarks ?? null,
+          enteredById: params.teacherUserId,
+          enteredAt: new Date(),
+        };
+
+        if (existing) {
+          await tx.mark.update({ where: { id: existing.id }, data });
+          await recordMarkChange(tx as PrismaClient, {
+            studentId: entry.studentId,
+            examId: params.examId,
+            subjectId: params.subjectId,
+            fromValue: existing.marksObtained,
+            toValue: data.marksObtained,
+            actorUserId: params.teacherUserId,
+          });
+        } else {
+          await tx.mark.create({
+            data: {
+              examId: params.examId,
+              studentId: entry.studentId,
+              subjectId: params.subjectId,
+              academicYearId: params.academicYearId,
+              ...data,
+            },
+          });
+        }
       }
-    }
-  });
+    },
+    { timeout: 30_000 },
+  );
 
   return { ok: true };
 }

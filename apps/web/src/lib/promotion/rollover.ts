@@ -7,16 +7,29 @@ import type { PrismaClient } from "@prisma/client";
  */
 export async function cloneClasses(
   prisma: PrismaClient,
-  params: { schoolId: number; fromAcademicYearId: number; toAcademicYearId: number }
+  params: {
+    schoolId: number;
+    fromAcademicYearId: number;
+    toAcademicYearId: number;
+  },
 ): Promise<Map<number, number>> {
   const sourceClasses = await prisma.class.findMany({
-    where: { schoolId: params.schoolId, academicYearId: params.fromAcademicYearId, archived: false },
+    where: {
+      schoolId: params.schoolId,
+      academicYearId: params.fromAcademicYearId,
+      archived: false,
+    },
   });
 
   const existing = await prisma.class.findMany({
-    where: { schoolId: params.schoolId, academicYearId: params.toAcademicYearId },
+    where: {
+      schoolId: params.schoolId,
+      academicYearId: params.toAcademicYearId,
+    },
   });
-  const existingByKey = new Map(existing.map((c) => [`${c.gradeId}:${c.section}`, c.id]));
+  const existingByKey = new Map(
+    existing.map((c) => [`${c.gradeId}:${c.section}`, c.id]),
+  );
 
   const map = new Map<number, number>();
 
@@ -35,6 +48,8 @@ export async function cloneClasses(
         section: source.section,
         academicYearId: params.toAcademicYearId,
         archived: false,
+        capacity: source.capacity,
+        room: source.room,
       },
     });
     existingByKey.set(key, created.id);
@@ -50,7 +65,7 @@ export async function cloneFaculty(
     classMap: Map<number, number>;
     fromAcademicYearId: number;
     toAcademicYearId: number;
-  }
+  },
 ): Promise<{ cloned: number; skippedInactive: number }> {
   const sourceLinks = await prisma.classTeacher.findMany({
     where: {
@@ -64,7 +79,7 @@ export async function cloneFaculty(
     where: { academicYearId: params.toAcademicYearId },
   });
   const existingKeys = new Set(
-    existing.map((l) => `${l.classId}:${l.teacherUserId}:${l.subjectId}`)
+    existing.map((l) => `${l.classId}:${l.teacherUserId}:${l.subjectId}`),
   );
 
   let cloned = 0;
@@ -104,7 +119,7 @@ export async function cloneTimetable(
     classMap: Map<number, number>;
     fromAcademicYearId: number;
     toAcademicYearId: number;
-  }
+  },
 ): Promise<{ cloned: number; skippedNoTeacher: number }> {
   const sourceEntries = await prisma.timetableEntry.findMany({
     where: {
@@ -117,14 +132,14 @@ export async function cloneTimetable(
     where: { academicYearId: params.toAcademicYearId },
   });
   const facultyKeys = new Set(
-    targetFaculty.map((l) => `${l.classId}:${l.teacherUserId}:${l.subjectId}`)
+    targetFaculty.map((l) => `${l.classId}:${l.teacherUserId}:${l.subjectId}`),
   );
 
   const existing = await prisma.timetableEntry.findMany({
     where: { academicYearId: params.toAcademicYearId },
   });
   const existingKeys = new Set(
-    existing.map((e) => `${e.classId}:${e.dayOfWeek}:${e.periodId}`)
+    existing.map((e) => `${e.classId}:${e.dayOfWeek}:${e.periodId}`),
   );
   // `TimetableEntry` also carries a unique constraint on
   // (teacherUserId, dayOfWeek, periodId, academicYearId): a teacher can only be
@@ -136,7 +151,7 @@ export async function cloneTimetable(
   const teacherSlotKeys = new Set(
     existing
       .filter((e) => e.teacherUserId !== null)
-      .map((e) => `${e.teacherUserId}:${e.dayOfWeek}:${e.periodId}`)
+      .map((e) => `${e.teacherUserId}:${e.dayOfWeek}:${e.periodId}`),
   );
 
   let cloned = 0;
@@ -178,7 +193,9 @@ export async function cloneTimetable(
     });
     existingKeys.add(key);
     if (teacherUserId !== null) {
-      teacherSlotKeys.add(`${teacherUserId}:${entry.dayOfWeek}:${entry.periodId}`);
+      teacherSlotKeys.add(
+        `${teacherUserId}:${entry.dayOfWeek}:${entry.periodId}`,
+      );
     }
     cloned += 1;
   }
@@ -193,7 +210,7 @@ export async function cloneFeeStructures(
     classMap: Map<number, number>;
     fromAcademicYearId: number;
     toAcademicYearId: number;
-  }
+  },
 ): Promise<{ cloned: number }> {
   const sourceStructures = await prisma.feeStructure.findMany({
     where: {
@@ -211,7 +228,9 @@ export async function cloneFeeStructures(
   // structures both labeled "Term 1" for different fee categories with different
   // amounts), so the dedupe key also includes `amount` to avoid conflating them
   // and silently dropping one on rollover.
-  const existingKeys = new Set(existing.map((f) => `${f.classId}:${f.term}:${f.amount.toString()}`));
+  const existingKeys = new Set(
+    existing.map((f) => `${f.classId}:${f.term}:${f.amount.toString()}`),
+  );
 
   let cloned = 0;
 
@@ -265,7 +284,7 @@ export async function runRollover(
     fromAcademicYearId: number;
     toAcademicYearId: number;
     options: RolloverOptions;
-  }
+  },
 ): Promise<RolloverSummary> {
   const summary: RolloverSummary = {
     classes: 0,

@@ -29,7 +29,7 @@ export async function getAttendanceRoster(
     academicYearId: number;
     role: SessionClaims["role"];
     userId: number;
-  }
+  },
 ): Promise<GetRosterResult> {
   if (params.role === "teacher") {
     const assignment = await prisma.classTeacher.findFirst({
@@ -66,10 +66,12 @@ export async function getAttendanceRoster(
   return {
     ok: true,
     students: enrolled.map((student) => {
-      const monthRecords = attendanceRows.filter((record) => record.studentId === student.id);
+      const monthRecords = attendanceRows.filter(
+        (record) => record.studentId === student.id,
+      );
       const monthPercent = attendancePercent(monthRecords);
       const todayRecord = monthRecords.find(
-        (record) => record.date.toISOString().slice(0, 10) === params.date
+        (record) => record.date.toISOString().slice(0, 10) === params.date,
       );
 
       return {
@@ -103,10 +105,17 @@ export async function markAttendance(
     role: SessionClaims["role"];
     entries: Array<{
       studentId: number;
-      status: "present" | "absent" | "late" | "half_day" | "excused" | "holiday" | null;
+      status:
+        | "present"
+        | "absent"
+        | "late"
+        | "half_day"
+        | "excused"
+        | "holiday"
+        | null;
       note?: string;
     }>;
-  }
+  },
 ): Promise<MarkAttendanceResult> {
   if (params.role === "teacher") {
     const today = getSchoolLocalToday();
@@ -147,55 +156,70 @@ export async function markAttendance(
       studentId: { in: params.entries.map((entry) => entry.studentId) },
     },
   });
-  if (enrolledCount !== params.entries.length) return { ok: false, error: "STUDENT_MISMATCH" };
+  if (enrolledCount !== params.entries.length)
+    return { ok: false, error: "STUDENT_MISMATCH" };
 
   const targetDate = new Date(params.date);
-  await prisma.$transaction(async (tx) => {
-    for (const entry of params.entries) {
-      const existing = await tx.attendance.findUnique({
-        where: { studentId_date: { studentId: entry.studentId, date: targetDate } },
-      });
+  // Interactive transaction with a per-entry findUnique + write + optional
+  // audit-row write: for a large class (40-60 students) that's roughly
+  // 80-180 sequential round-trips inside one transaction, which can exceed
+  // Prisma's 5s interactive-transaction default under real load. Matches the
+  // { timeout: 30_000 } precedent in confirmPromotionRun (promotion.ts).
+  await prisma.$transaction(
+    async (tx) => {
+      for (const entry of params.entries) {
+        const existing = await tx.attendance.findUnique({
+          where: {
+            studentId_date: { studentId: entry.studentId, date: targetDate },
+          },
+        });
 
-      if (entry.status === null) {
+        if (entry.status === null) {
+          if (existing) {
+            await tx.attendance.delete({ where: { id: existing.id } });
+            await recordAttendanceChange(tx as PrismaClient, {
+              studentId: entry.studentId,
+              date: targetDate,
+              fromStatus: existing.status,
+              toStatus: "cleared",
+              actorUserId: params.teacherUserId,
+            });
+          }
+          continue;
+        }
+
         if (existing) {
-          await tx.attendance.delete({ where: { id: existing.id } });
+          await tx.attendance.update({
+            where: { id: existing.id },
+            data: {
+              status: entry.status,
+              markedById: params.teacherUserId,
+              note: entry.note ?? null,
+            },
+          });
           await recordAttendanceChange(tx as PrismaClient, {
             studentId: entry.studentId,
             date: targetDate,
             fromStatus: existing.status,
-            toStatus: "cleared",
+            toStatus: entry.status,
             actorUserId: params.teacherUserId,
           });
+        } else {
+          await tx.attendance.create({
+            data: {
+              studentId: entry.studentId,
+              academicYearId: params.academicYearId,
+              date: targetDate,
+              status: entry.status,
+              markedById: params.teacherUserId,
+              note: entry.note ?? null,
+            },
+          });
         }
-        continue;
       }
-
-      if (existing) {
-        await tx.attendance.update({
-          where: { id: existing.id },
-          data: { status: entry.status, markedById: params.teacherUserId, note: entry.note ?? null },
-        });
-        await recordAttendanceChange(tx as PrismaClient, {
-          studentId: entry.studentId,
-          date: targetDate,
-          fromStatus: existing.status,
-          toStatus: entry.status,
-          actorUserId: params.teacherUserId,
-        });
-      } else {
-        await tx.attendance.create({
-          data: {
-            studentId: entry.studentId,
-            academicYearId: params.academicYearId,
-            date: targetDate,
-            status: entry.status,
-            markedById: params.teacherUserId,
-            note: entry.note ?? null,
-          },
-        });
-      }
-    }
-  });
+    },
+    { timeout: 30_000 },
+  );
 
   return { ok: true };
 }

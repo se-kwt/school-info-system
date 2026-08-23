@@ -3,7 +3,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth/require-api-role";
 import { AuthError } from "@/lib/auth/rbac";
-import { listGrades, createGrade, type CreateGradeResult } from "@/lib/school-setup/grades";
+import {
+  listGrades,
+  createGrade,
+  type CreateGradeResult,
+} from "@/lib/school-setup/grades";
 
 /**
  * `createGrade` runs inside a Serializable transaction when it auto-assigns
@@ -22,7 +26,7 @@ function isTransactionConflict(err: unknown): boolean {
 
 async function createGradeWithRetry(
   schoolId: number,
-  input: Parameters<typeof createGrade>[2]
+  input: Parameters<typeof createGrade>[2],
 ): Promise<CreateGradeResult> {
   try {
     return await createGrade(prisma, schoolId, input);
@@ -40,7 +44,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const academicYearIdParam = searchParams.get("academicYearId");
     const grades = await listGrades(prisma, claims.schoolId, {
-      academicYearId: academicYearIdParam ? Number(academicYearIdParam) : undefined,
+      academicYearId: academicYearIdParam
+        ? Number(academicYearIdParam)
+        : undefined,
     });
     return NextResponse.json(grades);
   } catch (err) {
@@ -59,7 +65,10 @@ export async function POST(request: Request) {
     try {
       ({ name } = await request.json());
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 },
+      );
     }
 
     if (!name) {
@@ -68,7 +77,11 @@ export async function POST(request: Request) {
 
     const result = await createGradeWithRetry(claims.schoolId, { name });
     if (!result.ok) {
-      return NextResponse.json({ error: "A grade with this name already exists" }, { status: 409 });
+      const message =
+        result.error === "DUPLICATE_SORT_ORDER"
+          ? "A grade with this sort order already exists"
+          : "A grade with this name already exists";
+      return NextResponse.json({ error: message }, { status: 409 });
     }
 
     return NextResponse.json(result.grade, { status: 201 });
@@ -78,8 +91,11 @@ export async function POST(request: Request) {
     }
     if (isTransactionConflict(err)) {
       return NextResponse.json(
-        { error: "This request conflicted with another update. Please try again." },
-        { status: 409 }
+        {
+          error:
+            "This request conflicted with another update. Please try again.",
+        },
+        { status: 409 },
       );
     }
     throw err;

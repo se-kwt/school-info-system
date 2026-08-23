@@ -16,17 +16,33 @@ describe("rollover: classes", () => {
 
   beforeEach(async () => {
     await resetDb();
-    const school = await prisma.school.create({ data: { name: "Rollover School" } });
+    const school = await prisma.school.create({
+      data: { name: "Rollover School" },
+    });
     schoolId = school.id;
     const fromYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+      data: {
+        schoolId,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
     });
     fromYearId = fromYear.id;
     const toYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+      data: {
+        schoolId,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "upcoming",
+      },
     });
     toYearId = toYear.id;
-    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    const grade = await prisma.grade.create({
+      data: { schoolId, name: "Grade 1" },
+    });
     gradeId = grade.id;
   });
 
@@ -38,43 +54,112 @@ describe("rollover: classes", () => {
       ],
     });
 
-    const map = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const map = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
     const cloned = await prisma.class.findMany({
       where: { academicYearId: toYearId },
       orderBy: { section: "asc" },
     });
     expect(cloned.map((c) => c.section)).toEqual(["A", "B"]);
-    expect(cloned.every((c) => c.gradeId === gradeId && c.archived === false)).toBe(true);
+    expect(
+      cloned.every((c) => c.gradeId === gradeId && c.archived === false),
+    ).toBe(true);
     expect(map.size).toBe(2);
   });
 
   it("is idempotent", async () => {
-    await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
 
-    await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
-    expect(await prisma.class.count({ where: { academicYearId: toYearId } })).toBe(1);
+    expect(
+      await prisma.class.count({ where: { academicYearId: toYearId } }),
+    ).toBe(1);
   });
 
   it("adopts a class the admin already created by hand", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const manual = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: toYearId } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const manual = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: toYearId },
+    });
 
-    const map = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const map = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
-    expect(await prisma.class.count({ where: { academicYearId: toYearId } })).toBe(1);
+    expect(
+      await prisma.class.count({ where: { academicYearId: toYearId } }),
+    ).toBe(1);
     expect(map.get(source.id)).toBe(manual.id);
   });
 
+  it("carries capacity and room forward onto the cloned class", async () => {
+    const source = await prisma.class.create({
+      data: {
+        schoolId,
+        gradeId,
+        section: "A",
+        academicYearId: fromYearId,
+        capacity: 35,
+        room: "Room 12",
+      },
+    });
+
+    const map = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+
+    const cloned = await prisma.class.findUnique({
+      where: { id: map.get(source.id) },
+    });
+    expect(cloned?.capacity).toBe(35);
+    expect(cloned?.room).toBe("Room 12");
+  });
+
   it("skips archived source classes", async () => {
-    await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    await prisma.class.create({ data: { schoolId, gradeId, section: "Z", academicYearId: fromYearId, archived: true } });
+    await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    await prisma.class.create({
+      data: {
+        schoolId,
+        gradeId,
+        section: "Z",
+        academicYearId: fromYearId,
+        archived: true,
+      },
+    });
 
-    await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
-    const sections = (await prisma.class.findMany({ where: { academicYearId: toYearId } })).map((c) => c.section);
+    const sections = (
+      await prisma.class.findMany({ where: { academicYearId: toYearId } })
+    ).map((c) => c.section);
     expect(sections).toEqual(["A"]);
   });
 });
@@ -87,36 +172,77 @@ describe("rollover: faculty", () => {
 
   beforeEach(async () => {
     await resetDb();
-    const school = await prisma.school.create({ data: { name: "Rollover School" } });
+    const school = await prisma.school.create({
+      data: { name: "Rollover School" },
+    });
     schoolId = school.id;
     const fromYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+      data: {
+        schoolId,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
     });
     fromYearId = fromYear.id;
     const toYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+      data: {
+        schoolId,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "upcoming",
+      },
     });
     toYearId = toYear.id;
-    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    const grade = await prisma.grade.create({
+      data: { schoolId, name: "Grade 1" },
+    });
     gradeId = grade.id;
   });
 
   it("clones faculty assignments onto the cloned classes", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const subject = await prisma.subject.create({
+      data: { gradeId, name: "Mathematics" },
+    });
     const teacher = await prisma.user.create({
-      data: { schoolId, phone: "+10000000201", role: "teacher", name: "Maths Teacher" },
+      data: {
+        schoolId,
+        phone: "+10000000201",
+        role: "teacher",
+        name: "Maths Teacher",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: source.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId, isClassTeacher: true },
+      data: {
+        classId: source.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: fromYearId,
+        isClassTeacher: true,
+      },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    const result = await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    const result = await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
     expect(result).toEqual({ cloned: 1, skippedInactive: 0 });
 
-    const cloned = await prisma.classTeacher.findFirstOrThrow({ where: { academicYearId: toYearId } });
+    const cloned = await prisma.classTeacher.findFirstOrThrow({
+      where: { academicYearId: toYearId },
+    });
     expect(cloned.classId).toBe(classMap.get(source.id));
     expect(cloned.teacherUserId).toBe(teacher.id);
     expect(cloned.subjectId).toBe(subject.id);
@@ -124,37 +250,90 @@ describe("rollover: faculty", () => {
   });
 
   it("skips assignments whose teacher is no longer active, and reports them", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const subject = await prisma.subject.create({
+      data: { gradeId, name: "Mathematics" },
+    });
     const leaver = await prisma.user.create({
-      data: { schoolId, phone: "+10000000202", role: "teacher", name: "Departed", status: "inactive" },
+      data: {
+        schoolId,
+        phone: "+10000000202",
+        role: "teacher",
+        name: "Departed",
+        status: "inactive",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: source.id, subjectId: subject.id, teacherUserId: leaver.id, academicYearId: fromYearId },
+      data: {
+        classId: source.id,
+        subjectId: subject.id,
+        teacherUserId: leaver.id,
+        academicYearId: fromYearId,
+      },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    const result = await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    const result = await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
     expect(result).toEqual({ cloned: 0, skippedInactive: 1 });
-    expect(await prisma.classTeacher.count({ where: { academicYearId: toYearId } })).toBe(0);
+    expect(
+      await prisma.classTeacher.count({ where: { academicYearId: toYearId } }),
+    ).toBe(0);
   });
 
   it("is idempotent", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const subject = await prisma.subject.create({
+      data: { gradeId, name: "Mathematics" },
+    });
     const teacher = await prisma.user.create({
-      data: { schoolId, phone: "+10000000203", role: "teacher", name: "Maths Teacher" },
+      data: {
+        schoolId,
+        phone: "+10000000203",
+        role: "teacher",
+        name: "Maths Teacher",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: source.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId },
+      data: {
+        classId: source.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: fromYearId,
+      },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
-    expect(await prisma.classTeacher.count({ where: { academicYearId: toYearId } })).toBe(1);
+    expect(
+      await prisma.classTeacher.count({ where: { academicYearId: toYearId } }),
+    ).toBe(1);
   });
 });
 
@@ -166,31 +345,67 @@ describe("rollover: timetable", () => {
 
   beforeEach(async () => {
     await resetDb();
-    const school = await prisma.school.create({ data: { name: "Rollover School" } });
+    const school = await prisma.school.create({
+      data: { name: "Rollover School" },
+    });
     schoolId = school.id;
     const fromYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+      data: {
+        schoolId,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
     });
     fromYearId = fromYear.id;
     const toYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+      data: {
+        schoolId,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "upcoming",
+      },
     });
     toYearId = toYear.id;
-    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    const grade = await prisma.grade.create({
+      data: { schoolId, name: "Grade 1" },
+    });
     gradeId = grade.id;
   });
 
   it("clones timetable entries onto the cloned classes", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const subject = await prisma.subject.create({
+      data: { gradeId, name: "Mathematics" },
+    });
     const teacher = await prisma.user.create({
-      data: { schoolId, phone: "+10000000301", role: "teacher", name: "Maths Teacher" },
+      data: {
+        schoolId,
+        phone: "+10000000301",
+        role: "teacher",
+        name: "Maths Teacher",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: source.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId },
+      data: {
+        classId: source.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: fromYearId,
+      },
     });
     const period = await prisma.period.create({
-      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+      data: {
+        schoolId,
+        order: 1,
+        label: "Period 1",
+        startTime: "09:00",
+        endTime: "09:45",
+      },
     });
     await prisma.timetableEntry.create({
       data: {
@@ -203,13 +418,27 @@ describe("rollover: timetable", () => {
       },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    const result = await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    const result = await cloneTimetable(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
     expect(result).toEqual({ cloned: 1, skippedNoTeacher: 0 });
 
-    const cloned = await prisma.timetableEntry.findFirstOrThrow({ where: { academicYearId: toYearId } });
+    const cloned = await prisma.timetableEntry.findFirstOrThrow({
+      where: { academicYearId: toYearId },
+    });
     expect(cloned.classId).toBe(classMap.get(source.id));
     expect(cloned.periodId).toBe(period.id);
     expect(cloned.dayOfWeek).toBe(1);
@@ -217,16 +446,37 @@ describe("rollover: timetable", () => {
   });
 
   it("clears the teacher when their assignment did not carry forward", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const subject = await prisma.subject.create({
+      data: { gradeId, name: "Mathematics" },
+    });
     const leaver = await prisma.user.create({
-      data: { schoolId, phone: "+10000000302", role: "teacher", name: "Departed", status: "inactive" },
+      data: {
+        schoolId,
+        phone: "+10000000302",
+        role: "teacher",
+        name: "Departed",
+        status: "inactive",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: source.id, subjectId: subject.id, teacherUserId: leaver.id, academicYearId: fromYearId },
+      data: {
+        classId: source.id,
+        subjectId: subject.id,
+        teacherUserId: leaver.id,
+        academicYearId: fromYearId,
+      },
     });
     const period = await prisma.period.create({
-      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+      data: {
+        schoolId,
+        order: 1,
+        label: "Period 1",
+        startTime: "09:00",
+        endTime: "09:45",
+      },
     });
     await prisma.timetableEntry.create({
       data: {
@@ -239,27 +489,61 @@ describe("rollover: timetable", () => {
       },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    const result = await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    const result = await cloneTimetable(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
     expect(result).toEqual({ cloned: 1, skippedNoTeacher: 1 });
 
-    const cloned = await prisma.timetableEntry.findFirstOrThrow({ where: { academicYearId: toYearId } });
+    const cloned = await prisma.timetableEntry.findFirstOrThrow({
+      where: { academicYearId: toYearId },
+    });
     expect(cloned.teacherUserId).toBeNull();
   });
 
   it("is idempotent", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const subject = await prisma.subject.create({
+      data: { gradeId, name: "Mathematics" },
+    });
     const teacher = await prisma.user.create({
-      data: { schoolId, phone: "+10000000303", role: "teacher", name: "Maths Teacher" },
+      data: {
+        schoolId,
+        phone: "+10000000303",
+        role: "teacher",
+        name: "Maths Teacher",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: source.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId },
+      data: {
+        classId: source.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: fromYearId,
+      },
     });
     const period = await prisma.period.create({
-      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+      data: {
+        schoolId,
+        order: 1,
+        label: "Period 1",
+        startTime: "09:00",
+        endTime: "09:45",
+      },
     });
     await prisma.timetableEntry.create({
       data: {
@@ -272,12 +556,32 @@ describe("rollover: timetable", () => {
       },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneTimetable(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneTimetable(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
-    expect(await prisma.timetableEntry.count({ where: { academicYearId: toYearId } })).toBe(1);
+    expect(
+      await prisma.timetableEntry.count({
+        where: { academicYearId: toYearId },
+      }),
+    ).toBe(1);
   });
 
   it("nulls the teacher instead of throwing when a carried-forward teacher would double-book a different class at the same day/period", async () => {
@@ -287,16 +591,36 @@ describe("rollover: timetable", () => {
     // gradeId+section) and clones 1A; cloning 1A's timetable entry would double-book T
     // at Mon/Period-1 via a different class, which the DB's teacher-uniqueness
     // constraint forbids. This must degrade gracefully (teacherUserId: null), not throw.
-    const sourceClass1A = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const sourceClass1A = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const subject = await prisma.subject.create({
+      data: { gradeId, name: "Mathematics" },
+    });
     const teacher = await prisma.user.create({
-      data: { schoolId, phone: "+10000000304", role: "teacher", name: "Shared Teacher" },
+      data: {
+        schoolId,
+        phone: "+10000000304",
+        role: "teacher",
+        name: "Shared Teacher",
+      },
     });
     const period = await prisma.period.create({
-      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+      data: {
+        schoolId,
+        order: 1,
+        label: "Period 1",
+        startTime: "09:00",
+        endTime: "09:45",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: sourceClass1A.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId },
+      data: {
+        classId: sourceClass1A.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: fromYearId,
+      },
     });
     await prisma.timetableEntry.create({
       data: {
@@ -310,9 +634,16 @@ describe("rollover: timetable", () => {
     });
 
     // Admin hand-built class 1B in the target year and already staffed T there.
-    const targetClass1B = await prisma.class.create({ data: { schoolId, gradeId, section: "B", academicYearId: toYearId } });
+    const targetClass1B = await prisma.class.create({
+      data: { schoolId, gradeId, section: "B", academicYearId: toYearId },
+    });
     await prisma.classTeacher.create({
-      data: { classId: targetClass1B.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: toYearId },
+      data: {
+        classId: targetClass1B.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: toYearId,
+      },
     });
     await prisma.timetableEntry.create({
       data: {
@@ -325,9 +656,21 @@ describe("rollover: timetable", () => {
       },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    const result = await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFaculty(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    const result = await cloneTimetable(prisma, {
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
     expect(result).toEqual({ cloned: 1, skippedNoTeacher: 1 });
 
@@ -353,39 +696,77 @@ describe("rollover: fee structures", () => {
 
   beforeEach(async () => {
     await resetDb();
-    const school = await prisma.school.create({ data: { name: "Rollover School" } });
+    const school = await prisma.school.create({
+      data: { name: "Rollover School" },
+    });
     schoolId = school.id;
     const fromYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+      data: {
+        schoolId,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
     });
     fromYearId = fromYear.id;
     const toYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+      data: {
+        schoolId,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "upcoming",
+      },
     });
     toYearId = toYear.id;
-    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    const grade = await prisma.grade.create({
+      data: { schoolId, name: "Grade 1" },
+    });
     gradeId = grade.id;
   });
 
   it("clones fee structures with their due dates shifted by a year", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
     await prisma.feeStructure.create({
-      data: { schoolId, academicYearId: fromYearId, classId: source.id, term: "Term 1", amount: 5000, dueDate: new Date("2026-06-01") },
+      data: {
+        schoolId,
+        academicYearId: fromYearId,
+        classId: source.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: new Date("2026-06-01"),
+      },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    const result = await cloneFeeStructures(prisma, { schoolId, classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    const result = await cloneFeeStructures(prisma, {
+      schoolId,
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
     expect(result).toEqual({ cloned: 1 });
 
-    const cloned = await prisma.feeStructure.findFirstOrThrow({ where: { academicYearId: toYearId } });
+    const cloned = await prisma.feeStructure.findFirstOrThrow({
+      where: { academicYearId: toYearId },
+    });
     expect(cloned.term).toBe("Term 1");
     expect(Number(cloned.amount)).toBe(5000);
     expect(cloned.dueDate.toISOString().slice(0, 10)).toBe("2027-06-01");
   });
 
   it("carries discount and fineAmount forward unchanged", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
     await prisma.feeStructure.create({
       data: {
         schoolId,
@@ -399,42 +780,106 @@ describe("rollover: fee structures", () => {
       },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFeeStructures(prisma, { schoolId, classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFeeStructures(prisma, {
+      schoolId,
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
-    const cloned = await prisma.feeStructure.findFirstOrThrow({ where: { academicYearId: toYearId } });
+    const cloned = await prisma.feeStructure.findFirstOrThrow({
+      where: { academicYearId: toYearId },
+    });
     expect(Number(cloned.discount)).toBe(250);
     expect(Number(cloned.fineAmount)).toBe(100);
   });
 
   it("is idempotent", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
     await prisma.feeStructure.create({
-      data: { schoolId, academicYearId: fromYearId, classId: source.id, term: "Term 1", amount: 5000, dueDate: new Date("2026-06-01") },
+      data: {
+        schoolId,
+        academicYearId: fromYearId,
+        classId: source.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: new Date("2026-06-01"),
+      },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFeeStructures(prisma, { schoolId, classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    await cloneFeeStructures(prisma, { schoolId, classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFeeStructures(prisma, {
+      schoolId,
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    await cloneFeeStructures(prisma, {
+      schoolId,
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
-    expect(await prisma.feeStructure.count({ where: { academicYearId: toYearId } })).toBe(1);
+    expect(
+      await prisma.feeStructure.count({ where: { academicYearId: toYearId } }),
+    ).toBe(1);
   });
 
   it("clones two legitimate fee structures that share a class and term but differ in amount, instead of silently dropping one", async () => {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    await prisma.feeStructure.create({
-      data: { schoolId, academicYearId: fromYearId, classId: source.id, term: "Term 1", amount: 5000, dueDate: new Date("2026-06-01") },
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
     });
     await prisma.feeStructure.create({
-      data: { schoolId, academicYearId: fromYearId, classId: source.id, term: "Term 1", amount: 1200, dueDate: new Date("2026-06-01") },
+      data: {
+        schoolId,
+        academicYearId: fromYearId,
+        classId: source.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: new Date("2026-06-01"),
+      },
+    });
+    await prisma.feeStructure.create({
+      data: {
+        schoolId,
+        academicYearId: fromYearId,
+        classId: source.id,
+        term: "Term 1",
+        amount: 1200,
+        dueDate: new Date("2026-06-01"),
+      },
     });
 
-    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
-    const result = await cloneFeeStructures(prisma, { schoolId, classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const classMap = await cloneClasses(prisma, {
+      schoolId,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
+    const result = await cloneFeeStructures(prisma, {
+      schoolId,
+      classMap,
+      fromAcademicYearId: fromYearId,
+      toAcademicYearId: toYearId,
+    });
 
     expect(result).toEqual({ cloned: 2 });
 
-    const cloned = await prisma.feeStructure.findMany({ where: { academicYearId: toYearId }, orderBy: { amount: "asc" } });
+    const cloned = await prisma.feeStructure.findMany({
+      where: { academicYearId: toYearId },
+      orderBy: { amount: "asc" },
+    });
     expect(cloned.map((f) => Number(f.amount))).toEqual([1200, 5000]);
   });
 });
@@ -447,31 +892,68 @@ describe("runRollover", () => {
 
   beforeEach(async () => {
     await resetDb();
-    const school = await prisma.school.create({ data: { name: "Rollover School" } });
+    const school = await prisma.school.create({
+      data: { name: "Rollover School" },
+    });
     schoolId = school.id;
     const fromYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+      data: {
+        schoolId,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
     });
     fromYearId = fromYear.id;
     const toYear = await prisma.academicYear.create({
-      data: { schoolId, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+      data: {
+        schoolId,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "upcoming",
+      },
     });
     toYearId = toYear.id;
-    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    const grade = await prisma.grade.create({
+      data: { schoolId, name: "Grade 1" },
+    });
     gradeId = grade.id;
   });
 
   async function seedSourceYear() {
-    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
-    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const source = await prisma.class.create({
+      data: { schoolId, gradeId, section: "A", academicYearId: fromYearId },
+    });
+    const subject = await prisma.subject.create({
+      data: { gradeId, name: "Mathematics" },
+    });
     const teacher = await prisma.user.create({
-      data: { schoolId, phone: "+10000000401", role: "teacher", name: "Maths Teacher" },
+      data: {
+        schoolId,
+        phone: "+10000000401",
+        role: "teacher",
+        name: "Maths Teacher",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: source.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId, isClassTeacher: true },
+      data: {
+        classId: source.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: fromYearId,
+        isClassTeacher: true,
+      },
     });
     const period = await prisma.period.create({
-      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+      data: {
+        schoolId,
+        order: 1,
+        label: "Period 1",
+        startTime: "09:00",
+        endTime: "09:45",
+      },
     });
     await prisma.timetableEntry.create({
       data: {
@@ -484,7 +966,14 @@ describe("runRollover", () => {
       },
     });
     await prisma.feeStructure.create({
-      data: { schoolId, academicYearId: fromYearId, classId: source.id, term: "Term 1", amount: 5000, dueDate: new Date("2026-06-01") },
+      data: {
+        schoolId,
+        academicYearId: fromYearId,
+        classId: source.id,
+        term: "Term 1",
+        amount: 5000,
+        dueDate: new Date("2026-06-01"),
+      },
     });
     return { source, subject, teacher, period };
   }
@@ -496,13 +985,24 @@ describe("runRollover", () => {
       schoolId,
       fromAcademicYearId: fromYearId,
       toAcademicYearId: toYearId,
-      options: { classes: true, faculty: true, timetable: false, feeStructures: false },
+      options: {
+        classes: true,
+        faculty: true,
+        timetable: false,
+        feeStructures: false,
+      },
     });
 
     expect(summary.classes).toBeGreaterThan(0);
     expect(summary.faculty.cloned).toBeGreaterThan(0);
-    expect(await prisma.timetableEntry.count({ where: { academicYearId: toYearId } })).toBe(0);
-    expect(await prisma.feeStructure.count({ where: { academicYearId: toYearId } })).toBe(0);
+    expect(
+      await prisma.timetableEntry.count({
+        where: { academicYearId: toYearId },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.feeStructure.count({ where: { academicYearId: toYearId } }),
+    ).toBe(0);
   });
 
   it("does nothing at all when every option is off", async () => {
@@ -512,11 +1012,18 @@ describe("runRollover", () => {
       schoolId,
       fromAcademicYearId: fromYearId,
       toAcademicYearId: toYearId,
-      options: { classes: false, faculty: false, timetable: false, feeStructures: false },
+      options: {
+        classes: false,
+        faculty: false,
+        timetable: false,
+        feeStructures: false,
+      },
     });
 
     expect(summary.classes).toBe(0);
-    expect(await prisma.class.count({ where: { academicYearId: toYearId } })).toBe(0);
+    expect(
+      await prisma.class.count({ where: { academicYearId: toYearId } }),
+    ).toBe(0);
   });
 
   it("clones everything when every option is on", async () => {
@@ -526,7 +1033,12 @@ describe("runRollover", () => {
       schoolId,
       fromAcademicYearId: fromYearId,
       toAcademicYearId: toYearId,
-      options: { classes: true, faculty: true, timetable: true, feeStructures: true },
+      options: {
+        classes: true,
+        faculty: true,
+        timetable: true,
+        feeStructures: true,
+      },
     });
 
     expect(summary.classes).toBe(1);
@@ -542,35 +1054,89 @@ describe("rollover: revert interaction", () => {
   });
 
   it("survives a revert of the promotion that created it, which the YEAR_HAS_ACTIVITY guard then blocks", async () => {
-    const { startOrResumePromotionRun, updateMappings, setStudentDecisions, confirmPromotionRun, revertPromotionRun } =
-      await import("../src/lib/promotion");
+    const {
+      startOrResumePromotionRun,
+      updateMappings,
+      setStudentDecisions,
+      confirmPromotionRun,
+      revertPromotionRun,
+    } = await import("../src/lib/promotion");
 
-    const school = await prisma.school.create({ data: { name: "Revert Interaction School" } });
+    const school = await prisma.school.create({
+      data: { name: "Revert Interaction School" },
+    });
     const fromYear = await prisma.academicYear.create({
-      data: { schoolId: school.id, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+      data: {
+        schoolId: school.id,
+        name: "2026-27",
+        startDate: new Date("2026-04-01"),
+        endDate: new Date("2027-03-31"),
+        status: "active",
+      },
     });
     const toYear = await prisma.academicYear.create({
-      data: { schoolId: school.id, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+      data: {
+        schoolId: school.id,
+        name: "2027-28",
+        startDate: new Date("2027-04-01"),
+        endDate: new Date("2028-03-31"),
+        status: "upcoming",
+      },
     });
     const admin = await prisma.user.create({
-      data: { schoolId: school.id, phone: "+10000000501", role: "admin", name: "Test Admin" },
+      data: {
+        schoolId: school.id,
+        phone: "+10000000501",
+        role: "admin",
+        name: "Test Admin",
+      },
     });
-    const grade = await prisma.grade.create({ data: { schoolId: school.id, name: "Grade 1" } });
+    const grade = await prisma.grade.create({
+      data: { schoolId: school.id, name: "Grade 1" },
+    });
     const source = await prisma.class.create({
-      data: { schoolId: school.id, gradeId: grade.id, section: "A", academicYearId: fromYear.id },
+      data: {
+        schoolId: school.id,
+        gradeId: grade.id,
+        section: "A",
+        academicYearId: fromYear.id,
+      },
     });
-    const subject = await prisma.subject.create({ data: { gradeId: grade.id, name: "Mathematics" } });
+    const subject = await prisma.subject.create({
+      data: { gradeId: grade.id, name: "Mathematics" },
+    });
     const teacher = await prisma.user.create({
-      data: { schoolId: school.id, phone: "+10000000502", role: "teacher", name: "Maths Teacher" },
+      data: {
+        schoolId: school.id,
+        phone: "+10000000502",
+        role: "teacher",
+        name: "Maths Teacher",
+      },
     });
     await prisma.classTeacher.create({
-      data: { classId: source.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYear.id, isClassTeacher: true },
+      data: {
+        classId: source.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: fromYear.id,
+        isClassTeacher: true,
+      },
     });
     const student = await prisma.student.create({
-      data: { schoolId: school.id, name: "Student One", dob: new Date("2016-01-01"), admissionNo: "REV-1" },
+      data: {
+        schoolId: school.id,
+        name: "Student One",
+        dob: new Date("2016-01-01"),
+        admissionNo: "REV-1",
+      },
     });
     await prisma.enrollment.create({
-      data: { studentId: student.id, classId: source.id, academicYearId: fromYear.id, status: "active" },
+      data: {
+        studentId: student.id,
+        classId: source.id,
+        academicYearId: fromYear.id,
+        status: "active",
+      },
     });
 
     const started = await startOrResumePromotionRun(prisma, {
@@ -583,7 +1149,10 @@ describe("rollover: revert interaction", () => {
     await updateMappings(prisma, {
       promotionRunId: started.id,
       schoolId: school.id,
-      mappings: started.mappings.map((m) => ({ fromClassId: m.fromClassId, toClassId: null })),
+      mappings: started.mappings.map((m) => ({
+        fromClassId: m.fromClassId,
+        toClassId: null,
+      })),
     });
     await setStudentDecisions(prisma, {
       promotionRunId: started.id,
@@ -594,7 +1163,12 @@ describe("rollover: revert interaction", () => {
     const confirmResult = await confirmPromotionRun(prisma, {
       promotionRunId: started.id,
       schoolId: school.id,
-      rollover: { classes: true, faculty: true, timetable: true, feeStructures: true },
+      rollover: {
+        classes: true,
+        faculty: true,
+        timetable: true,
+        feeStructures: true,
+      },
     });
     expect(confirmResult.ok).toBe(true);
     if (confirmResult.ok) {
@@ -606,18 +1180,29 @@ describe("rollover: revert interaction", () => {
 
     // Rollover created faculty and timetable rows in the target year regardless
     // of the student decisions above.
-    expect(await prisma.class.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
-    expect(await prisma.classTeacher.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
+    expect(
+      await prisma.class.count({ where: { academicYearId: toYear.id } }),
+    ).toBeGreaterThan(0);
+    expect(
+      await prisma.classTeacher.count({ where: { academicYearId: toYear.id } }),
+    ).toBeGreaterThan(0);
 
     // Reverting is refused: rollover's ClassTeacher/TimetableEntry rows in the
     // target year are exactly what the YEAR_HAS_ACTIVITY guard counts, so once
     // rollover has set up the new year, an automatic revert is no longer safe.
     // This is deliberate -- do not weaken the guard to make rollover revertible.
-    const revertResult = await revertPromotionRun(prisma, { promotionRunId: started.id, schoolId: school.id });
+    const revertResult = await revertPromotionRun(prisma, {
+      promotionRunId: started.id,
+      schoolId: school.id,
+    });
     expect(revertResult).toEqual({ ok: false, error: "YEAR_HAS_ACTIVITY" });
 
     // The rollover-created rows survive the (refused) revert attempt untouched.
-    expect(await prisma.class.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
-    expect(await prisma.classTeacher.count({ where: { academicYearId: toYear.id } })).toBeGreaterThan(0);
+    expect(
+      await prisma.class.count({ where: { academicYearId: toYear.id } }),
+    ).toBeGreaterThan(0);
+    expect(
+      await prisma.classTeacher.count({ where: { academicYearId: toYear.id } }),
+    ).toBeGreaterThan(0);
   });
 });
