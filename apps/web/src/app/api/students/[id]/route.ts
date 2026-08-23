@@ -25,6 +25,15 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       gender?: "male" | "female" | "other";
       studentIdNumber?: string;
       dateOfJoin?: string;
+      address?: string;
+      bloodGroup?: string;
+      nationality?: string;
+      religion?: string;
+      previousSchool?: string;
+      emergencyContactName?: string;
+      emergencyContactPhone?: string;
+      category?: string;
+      admissionDate?: string;
       parents?: { relationship: GuardianRelationship; name: string; phone: string; email?: string }[];
       siblingStudentIds?: number[];
     };

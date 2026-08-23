@@ -16,6 +16,15 @@ export interface SaveStudentFields {
   gender: "male" | "female" | "other" | "";
   studentIdNumber: string;
   dateOfJoin: string;
+  address: string;
+  bloodGroup: string;
+  nationality: string;
+  religion: string;
+  previousSchool: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  category: string;
+  admissionDate: string;
   siblingStudentIds: number[];
   parents: { relationship: string; firstName: string; lastName: string; phone: string; email: string }[];
 }
@@ -77,6 +86,15 @@ export function StudentDetailModal({
   const [gender, setGender] = useState<"male" | "female" | "other" | "">(student?.gender ?? "");
   const [studentIdNumber, setStudentIdNumber] = useState(student?.studentIdNumber ?? "");
   const [dateOfJoin, setDateOfJoin] = useState(student?.dateOfJoin ?? "");
+  const [address, setAddress] = useState(student?.address ?? "");
+  const [bloodGroup, setBloodGroup] = useState(student?.bloodGroup ?? "");
+  const [nationality, setNationality] = useState(student?.nationality ?? "");
+  const [religion, setReligion] = useState(student?.religion ?? "");
+  const [previousSchool, setPreviousSchool] = useState(student?.previousSchool ?? "");
+  const [emergencyContactName, setEmergencyContactName] = useState(student?.emergencyContactName ?? "");
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState(student?.emergencyContactPhone ?? "");
+  const [category, setCategory] = useState(student?.category ?? "");
+  const [admissionDate, setAdmissionDate] = useState(student?.admissionDate ?? "");
   const [siblingIds, setSiblingIds] = useState<(number | null)[]>(
     student?.siblings.map((s) => s.id) ?? []
   );
@@ -103,6 +121,15 @@ export function StudentDetailModal({
       gender,
       studentIdNumber,
       dateOfJoin,
+      address,
+      bloodGroup,
+      nationality,
+      religion,
+      previousSchool,
+      emergencyContactName,
+      emergencyContactPhone,
+      category,
+      admissionDate,
       siblingStudentIds: siblingIds.filter((id): id is number => id !== null),
       parents: parentRows,
     });
@@ -495,6 +522,134 @@ export function StudentDetailModal({
               </button>
             )}
           </div>
+        </FormSection>
+
+        <FormSection number={4} title="Admission record">
+          {(isAdmin || student?.address) && (
+            <Field label="Address" htmlFor="address">
+              <input
+                id="address"
+                type="text"
+                aria-label="Address"
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                placeholder="Address"
+              />
+            </Field>
+          )}
+          {(isAdmin || student?.bloodGroup) && (
+            <Field label="Blood group" htmlFor="bloodGroup">
+              <input
+                id="bloodGroup"
+                type="text"
+                aria-label="Blood group"
+                value={bloodGroup}
+                onChange={(event) => setBloodGroup(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                placeholder="Blood group"
+              />
+            </Field>
+          )}
+          {(isAdmin || student?.nationality) && (
+            <Field label="Nationality" htmlFor="nationality">
+              <input
+                id="nationality"
+                type="text"
+                aria-label="Nationality"
+                value={nationality}
+                onChange={(event) => setNationality(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                placeholder="Nationality"
+              />
+            </Field>
+          )}
+          {(isAdmin || student?.religion) && (
+            <Field label="Religion" htmlFor="religion">
+              <input
+                id="religion"
+                type="text"
+                aria-label="Religion"
+                value={religion}
+                onChange={(event) => setReligion(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                placeholder="Religion"
+              />
+            </Field>
+          )}
+          {(isAdmin || student?.category) && (
+            <Field label="Category" htmlFor="category">
+              <input
+                id="category"
+                type="text"
+                aria-label="Category"
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                placeholder="Category"
+              />
+            </Field>
+          )}
+          {(isAdmin || student?.previousSchool) && (
+            <Field label="Previous school" htmlFor="previousSchool">
+              <input
+                id="previousSchool"
+                type="text"
+                aria-label="Previous school"
+                value={previousSchool}
+                onChange={(event) => setPreviousSchool(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                placeholder="Previous school"
+              />
+            </Field>
+          )}
+          {(isAdmin || student?.emergencyContactName) && (
+            <Field label="Emergency contact name" htmlFor="emergencyContactName">
+              <input
+                id="emergencyContactName"
+                type="text"
+                aria-label="Emergency contact name"
+                value={emergencyContactName}
+                onChange={(event) => setEmergencyContactName(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                placeholder="Emergency contact name"
+              />
+            </Field>
+          )}
+          {(isAdmin || student?.emergencyContactPhone) && (
+            <Field label="Emergency contact phone" htmlFor="emergencyContactPhone">
+              <input
+                id="emergencyContactPhone"
+                type="tel"
+                aria-label="Emergency contact phone"
+                value={emergencyContactPhone}
+                onChange={(event) => setEmergencyContactPhone(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+                placeholder="Emergency contact phone"
+              />
+            </Field>
+          )}
+          {(isAdmin || student?.admissionDate) && (
+            <Field label="Admission date" htmlFor="admissionDate">
+              <input
+                id="admissionDate"
+                type="date"
+                aria-label="Admission date"
+                value={admissionDate}
+                onChange={(event) => setAdmissionDate(event.target.value)}
+                disabled={!isAdmin}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
+              />
+            </Field>
+          )}
         </FormSection>
       </div>
 

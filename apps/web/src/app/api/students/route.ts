@@ -44,6 +44,15 @@ export async function POST(request: Request) {
     let gender: "male" | "female" | "other" | undefined;
     let studentIdNumber: string | undefined;
     let dateOfJoin: string | undefined;
+    let address: string | undefined;
+    let bloodGroup: string | undefined;
+    let nationality: string | undefined;
+    let religion: string | undefined;
+    let previousSchool: string | undefined;
+    let emergencyContactName: string | undefined;
+    let emergencyContactPhone: string | undefined;
+    let category: string | undefined;
+    let admissionDate: string | undefined;
     let parents: { relationship: GuardianRelationship; name: string; phone: string; email?: string }[] | undefined;
     let siblingStudentIds: number[] | undefined;
     try {
@@ -57,6 +66,15 @@ export async function POST(request: Request) {
         gender,
         studentIdNumber,
         dateOfJoin,
+        address,
+        bloodGroup,
+        nationality,
+        religion,
+        previousSchool,
+        emergencyContactName,
+        emergencyContactPhone,
+        category,
+        admissionDate,
         parents,
         siblingStudentIds,
       } = await request.json());
@@ -86,6 +104,15 @@ export async function POST(request: Request) {
       gender,
       studentIdNumber,
       dateOfJoin,
+      address,
+      bloodGroup,
+      nationality,
+      religion,
+      previousSchool,
+      emergencyContactName,
+      emergencyContactPhone,
+      category,
+      admissionDate,
       parents,
       siblingStudentIds,
     });

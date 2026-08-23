@@ -11,6 +11,15 @@ export interface StudentRow {
   gender: "male" | "female" | "other" | null;
   studentIdNumber: string | null;
   dateOfJoin: string | null;
+  address?: string | null;
+  bloodGroup?: string | null;
+  nationality?: string | null;
+  religion?: string | null;
+  previousSchool?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  category?: string | null;
+  admissionDate?: string | null;
   class: { gradeName: string; section: string } | null;
   parents: { relationship: string; name: string; phone: string; email: string | null }[];
   siblings: {

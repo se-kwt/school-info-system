@@ -92,6 +92,15 @@ export function StudentsView({
           gender: fields.gender || undefined,
           studentIdNumber: fields.studentIdNumber || undefined,
           dateOfJoin: fields.dateOfJoin || undefined,
+          address: fields.address || undefined,
+          bloodGroup: fields.bloodGroup || undefined,
+          nationality: fields.nationality || undefined,
+          religion: fields.religion || undefined,
+          previousSchool: fields.previousSchool || undefined,
+          emergencyContactName: fields.emergencyContactName || undefined,
+          emergencyContactPhone: fields.emergencyContactPhone || undefined,
+          category: fields.category || undefined,
+          admissionDate: fields.admissionDate || undefined,
           parents: fields.parents.map((p) => ({
             relationship: p.relationship,
             name: `${p.firstName} ${p.lastName}`.trim(),
@@ -121,6 +130,15 @@ export function StudentsView({
         gender?: "male" | "female" | "other";
         studentIdNumber?: string;
         dateOfJoin?: string;
+        address?: string;
+        bloodGroup?: string;
+        nationality?: string;
+        religion?: string;
+        previousSchool?: string;
+        emergencyContactName?: string;
+        emergencyContactPhone?: string;
+        category?: string;
+        admissionDate?: string;
         parents?: { relationship: string; name: string; phone: string; email?: string }[];
         siblingStudentIds?: number[];
       } = {
@@ -134,6 +152,15 @@ export function StudentsView({
       if (fields.gender) body.gender = fields.gender;
       if (fields.studentIdNumber) body.studentIdNumber = fields.studentIdNumber;
       if (fields.dateOfJoin) body.dateOfJoin = fields.dateOfJoin;
+      if (fields.address) body.address = fields.address;
+      if (fields.bloodGroup) body.bloodGroup = fields.bloodGroup;
+      if (fields.nationality) body.nationality = fields.nationality;
+      if (fields.religion) body.religion = fields.religion;
+      if (fields.previousSchool) body.previousSchool = fields.previousSchool;
+      if (fields.emergencyContactName) body.emergencyContactName = fields.emergencyContactName;
+      if (fields.emergencyContactPhone) body.emergencyContactPhone = fields.emergencyContactPhone;
+      if (fields.category) body.category = fields.category;
+      if (fields.admissionDate) body.admissionDate = fields.admissionDate;
       body.parents = fields.parents.map((p) => ({
         relationship: p.relationship,
         name: `${p.firstName} ${p.lastName}`.trim(),

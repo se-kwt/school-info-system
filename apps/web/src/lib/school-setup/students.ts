@@ -13,6 +13,15 @@ export interface StudentSummary {
   gender: "male" | "female" | "other" | null;
   studentIdNumber: string | null;
   dateOfJoin: string | null;
+  address: string | null;
+  bloodGroup: string | null;
+  nationality: string | null;
+  religion: string | null;
+  previousSchool: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  category: string | null;
+  admissionDate: string | null;
   class: { gradeName: string; section: string } | null;
   parents: { relationship: GuardianRelationship; name: string; phone: string; email: string | null }[];
   siblings: { id: number; name: string; admissionNo: string; gender: "male" | "female" | "other" | null; class: { gradeName: string; section: string } | null }[];
@@ -116,6 +125,15 @@ export async function listStudents(
       gender: student.gender,
       studentIdNumber: student.studentIdNumber,
       dateOfJoin: student.dateOfJoin ? student.dateOfJoin.toISOString().slice(0, 10) : null,
+      address: student.address,
+      bloodGroup: student.bloodGroup,
+      nationality: student.nationality,
+      religion: student.religion,
+      previousSchool: student.previousSchool,
+      emergencyContactName: student.emergencyContactName,
+      emergencyContactPhone: student.emergencyContactPhone,
+      category: student.category,
+      admissionDate: student.admissionDate ? student.admissionDate.toISOString().slice(0, 10) : null,
       class: enrollment ? { gradeName: enrollment.class.grade.name, section: enrollment.class.section } : null,
       parents: student.parentLinks.map((link) => ({
         relationship: link.relationship,

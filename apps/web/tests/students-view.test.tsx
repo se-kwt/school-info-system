@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, within, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StudentsView } from "../src/components/school-setup/StudentsView";
 
@@ -143,6 +143,58 @@ describe("StudentsView", () => {
     await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
 
     expect(screen.getByLabelText(/date of birth/i)).toHaveValue("2015-03-14");
+  });
+
+  it("sends every admission field on create", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 1 }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<StudentsView initialStudents={[]} classes={classes} isAdmin={true} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /add.*student/i }));
+    await userEvent.type(screen.getByLabelText(/^first name/i), "New");
+    await userEvent.type(screen.getByLabelText(/^last name/i), "Student");
+    await userEvent.type(screen.getByLabelText(/date of birth/i), "2015-01-01");
+    await userEvent.type(screen.getByLabelText(/admission number/i), "NEW-001");
+    await userEvent.type(screen.getByLabelText(/^address/i), "12 Example Road");
+    await userEvent.type(screen.getByLabelText(/blood group/i), "O+");
+    await userEvent.type(screen.getByLabelText(/emergency contact name/i), "Aunt");
+    await userEvent.type(screen.getByLabelText(/emergency contact phone/i), "+919876543210");
+    await userEvent.type(screen.getByLabelText(/previous school/i), "Little Flower LP");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.address).toBe("12 Example Road");
+    expect(body.bloodGroup).toBe("O+");
+    expect(body.emergencyContactName).toBe("Aunt");
+    expect(body.emergencyContactPhone).toBe("+919876543210");
+    expect(body.previousSchool).toBe("Little Flower LP");
+  });
+
+  it("offers a third gender option", async () => {
+    render(<StudentsView initialStudents={[]} classes={classes} isAdmin={true} />);
+    await userEvent.click(screen.getByRole("button", { name: /add.*student/i }));
+
+    const select = screen.getByLabelText(/gender/i);
+    const options = within(select).getAllByRole("option").map((o) => o.getAttribute("value"));
+
+    expect(options).toEqual(expect.arrayContaining(["male", "female", "other"]));
+  });
+
+  it("offers guardian relationship as a fixed list, not free text", async () => {
+    render(<StudentsView initialStudents={[]} classes={classes} isAdmin={true} />);
+    await userEvent.click(screen.getByRole("button", { name: /add.*student/i }));
+    await userEvent.click(screen.getByRole("button", { name: /add parent/i }));
+
+    const select = screen.getByLabelText(/relationship/i);
+    expect(select.tagName).toBe("SELECT");
+    const options = within(select).getAllByRole("option").map((o) => o.getAttribute("value"));
+    expect(options).toEqual(
+      expect.arrayContaining(["father", "mother", "guardian", "grandparent", "sibling", "other"])
+    );
   });
 
   it("non-admin can open a card but sees no Save button", async () => {
