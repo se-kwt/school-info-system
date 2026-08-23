@@ -408,6 +408,8 @@ model FeeStructure {
   classId        Int
   term           String
   amount         Decimal      @db.Decimal(12, 2)
+  discount       Decimal      @default(0) @db.Decimal(12, 2)
+  fineAmount     Decimal      @default(0) @db.Decimal(12, 2)
   dueDate        DateTime
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int

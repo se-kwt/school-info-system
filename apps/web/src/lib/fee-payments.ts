@@ -45,6 +45,9 @@ export async function getFeeRoster(
     payments.map((p) => [p.studentId, p._sum.amountPaid ?? new Prisma.Decimal(0)])
   );
 
+  const now = new Date();
+  const netDue = netAmountDue(feeStructure, now);
+
   return {
     ok: true,
     students: enrolled.map((student) => {
@@ -53,11 +56,24 @@ export async function getFeeRoster(
         studentId: student.id,
         name: student.name,
         amountPaid: toNumber(amountPaid),
-        amount: toNumber(feeStructure.amount),
-        status: computeFeeStatus(amountPaid, feeStructure.amount, feeStructure.dueDate),
+        amount: toNumber(netDue),
+        status: computeFeeStatus(amountPaid, netDue, feeStructure.dueDate, now),
       };
     }),
   };
+}
+
+export function netAmountDue(
+  feeStructure: {
+    amount: Prisma.Decimal;
+    discount: Prisma.Decimal;
+    fineAmount: Prisma.Decimal;
+    dueDate: Date;
+  },
+  now: Date = new Date()
+): Prisma.Decimal {
+  const base = feeStructure.amount.minus(feeStructure.discount);
+  return now > feeStructure.dueDate ? base.add(feeStructure.fineAmount) : base;
 }
 
 export function computeFeeStatus(
@@ -130,7 +146,10 @@ export async function recordPayment(
       });
       const newAmountPaid = priorTotal.add(new Prisma.Decimal(params.amount));
 
-      if (newAmountPaid.greaterThan(feeStructure.amount)) {
+      const now = new Date();
+      const netDue = netAmountDue(feeStructure, now);
+
+      if (newAmountPaid.greaterThan(netDue)) {
         return { ok: false, error: "EXCEEDS_AMOUNT_DUE" };
       }
 
@@ -155,7 +174,7 @@ export async function recordPayment(
       return {
         ok: true,
         amountPaid: toNumber(newAmountPaid),
-        status: computeFeeStatus(newAmountPaid, feeStructure.amount, feeStructure.dueDate),
+        status: computeFeeStatus(newAmountPaid, netDue, feeStructure.dueDate, now),
         receiptNo,
       };
     },

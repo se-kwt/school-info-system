@@ -10,13 +10,15 @@ vi.mock("next/headers", () => ({
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
-import { createActiveYear, createClass } from "./helpers/enrollment";
+import { createActiveYear, createClass, createEnrolledStudent } from "./helpers/enrollment";
 import { signSessionToken } from "../src/lib/auth/jwt";
 import {
   GET as getFeeStructures,
   POST as postFeeStructures,
 } from "../src/app/api/fee-structures/route";
 import { listFeeStructures } from "../src/lib/fee-structures";
+import { netAmountDue, recordPayment } from "../src/lib/fee-payments";
+import { Prisma } from "@prisma/client";
 
 describe("/api/fee-structures", () => {
   beforeEach(async () => {
@@ -294,5 +296,86 @@ describe("/api/fee-structures", () => {
     const request = new Request("http://localhost/api/fee-structures");
     const response = await getFeeStructures(request);
     expect(response.status).toBe(400);
+  });
+});
+
+describe("netAmountDue", () => {
+  it("subtracts the discount from the amount due", () => {
+    const due = netAmountDue(
+      {
+        amount: new Prisma.Decimal(5000),
+        discount: new Prisma.Decimal(500),
+        fineAmount: new Prisma.Decimal(0),
+        dueDate: new Date("2026-12-01"),
+      },
+      new Date("2026-06-01")
+    );
+    expect(due.toNumber()).toBe(4500);
+  });
+
+  it("adds the fine once the due date has passed", () => {
+    const due = netAmountDue(
+      {
+        amount: new Prisma.Decimal(5000),
+        discount: new Prisma.Decimal(0),
+        fineAmount: new Prisma.Decimal(200),
+        dueDate: new Date("2026-01-01"),
+      },
+      new Date("2026-06-01")
+    );
+    expect(due.toNumber()).toBe(5200);
+  });
+
+  it("does not add the fine before the due date", () => {
+    const due = netAmountDue(
+      {
+        amount: new Prisma.Decimal(5000),
+        discount: new Prisma.Decimal(0),
+        fineAmount: new Prisma.Decimal(200),
+        dueDate: new Date("2026-12-01"),
+      },
+      new Date("2026-06-01")
+    );
+    expect(due.toNumber()).toBe(5000);
+  });
+
+  it("lets a payment cover the fine without triggering EXCEEDS_AMOUNT_DUE", async () => {
+    await resetDb();
+    const school = await prisma.school.create({ data: { name: "Fine Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const student = await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: year.id,
+      name: "Fine Student",
+      dob: new Date("2016-01-01"),
+      admissionNo: "SCH-960",
+    });
+    const accountant = await prisma.user.create({
+      data: { phone: "+15550101010", role: "accountant", name: "Fine Accountant", schoolId: school.id },
+    });
+    // a fee structure of 5000 with a 200 fine, past its due date
+    const feeStructure = await prisma.feeStructure.create({
+      data: {
+        schoolId: school.id,
+        academicYearId: year.id,
+        classId: klass.id,
+        term: "Term 1",
+        amount: 5000,
+        fineAmount: 200,
+        dueDate: new Date("2020-01-01"),
+      },
+    });
+
+    const result = await recordPayment(prisma, {
+      feeStructureId: feeStructure.id,
+      studentId: student.id,
+      schoolId: school.id,
+      recordedById: accountant.id,
+      amount: 5200,
+      mode: "cash",
+    });
+    expect(result).toMatchObject({ ok: true, status: "paid" });
   });
 });

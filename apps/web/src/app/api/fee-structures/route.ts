@@ -51,8 +51,10 @@ export async function POST(request: Request) {
     let term: string | undefined;
     let amount: number | undefined;
     let dueDate: string | undefined;
+    let discount: number | undefined;
+    let fineAmount: number | undefined;
     try {
-      ({ classId, term, amount, dueDate } = await request.json());
+      ({ classId, term, amount, dueDate, discount, fineAmount } = await request.json());
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -74,6 +76,8 @@ export async function POST(request: Request) {
       term,
       amount,
       dueDate,
+      discount,
+      fineAmount,
     });
 
     if (!result.ok) {

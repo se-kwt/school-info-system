@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { computeFeeStatus, type FeeStatus } from "../fee-payments";
+import { computeFeeStatus, netAmountDue, type FeeStatus } from "../fee-payments";
 import { toNumber } from "../money";
 
 export interface ParentFeeHistoryEntry {
@@ -39,19 +39,22 @@ export async function getParentFeesHistory(
     orderBy: { dueDate: "desc" },
   });
 
+  const now = new Date();
+
   return feeStructures.map((structure) => {
     const amountPaid = structure.payments.reduce(
       (sum, p) => sum.add(p.amountPaid),
       new Prisma.Decimal(0)
     );
+    const netDue = netAmountDue(structure, now);
     return {
       id: structure.id,
       term: structure.term,
       className: `${structure.class.grade.name} ${structure.class.section}`,
       academicYearName: structure.academicYear.name,
-      amount: toNumber(structure.amount),
+      amount: toNumber(netDue),
       amountPaid: toNumber(amountPaid),
-      status: computeFeeStatus(amountPaid, structure.amount, structure.dueDate),
+      status: computeFeeStatus(amountPaid, netDue, structure.dueDate, now),
       dueDate: structure.dueDate.toISOString().slice(0, 10),
     };
   });

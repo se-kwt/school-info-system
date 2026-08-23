@@ -45,7 +45,14 @@ export async function createFeeStructure(
   prisma: PrismaClient,
   schoolId: number,
   academicYearId: number,
-  input: { classId: number; term: string; amount: number; dueDate: string }
+  input: {
+    classId: number;
+    term: string;
+    amount: number;
+    dueDate: string;
+    discount?: number;
+    fineAmount?: number;
+  }
 ): Promise<CreateFeeStructureResult> {
   const klass = await prisma.class.findFirst({
     where: { id: input.classId, schoolId, academicYearId },
@@ -59,6 +66,8 @@ export async function createFeeStructure(
       classId: input.classId,
       term: input.term,
       amount: input.amount,
+      discount: input.discount ?? 0,
+      fineAmount: input.fineAmount ?? 0,
       dueDate: new Date(input.dueDate),
     },
   });

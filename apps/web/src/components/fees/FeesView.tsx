@@ -50,6 +50,8 @@ export function FeesView({
   const [newTerm, setNewTerm] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
+  const [newDiscount, setNewDiscount] = useState("");
+  const [newFineAmount, setNewFineAmount] = useState("");
 
   async function refreshFeeStructures() {
     if (!classId) return;
@@ -106,6 +108,8 @@ export function FeesView({
         term: newTerm,
         amount: Number(newAmount),
         dueDate: newDueDate,
+        discount: newDiscount ? Number(newDiscount) : 0,
+        fineAmount: newFineAmount ? Number(newFineAmount) : 0,
       }),
     });
 
@@ -114,6 +118,8 @@ export function FeesView({
       setNewTerm("");
       setNewAmount("");
       setNewDueDate("");
+      setNewDiscount("");
+      setNewFineAmount("");
       await refreshFeeStructures();
       return;
     }
@@ -199,6 +205,22 @@ export function FeesView({
               aria-label="New due date"
               value={newDueDate}
               onChange={(event) => setNewDueDate(event.target.value)}
+              className={inputClass}
+            />
+            <input
+              type="number"
+              aria-label="New discount"
+              placeholder="Discount"
+              value={newDiscount}
+              onChange={(event) => setNewDiscount(event.target.value)}
+              className={inputClass}
+            />
+            <input
+              type="number"
+              aria-label="New fine amount"
+              placeholder="Fine"
+              value={newFineAmount}
+              onChange={(event) => setNewFineAmount(event.target.value)}
               className={inputClass}
             />
             <button
