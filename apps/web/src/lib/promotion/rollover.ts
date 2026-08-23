@@ -97,3 +97,68 @@ export async function cloneFaculty(
 
   return { cloned, skippedInactive };
 }
+
+export async function cloneTimetable(
+  prisma: PrismaClient,
+  params: {
+    classMap: Map<number, number>;
+    fromAcademicYearId: number;
+    toAcademicYearId: number;
+  }
+): Promise<{ cloned: number; skippedNoTeacher: number }> {
+  const sourceEntries = await prisma.timetableEntry.findMany({
+    where: {
+      academicYearId: params.fromAcademicYearId,
+      classId: { in: [...params.classMap.keys()] },
+    },
+  });
+
+  const targetFaculty = await prisma.classTeacher.findMany({
+    where: { academicYearId: params.toAcademicYearId },
+  });
+  const facultyKeys = new Set(
+    targetFaculty.map((l) => `${l.classId}:${l.teacherUserId}:${l.subjectId}`)
+  );
+
+  const existing = await prisma.timetableEntry.findMany({
+    where: { academicYearId: params.toAcademicYearId },
+  });
+  const existingKeys = new Set(
+    existing.map((e) => `${e.classId}:${e.dayOfWeek}:${e.periodId}`)
+  );
+
+  let cloned = 0;
+  let skippedNoTeacher = 0;
+
+  for (const entry of sourceEntries) {
+    const targetClassId = params.classMap.get(entry.classId);
+    if (targetClassId === undefined) continue;
+
+    const key = `${targetClassId}:${entry.dayOfWeek}:${entry.periodId}`;
+    if (existingKeys.has(key)) continue;
+
+    let teacherUserId: number | null = entry.teacherUserId;
+    if (
+      teacherUserId !== null &&
+      !facultyKeys.has(`${targetClassId}:${teacherUserId}:${entry.subjectId}`)
+    ) {
+      teacherUserId = null;
+      skippedNoTeacher += 1;
+    }
+
+    await prisma.timetableEntry.create({
+      data: {
+        classId: targetClassId,
+        academicYearId: params.toAcademicYearId,
+        dayOfWeek: entry.dayOfWeek,
+        periodId: entry.periodId,
+        subjectId: entry.subjectId,
+        teacherUserId,
+      },
+    });
+    existingKeys.add(key);
+    cloned += 1;
+  }
+
+  return { cloned, skippedNoTeacher };
+}

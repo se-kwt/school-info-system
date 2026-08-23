@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "./helpers/db";
-import { cloneClasses, cloneFaculty } from "../src/lib/promotion/rollover";
+import { cloneClasses, cloneFaculty, cloneTimetable } from "../src/lib/promotion/rollover";
 
 describe("rollover: classes", () => {
   let schoolId: number;
@@ -149,5 +149,128 @@ describe("rollover: faculty", () => {
     await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
 
     expect(await prisma.classTeacher.count({ where: { academicYearId: toYearId } })).toBe(1);
+  });
+});
+
+describe("rollover: timetable", () => {
+  let schoolId: number;
+  let fromYearId: number;
+  let toYearId: number;
+  let gradeId: number;
+
+  beforeEach(async () => {
+    await resetDb();
+    const school = await prisma.school.create({ data: { name: "Rollover School" } });
+    schoolId = school.id;
+    const fromYear = await prisma.academicYear.create({
+      data: { schoolId, name: "2026-27", startDate: new Date("2026-04-01"), endDate: new Date("2027-03-31"), status: "active" },
+    });
+    fromYearId = fromYear.id;
+    const toYear = await prisma.academicYear.create({
+      data: { schoolId, name: "2027-28", startDate: new Date("2027-04-01"), endDate: new Date("2028-03-31"), status: "upcoming" },
+    });
+    toYearId = toYear.id;
+    const grade = await prisma.grade.create({ data: { schoolId, name: "Grade 1" } });
+    gradeId = grade.id;
+  });
+
+  it("clones timetable entries onto the cloned classes", async () => {
+    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const teacher = await prisma.user.create({
+      data: { schoolId, phone: "+10000000301", role: "teacher", name: "Maths Teacher" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: source.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId },
+    });
+    const period = await prisma.period.create({
+      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
+    await prisma.timetableEntry.create({
+      data: {
+        classId: source.id,
+        academicYearId: fromYearId,
+        dayOfWeek: 1,
+        periodId: period.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+      },
+    });
+
+    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const result = await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+
+    expect(result).toEqual({ cloned: 1, skippedNoTeacher: 0 });
+
+    const cloned = await prisma.timetableEntry.findFirstOrThrow({ where: { academicYearId: toYearId } });
+    expect(cloned.classId).toBe(classMap.get(source.id));
+    expect(cloned.periodId).toBe(period.id);
+    expect(cloned.dayOfWeek).toBe(1);
+    expect(cloned.teacherUserId).toBe(teacher.id);
+  });
+
+  it("clears the teacher when their assignment did not carry forward", async () => {
+    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const leaver = await prisma.user.create({
+      data: { schoolId, phone: "+10000000302", role: "teacher", name: "Departed", status: "inactive" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: source.id, subjectId: subject.id, teacherUserId: leaver.id, academicYearId: fromYearId },
+    });
+    const period = await prisma.period.create({
+      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
+    await prisma.timetableEntry.create({
+      data: {
+        classId: source.id,
+        academicYearId: fromYearId,
+        dayOfWeek: 1,
+        periodId: period.id,
+        subjectId: subject.id,
+        teacherUserId: leaver.id,
+      },
+    });
+
+    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const result = await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+
+    expect(result).toEqual({ cloned: 1, skippedNoTeacher: 1 });
+
+    const cloned = await prisma.timetableEntry.findFirstOrThrow({ where: { academicYearId: toYearId } });
+    expect(cloned.teacherUserId).toBeNull();
+  });
+
+  it("is idempotent", async () => {
+    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const teacher = await prisma.user.create({
+      data: { schoolId, phone: "+10000000303", role: "teacher", name: "Maths Teacher" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: source.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId },
+    });
+    const period = await prisma.period.create({
+      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
+    await prisma.timetableEntry.create({
+      data: {
+        classId: source.id,
+        academicYearId: fromYearId,
+        dayOfWeek: 1,
+        periodId: period.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+      },
+    });
+
+    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+
+    expect(await prisma.timetableEntry.count({ where: { academicYearId: toYearId } })).toBe(1);
   });
 });
