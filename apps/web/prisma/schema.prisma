@@ -81,6 +81,8 @@ model School {
   id            Int            @id @default(autoincrement())
   name          String
   logoUrl       String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   users         User[]
   students      Student[]
   classes       Class[]
@@ -93,21 +95,25 @@ model School {
 }
 
 model Grade {
-  id       Int       @id @default(autoincrement())
-  school   School    @relation(fields: [schoolId], references: [id])
-  schoolId Int
-  name     String
-  subjects Subject[]
-  classes  Class[]
+  id        Int       @id @default(autoincrement())
+  school    School    @relation(fields: [schoolId], references: [id])
+  schoolId  Int
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  subjects  Subject[]
+  classes   Class[]
 
   @@unique([schoolId, name])
 }
 
 model Subject {
-  id      Int    @id @default(autoincrement())
-  grade   Grade  @relation(fields: [gradeId], references: [id])
-  gradeId Int
-  name    String
+  id        Int      @id @default(autoincrement())
+  grade     Grade    @relation(fields: [gradeId], references: [id])
+  gradeId   Int
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   versions         SyllabusVersion[]
   classTeachers    ClassTeacher[]
@@ -130,20 +136,23 @@ model SyllabusVersion {
   createdBy   User     @relation(fields: [createdById], references: [id])
   createdById Int
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([subjectId, versionNum])
   @@index([createdById])
 }
 
 model Period {
-  id        Int     @id @default(autoincrement())
-  school    School  @relation(fields: [schoolId], references: [id])
+  id        Int      @id @default(autoincrement())
+  school    School   @relation(fields: [schoolId], references: [id])
   schoolId  Int
   order     Int
   label     String
-  isBreak   Boolean @default(false)
+  isBreak   Boolean  @default(false)
   startTime String
   endTime   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   overrides        PeriodDayOverride[]
   timetableEntries TimetableEntry[]
@@ -152,36 +161,40 @@ model Period {
 }
 
 model PeriodDayOverride {
-  id        Int    @id @default(autoincrement())
-  period    Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  period    Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
   periodId  Int
   dayOfWeek Int
   startTime String
   endTime   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([periodId, dayOfWeek])
 }
 
 model User {
-  id       Int        @id @default(autoincrement())
-  phone    String     @unique
-  role     Role
-  name     String
-  email    String?
-  status   UserStatus @default(active)
-  school   School     @relation(fields: [schoolId], references: [id])
-  schoolId Int
+  id        Int        @id @default(autoincrement())
+  phone     String     @unique
+  role      Role
+  name      String
+  email     String?
+  status    UserStatus @default(active)
+  school    School     @relation(fields: [schoolId], references: [id])
+  schoolId  Int
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   parentLinks         ParentStudent[]
   classesTaught       ClassTeacher[]
-  attendanceMarked    Attendance[]     @relation("MarkedBy")
+  attendanceMarked    Attendance[]      @relation("MarkedBy")
   assignmentsCreated  Assignment[]
-  feePaymentsRecorded FeePayment[]     @relation("RecordedBy")
+  feePaymentsRecorded FeePayment[]      @relation("RecordedBy")
   notifications       Notification[]
   timetableEntries    TimetableEntry[]
   promotionRunsRun    PromotionRun[]
   syllabusVersions    SyllabusVersion[]
-  marksEntered        Mark[]           @relation("MarksEnteredBy")
+  marksEntered        Mark[]            @relation("MarksEnteredBy")
 
   @@index([schoolId])
 }
@@ -198,6 +211,8 @@ model Student {
   gender          Gender?
   studentIdNumber String?       @unique
   dateOfJoin      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   parentLinks         ParentStudent[]
   attendance          Attendance[]
@@ -213,23 +228,27 @@ model Student {
 }
 
 model StudentSibling {
-  id        Int     @id @default(autoincrement())
-  student   Student @relation("StudentSiblingA", fields: [studentId], references: [id])
+  id        Int      @id @default(autoincrement())
+  student   Student  @relation("StudentSiblingA", fields: [studentId], references: [id])
   studentId Int
-  sibling   Student @relation("StudentSiblingB", fields: [siblingId], references: [id])
+  sibling   Student  @relation("StudentSiblingB", fields: [siblingId], references: [id])
   siblingId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([studentId, siblingId])
   @@index([siblingId])
 }
 
 model ParentStudent {
-  id           Int     @id @default(autoincrement())
-  parent       User    @relation(fields: [parentUserId], references: [id])
+  id           Int      @id @default(autoincrement())
+  parent       User     @relation(fields: [parentUserId], references: [id])
   parentUserId Int
-  student      Student @relation(fields: [studentId], references: [id])
+  student      Student  @relation(fields: [studentId], references: [id])
   studentId    Int
-  relationship String  @default("Guardian")
+  relationship String   @default("Guardian")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([parentUserId, studentId])
   @@index([studentId])
@@ -245,6 +264,8 @@ model Class {
   gradeId        Int
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   teacherLinks     ClassTeacher[]
   assignments      Assignment[]
@@ -270,6 +291,8 @@ model ClassTeacher {
   isClassTeacher Boolean      @default(false)
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@unique([classId, teacherUserId, subjectId, academicYearId])
   @@index([teacherUserId])
@@ -288,6 +311,8 @@ model Attendance {
   markedBy       User             @relation("MarkedBy", fields: [markedById], references: [id])
   markedById     Int
   note           String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@unique([studentId, date])
   @@index([markedById])
@@ -310,6 +335,8 @@ model Assignment {
   createdById    Int
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   statuses AssignmentStatus[]
 
@@ -326,6 +353,8 @@ model AssignmentStatus {
   student      Student               @relation(fields: [studentId], references: [id])
   studentId    Int
   status       AssignmentStatusValue @default(pending)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
 
   @@unique([assignmentId, studentId])
   @@index([studentId])
@@ -344,6 +373,8 @@ model Exam {
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
   published      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   marks Mark[]
 
@@ -371,6 +402,8 @@ model Mark {
   enteredBy      User         @relation("MarksEnteredBy", fields: [enteredById], references: [id])
   enteredById    Int
   enteredAt      DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@unique([examId, studentId, subjectId])
   @@index([studentId])
@@ -391,6 +424,8 @@ model TimetableEntry {
   teacherUserId  Int?
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@unique([classId, dayOfWeek, periodId, academicYearId])
   @@unique([teacherUserId, dayOfWeek, periodId, academicYearId])
@@ -413,6 +448,8 @@ model FeeStructure {
   dueDate        DateTime
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   payments FeePayment[]
 
@@ -444,6 +481,7 @@ model FeePayment {
   recordedBy     User         @relation("RecordedBy", fields: [recordedById], references: [id])
   recordedById   Int
   createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@unique([feeStructureId, receiptNo])
   @@index([studentId, feeStructureId])
@@ -462,6 +500,7 @@ model Notification {
   relatedId Int?
   readAt    DateTime?
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([userId])
 }
@@ -475,6 +514,7 @@ model OtpCode {
   attempts  Int       @default(0)
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([phone])
 }
@@ -492,6 +532,8 @@ model AcademicYear {
   startDate DateTime
   endDate   DateTime
   status    AcademicYearStatus @default(upcoming)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
   enrollments      Enrollment[]
   classTeachers    ClassTeacher[]
@@ -519,6 +561,7 @@ model Enrollment {
   rollNumber     String?
   status         EnrollmentStatus @default(active)
   createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@unique([studentId, academicYearId])
   @@unique([classId, academicYearId, rollNumber])
@@ -537,6 +580,7 @@ model PromotionRun {
   initiatedById      Int
   status             PromotionRunStatus @default(draft)
   createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
   confirmedAt        DateTime?
 
   mappings   PromotionMapping[]
@@ -556,6 +600,8 @@ model PromotionMapping {
   fromClassId    Int
   toClass        Class?       @relation("MappingTo", fields: [toClassId], references: [id])
   toClassId      Int?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@unique([promotionRunId, fromClassId])
   @@index([fromClassId])
@@ -571,6 +617,8 @@ model PromotionLogEntry {
   fromClassId    Int
   toClassId      Int?
   action         EnrollmentStatus
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@unique([promotionRunId, studentId])
   @@index([studentId])
