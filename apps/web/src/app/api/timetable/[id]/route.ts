@@ -44,6 +44,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
           { status: 409 }
         );
       }
+      if (result.error === "TEACHER_INACTIVE") {
+        return NextResponse.json(
+          { error: "That teacher is deactivated and cannot be assigned" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         { error: "The selected teacher is not assigned to teach this subject on this class" },
         { status: 400 }

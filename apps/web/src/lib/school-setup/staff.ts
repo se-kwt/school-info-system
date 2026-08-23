@@ -206,15 +206,24 @@ export async function deleteStaff(
   const user = await prisma.user.findFirst({ where: { id: params.userId, schoolId: params.schoolId } });
   if (!user) return { ok: false, error: "NOT_FOUND" };
 
-  const [attendanceCount, assignmentCount, feePaymentCount, timetableCount, promotionRunCount] = await Promise.all([
-    prisma.attendance.count({ where: { markedById: params.userId } }),
-    prisma.assignment.count({ where: { createdById: params.userId } }),
-    prisma.feePayment.count({ where: { recordedById: params.userId } }),
-    prisma.timetableEntry.count({ where: { teacherUserId: params.userId } }),
-    prisma.promotionRun.count({ where: { initiatedById: params.userId } }),
-  ]);
+  const [attendanceCount, assignmentCount, feePaymentCount, timetableCount, classTeacherCount, promotionRunCount] =
+    await Promise.all([
+      prisma.attendance.count({ where: { markedById: params.userId } }),
+      prisma.assignment.count({ where: { createdById: params.userId } }),
+      prisma.feePayment.count({ where: { recordedById: params.userId } }),
+      prisma.timetableEntry.count({ where: { teacherUserId: params.userId } }),
+      // `deactivateStaff` clears a teacher's timetable slots (teacherUserId ->
+      // null) but deliberately preserves their `ClassTeacher` rows, so those rows
+      // — not the timetable count — are the durable record of assignment history
+      // for a deactivated teacher. Count them too or a deactivate-then-delete
+      // flow could hard-delete a teacher whose only footprint was timetable rows,
+      // destroying the ClassTeacher history Task 5 set out to preserve.
+      prisma.classTeacher.count({ where: { teacherUserId: params.userId } }),
+      prisma.promotionRun.count({ where: { initiatedById: params.userId } }),
+    ]);
 
-  const hasHistory = attendanceCount + assignmentCount + feePaymentCount + timetableCount + promotionRunCount > 0;
+  const hasHistory =
+    attendanceCount + assignmentCount + feePaymentCount + timetableCount + classTeacherCount + promotionRunCount > 0;
   if (hasHistory) return { ok: false, error: "HAS_HISTORY" };
 
   await prisma.$transaction(async (tx) => {
@@ -243,9 +252,12 @@ export async function deactivateStaff(
     await tx.user.update({ where: { id: params.userId }, data: { status: "inactive" } });
     if (params.academicYearId) {
       // Faculty assignments are KEPT. `assignTeacherToSubject` already refuses to
-      // create new ones for an inactive teacher (Phase 1), and every read path that
-      // offers a teacher filters on status — so keeping the rows costs nothing and
-      // makes reactivation lossless.
+      // create new ones for an inactive teacher (Phase 1), and the read paths that
+      // offer a teacher for further staffing action filter on status:
+      // `listClassFaculty` only returns links to active teachers, and
+      // `createTimetableEntry`/`editTimetableEntry` reject staffing an inactive
+      // teacher onto a slot even though their `ClassTeacher` link still exists.
+      // So keeping the rows costs nothing and makes reactivation lossless.
       await tx.timetableEntry.updateMany({
         where: { teacherUserId: params.userId, academicYearId: params.academicYearId },
         data: { teacherUserId: null },

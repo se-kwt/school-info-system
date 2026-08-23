@@ -63,6 +63,7 @@ export type CreateTimetableEntryResult =
   | { ok: false; error: "BREAK_PERIOD" }
   | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "INVALID_TEACHER" }
+  | { ok: false; error: "TEACHER_INACTIVE" }
   | { ok: false; error: "TEACHER_ALREADY_BOOKED" }
   | { ok: false; error: "DUPLICATE_SLOT" };
 
@@ -94,8 +95,10 @@ export async function createTimetableEntry(
   if (params.teacherUserId !== undefined) {
     const link = await prisma.classTeacher.findFirst({
       where: { classId: params.classId, subjectId: params.subjectId, teacherUserId: params.teacherUserId, academicYearId: params.academicYearId },
+      include: { teacher: true },
     });
     if (!link) return { ok: false, error: "INVALID_TEACHER" };
+    if (link.teacher.status !== "active") return { ok: false, error: "TEACHER_INACTIVE" };
   }
 
   if (params.teacherUserId !== undefined) {
@@ -137,6 +140,7 @@ export type EditTimetableEntryResult =
   | { ok: false; error: "NOT_FOUND" }
   | { ok: false; error: "INVALID_SUBJECT" }
   | { ok: false; error: "INVALID_TEACHER" }
+  | { ok: false; error: "TEACHER_INACTIVE" }
   | { ok: false; error: "TEACHER_ALREADY_BOOKED" };
 
 export async function editTimetableEntry(
@@ -163,8 +167,10 @@ export async function editTimetableEntry(
           teacherUserId: params.fields.teacherUserId,
           academicYearId: entry.academicYearId,
         },
+        include: { teacher: true },
       });
       if (!link) return { ok: false, error: "INVALID_TEACHER" };
+      if (link.teacher.status !== "active") return { ok: false, error: "TEACHER_INACTIVE" };
 
       const clash = await prisma.timetableEntry.findFirst({
         where: {

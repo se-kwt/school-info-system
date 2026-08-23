@@ -107,6 +107,12 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
+      if (result.error === "TEACHER_INACTIVE") {
+        return NextResponse.json(
+          { error: "That teacher is deactivated and cannot be assigned" },
+          { status: 400 }
+        );
+      }
       if (result.error === "TEACHER_ALREADY_BOOKED") {
         return NextResponse.json(
           { error: "This teacher is already booked for another class at this day and period" },

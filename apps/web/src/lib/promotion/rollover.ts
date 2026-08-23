@@ -126,6 +126,18 @@ export async function cloneTimetable(
   const existingKeys = new Set(
     existing.map((e) => `${e.classId}:${e.dayOfWeek}:${e.periodId}`)
   );
+  // `TimetableEntry` also carries a unique constraint on
+  // (teacherUserId, dayOfWeek, periodId, academicYearId): a teacher can only be
+  // booked in one class at a given day/period. `existingKeys` above only guards
+  // the (classId, dayOfWeek, periodId) constraint, so a carried-forward teacher
+  // can still collide with a slot the admin hand-built in the target year for a
+  // *different* class. Track that separately so we can null the teacher out
+  // instead of throwing P2002 mid-transaction.
+  const teacherSlotKeys = new Set(
+    existing
+      .filter((e) => e.teacherUserId !== null)
+      .map((e) => `${e.teacherUserId}:${e.dayOfWeek}:${e.periodId}`)
+  );
 
   let cloned = 0;
   let skippedNoTeacher = 0;
@@ -146,6 +158,14 @@ export async function cloneTimetable(
       skippedNoTeacher += 1;
     }
 
+    if (teacherUserId !== null) {
+      const teacherSlotKey = `${teacherUserId}:${entry.dayOfWeek}:${entry.periodId}`;
+      if (teacherSlotKeys.has(teacherSlotKey)) {
+        teacherUserId = null;
+        skippedNoTeacher += 1;
+      }
+    }
+
     await prisma.timetableEntry.create({
       data: {
         classId: targetClassId,
@@ -157,6 +177,9 @@ export async function cloneTimetable(
       },
     });
     existingKeys.add(key);
+    if (teacherUserId !== null) {
+      teacherSlotKeys.add(`${teacherUserId}:${entry.dayOfWeek}:${entry.periodId}`);
+    }
     cloned += 1;
   }
 
@@ -182,7 +205,13 @@ export async function cloneFeeStructures(
   const existing = await prisma.feeStructure.findMany({
     where: { academicYearId: params.toAcademicYearId },
   });
-  const existingKeys = new Set(existing.map((f) => `${f.classId}:${f.term}`));
+  // `(classId, term)` is a naming convention, not a DB constraint — `FeeStructure`
+  // has no `@@unique` on it, and `createFeeStructure` allows duplicates. Two
+  // source rows can legitimately share a class and term (e.g. two different fee
+  // structures both labeled "Term 1" for different fee categories with different
+  // amounts), so the dedupe key also includes `amount` to avoid conflating them
+  // and silently dropping one on rollover.
+  const existingKeys = new Set(existing.map((f) => `${f.classId}:${f.term}:${f.amount.toString()}`));
 
   let cloned = 0;
 
@@ -190,7 +219,7 @@ export async function cloneFeeStructures(
     const targetClassId = params.classMap.get(source.classId);
     if (targetClassId === undefined) continue;
 
-    const key = `${targetClassId}:${source.term}`;
+    const key = `${targetClassId}:${source.term}:${source.amount.toString()}`;
     if (existingKeys.has(key)) continue;
 
     const dueDate = new Date(source.dueDate);

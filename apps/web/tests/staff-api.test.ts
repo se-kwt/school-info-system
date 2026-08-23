@@ -346,6 +346,50 @@ describe("/api/staff/[id]", () => {
     expect(body.deletable).toBe(false);
   });
 
+  it("still refuses to delete a deactivated teacher whose only footprint is a preserved ClassTeacher row", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const { admin, teacher } = await seedAdminAndTeacher(school.id);
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 5", section: "A" });
+    const subject = await prisma.subject.create({ data: { gradeId: klass.gradeId, name: "Math" } });
+    const period = await prisma.period.create({
+      data: { schoolId: school.id, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: klass.id, teacherUserId: teacher.id, subjectId: subject.id, academicYearId: year.id },
+    });
+    await prisma.timetableEntry.create({
+      data: {
+        classId: klass.id,
+        dayOfWeek: 1,
+        periodId: period.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+        academicYearId: year.id,
+      },
+    });
+    loginAs(admin.id, school.id);
+
+    // Deactivating clears the teacher off timetable rows (per Task 5) but keeps
+    // the ClassTeacher assignment. Deleting afterward must still be refused,
+    // because that ClassTeacher row is real assignment history.
+    const deactivateRequest = new Request(`http://localhost/api/staff/${teacher.id}/deactivate`, { method: "PATCH" });
+    await deactivateStaffRoute(deactivateRequest, { params: Promise.resolve({ id: String(teacher.id) }) });
+
+    expect(await prisma.timetableEntry.count({ where: { teacherUserId: teacher.id } })).toBe(0);
+    expect(await prisma.classTeacher.count({ where: { teacherUserId: teacher.id } })).toBe(1);
+
+    const deleteRequest = new Request(`http://localhost/api/staff/${teacher.id}`, { method: "DELETE" });
+    const response = await deleteStaffRoute(deleteRequest, { params: Promise.resolve({ id: String(teacher.id) }) });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.deletable).toBe(false);
+
+    const stillThere = await prisma.user.findUnique({ where: { id: teacher.id } });
+    expect(stillThere).not.toBeNull();
+    expect(await prisma.classTeacher.count({ where: { teacherUserId: teacher.id } })).toBe(1);
+  });
+
   it("rejects deleting your own account with 403", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const { admin } = await seedAdminAndTeacher(school.id);

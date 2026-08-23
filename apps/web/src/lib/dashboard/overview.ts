@@ -272,7 +272,7 @@ async function getAcademicOverview(
   }
 
   const classTeacherLinks = await prisma.classTeacher.findMany({
-    where: { classId: { in: classIds } },
+    where: { classId: { in: classIds }, teacher: { status: "active" } },
     include: { teacher: true },
   });
   const staffByUserId = new Map<number, StaffOverviewEntry>();

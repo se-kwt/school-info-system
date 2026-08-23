@@ -18,7 +18,7 @@ export async function listClassFaculty(
   if (!klass) return { ok: false, error: "NOT_FOUND" };
 
   const links = await prisma.classTeacher.findMany({
-    where: { classId: params.classId },
+    where: { classId: params.classId, teacher: { status: "active" } },
     include: { subject: true, teacher: true },
     orderBy: [{ subject: { name: "asc" } }, { teacher: { name: "asc" } }],
   });

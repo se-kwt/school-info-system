@@ -127,6 +127,19 @@ describe("class-teachers lib", () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it("omits a teacher from listClassFaculty once they are deactivated", async () => {
+    await assignTeacherToSubject(prisma, { classId, schoolId, subjectId, teacherUserId: teacherId });
+    let list = await listClassFaculty(prisma, { classId, schoolId });
+    if (!list.ok) throw new Error("expected ok");
+    expect(list.assignments).toHaveLength(1);
+
+    await prisma.user.update({ where: { id: teacherId }, data: { status: "inactive" } });
+
+    list = await listClassFaculty(prisma, { classId, schoolId });
+    if (!list.ok) throw new Error("expected ok");
+    expect(list.assignments).toHaveLength(0);
+  });
+
   it("refuses to staff an archived class", async () => {
     const archived = await prisma.class.create({
       data: { schoolId, gradeId, section: "Z", academicYearId: yearId, archived: true },

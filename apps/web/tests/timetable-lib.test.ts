@@ -54,6 +54,18 @@ describe("timetable lib", () => {
     expect(result).toEqual({ ok: false, error: "INVALID_TEACHER" });
   });
 
+  it("rejects staffing a deactivated teacher onto a timetable slot even though their ClassTeacher link survives deactivation", async () => {
+    await prisma.user.update({ where: { id: teacherId }, data: { status: "inactive" } });
+
+    const result = await createTimetableEntry(prisma, {
+      schoolId, academicYearId: yearId, classId, dayOfWeek: 1, periodId, subjectId, teacherUserId: teacherId,
+    });
+    expect(result).toEqual({ ok: false, error: "TEACHER_INACTIVE" });
+
+    const written = await prisma.timetableEntry.count({ where: { classId, teacherUserId: teacherId } });
+    expect(written).toBe(0);
+  });
+
   it("rejects editTimetableEntry when the new subjectId doesn't belong to the entry's class's grade", async () => {
     const school = await prisma.school.create({ data: { name: "Test School" } });
     const year = await createActiveYear(prisma, school.id);

@@ -279,6 +279,70 @@ describe("rollover: timetable", () => {
 
     expect(await prisma.timetableEntry.count({ where: { academicYearId: toYearId } })).toBe(1);
   });
+
+  it("nulls the teacher instead of throwing when a carried-forward teacher would double-book a different class at the same day/period", async () => {
+    // Admin hand-builds class 1B in the target year, staffing teacher T at Mon/Period-1.
+    // Source year has class 1A also at Mon/Period-1 with the same teacher T (legal
+    // there — different classes, T only booked once). Rollover adopts 1B (matches on
+    // gradeId+section) and clones 1A; cloning 1A's timetable entry would double-book T
+    // at Mon/Period-1 via a different class, which the DB's teacher-uniqueness
+    // constraint forbids. This must degrade gracefully (teacherUserId: null), not throw.
+    const sourceClass1A = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    const subject = await prisma.subject.create({ data: { gradeId, name: "Mathematics" } });
+    const teacher = await prisma.user.create({
+      data: { schoolId, phone: "+10000000304", role: "teacher", name: "Shared Teacher" },
+    });
+    const period = await prisma.period.create({
+      data: { schoolId, order: 1, label: "Period 1", startTime: "09:00", endTime: "09:45" },
+    });
+    await prisma.classTeacher.create({
+      data: { classId: sourceClass1A.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: fromYearId },
+    });
+    await prisma.timetableEntry.create({
+      data: {
+        classId: sourceClass1A.id,
+        academicYearId: fromYearId,
+        dayOfWeek: 1,
+        periodId: period.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+      },
+    });
+
+    // Admin hand-built class 1B in the target year and already staffed T there.
+    const targetClass1B = await prisma.class.create({ data: { schoolId, gradeId, section: "B", academicYearId: toYearId } });
+    await prisma.classTeacher.create({
+      data: { classId: targetClass1B.id, subjectId: subject.id, teacherUserId: teacher.id, academicYearId: toYearId },
+    });
+    await prisma.timetableEntry.create({
+      data: {
+        classId: targetClass1B.id,
+        academicYearId: toYearId,
+        dayOfWeek: 1,
+        periodId: period.id,
+        subjectId: subject.id,
+        teacherUserId: teacher.id,
+      },
+    });
+
+    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    await cloneFaculty(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const result = await cloneTimetable(prisma, { classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+
+    expect(result).toEqual({ cloned: 1, skippedNoTeacher: 1 });
+
+    const targetClass1A = classMap.get(sourceClass1A.id);
+    const clonedEntry = await prisma.timetableEntry.findFirstOrThrow({
+      where: { academicYearId: toYearId, classId: targetClass1A },
+    });
+    expect(clonedEntry.teacherUserId).toBeNull();
+
+    // The hand-built 1B entry is untouched.
+    const untouched = await prisma.timetableEntry.findFirstOrThrow({
+      where: { academicYearId: toYearId, classId: targetClass1B.id },
+    });
+    expect(untouched.teacherUserId).toBe(teacher.id);
+  });
 });
 
 describe("rollover: fee structures", () => {
@@ -354,6 +418,24 @@ describe("rollover: fee structures", () => {
     await cloneFeeStructures(prisma, { schoolId, classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
 
     expect(await prisma.feeStructure.count({ where: { academicYearId: toYearId } })).toBe(1);
+  });
+
+  it("clones two legitimate fee structures that share a class and term but differ in amount, instead of silently dropping one", async () => {
+    const source = await prisma.class.create({ data: { schoolId, gradeId, section: "A", academicYearId: fromYearId } });
+    await prisma.feeStructure.create({
+      data: { schoolId, academicYearId: fromYearId, classId: source.id, term: "Term 1", amount: 5000, dueDate: new Date("2026-06-01") },
+    });
+    await prisma.feeStructure.create({
+      data: { schoolId, academicYearId: fromYearId, classId: source.id, term: "Term 1", amount: 1200, dueDate: new Date("2026-06-01") },
+    });
+
+    const classMap = await cloneClasses(prisma, { schoolId, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+    const result = await cloneFeeStructures(prisma, { schoolId, classMap, fromAcademicYearId: fromYearId, toAcademicYearId: toYearId });
+
+    expect(result).toEqual({ cloned: 2 });
+
+    const cloned = await prisma.feeStructure.findMany({ where: { academicYearId: toYearId }, orderBy: { amount: "asc" } });
+    expect(cloned.map((f) => Number(f.amount))).toEqual([1200, 5000]);
   });
 });
 
