@@ -332,4 +332,21 @@ describe("StudentsView", () => {
     expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Deactivate" })).toBeNull();
   });
+
+  it("shows exactly one Deactivate button after a blocked delete, not a duplicate", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "blocked", deletable: false }), { status: 400 })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<StudentsView initialStudents={students} classes={classes} isAdmin={true} />);
+    await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(await screen.findByText(/has recorded history/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deactivate instead" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Deactivate" })).toHaveLength(1);
+  });
 });

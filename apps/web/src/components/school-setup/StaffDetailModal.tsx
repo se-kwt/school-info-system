@@ -307,14 +307,6 @@ export function StaffDetailModal({
           <div className="mt-2 flex gap-2">
             <button
               type="button"
-              onClick={onDeactivate}
-              disabled={isSubmitting}
-              className="rounded bg-amber-600 px-2 py-1 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Deactivate instead
-            </button>
-            <button
-              type="button"
               onClick={onCancelDelete}
               className="rounded border border-gray-300 px-2 py-1 text-xs"
             >

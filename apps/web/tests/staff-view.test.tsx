@@ -98,7 +98,7 @@ describe("StaffView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     expect(await screen.findByText(/has recorded activity/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Deactivate instead" }));
+    await userEvent.click(screen.getByRole("button", { name: "Deactivate" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
@@ -107,6 +107,23 @@ describe("StaffView", () => {
         expect.objectContaining({ method: "PATCH" })
       );
     });
+  });
+
+  it("shows exactly one Deactivate button after a blocked delete, not a duplicate", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "blocked", deletable: false }), { status: 400 })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
+    await userEvent.click(screen.getByRole("button", { name: /Jane Teacher/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(await screen.findByText(/has recorded activity/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deactivate instead" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Deactivate" })).toHaveLength(1);
   });
 
   it("hides Delete on the current user's own card", async () => {

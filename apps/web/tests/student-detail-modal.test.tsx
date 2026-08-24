@@ -301,7 +301,7 @@ describe("StudentDetailModal", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
-  it("edit mode: deleteBlocked shows Deactivate instead and Cancel", async () => {
+  it("edit mode: deleteBlocked shows the explanatory banner and Cancel, with exactly one Deactivate button", async () => {
     const onDeactivate = vi.fn();
     const onCancelDelete = vi.fn();
     render(
@@ -321,7 +321,11 @@ describe("StudentDetailModal", () => {
         onActivate={noop}
       />
     );
-    await userEvent.click(screen.getByRole("button", { name: "Deactivate instead" }));
+    expect(screen.getByText(/has recorded history/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deactivate instead" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Deactivate" })).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Deactivate" }));
     expect(onDeactivate).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancelDelete).toHaveBeenCalledTimes(1);
