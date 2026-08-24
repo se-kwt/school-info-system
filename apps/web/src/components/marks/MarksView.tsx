@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
 interface ExamOption {
   id: number;
@@ -70,6 +71,7 @@ export function MarksView({
   const [newExamDate, setNewExamDate] = useState("");
   const [newExamMaxMarks, setNewExamMaxMarks] = useState("");
   const [newExamPassMarks, setNewExamPassMarks] = useState("");
+  const { isSubmitting, run } = useSubmitGuard();
 
   const availableSubjects = teacherSubjects
     .filter((ts) => ts.classId === Number(classId))
@@ -115,36 +117,38 @@ export function MarksView({
   async function handleCreateExam() {
     setError(null);
     setMessage(null);
-    const response = await fetch("/api/exams", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: newExamName,
-        term: newExamTerm,
-        examDate: newExamDate,
-        maxMarks: Number(newExamMaxMarks),
-        passMarks: Number(newExamPassMarks),
-      }),
-    });
+    await run(async () => {
+      const response = await fetch("/api/exams", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: newExamName,
+          term: newExamTerm,
+          examDate: newExamDate,
+          maxMarks: Number(newExamMaxMarks),
+          passMarks: Number(newExamPassMarks),
+        }),
+      });
 
-    if (response.ok) {
-      const created = await response.json();
-      setMessage("Exam created");
-      setNewExamName("");
-      setNewExamTerm("");
-      setNewExamDate("");
-      setNewExamMaxMarks("");
-      setNewExamPassMarks("");
-      const listResponse = await fetch("/api/exams");
-      if (listResponse.ok) {
-        const body = await listResponse.json();
-        setExams(body.exams);
+      if (response.ok) {
+        const created = await response.json();
+        setMessage("Exam created");
+        setNewExamName("");
+        setNewExamTerm("");
+        setNewExamDate("");
+        setNewExamMaxMarks("");
+        setNewExamPassMarks("");
+        const listResponse = await fetch("/api/exams");
+        if (listResponse.ok) {
+          const body = await listResponse.json();
+          setExams(body.exams);
+        }
+        setExamId(String(created.id));
+        return;
       }
-      setExamId(String(created.id));
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   async function handleTogglePublished() {
@@ -152,23 +156,25 @@ export function MarksView({
     if (!currentExam) return;
     setError(null);
     setMessage(null);
-    const response = await fetch(`/api/exams/${currentExam.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ published: !currentExam.published }),
-    });
+    await run(async () => {
+      const response = await fetch(`/api/exams/${currentExam.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ published: !currentExam.published }),
+      });
 
-    if (response.ok) {
-      setExams((prev) =>
-        prev.map((exam) =>
-          exam.id === currentExam.id ? { ...exam, published: !currentExam.published } : exam
-        )
-      );
-      setMessage(currentExam.published ? "Exam unpublished" : "Exam published");
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      if (response.ok) {
+        setExams((prev) =>
+          prev.map((exam) =>
+            exam.id === currentExam.id ? { ...exam, published: !currentExam.published } : exam
+          )
+        );
+        setMessage(currentExam.published ? "Exam unpublished" : "Exam published");
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   async function handleSave() {
@@ -211,29 +217,31 @@ export function MarksView({
       return;
     }
 
-    const response = await fetch("/api/marks", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        classId: Number(classId),
-        examId: Number(examId),
-        subjectId: Number(entrySubjectId),
-        entries: entries.map((e) => ({
-          studentId: e.studentId,
-          marksObtained: e.marksObtained,
-          isAbsent: e.isAbsent,
-          remarks: e.remarks,
-        })),
-      }),
-    });
+    await run(async () => {
+      const response = await fetch("/api/marks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          classId: Number(classId),
+          examId: Number(examId),
+          subjectId: Number(entrySubjectId),
+          entries: entries.map((e) => ({
+            studentId: e.studentId,
+            marksObtained: e.marksObtained,
+            isAbsent: e.isAbsent,
+            remarks: e.remarks,
+          })),
+        }),
+      });
 
-    if (response.ok) {
-      setMessage("Marks saved");
-      await refresh();
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      if (response.ok) {
+        setMessage("Marks saved");
+        await refresh();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   return (
@@ -268,10 +276,12 @@ export function MarksView({
           <button
             type="button"
             onClick={handleTogglePublished}
+            disabled={isSubmitting}
             className={
-              exams.find((exam) => String(exam.id) === examId)?.published
+              (exams.find((exam) => String(exam.id) === examId)?.published
                 ? "rounded-lg border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-700 transition-all hover:bg-neutral-50"
-                : "rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-emerald-700"
+                : "rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-emerald-700") +
+              " disabled:cursor-not-allowed disabled:opacity-50"
             }
           >
             {exams.find((exam) => String(exam.id) === examId)?.published
@@ -324,7 +334,8 @@ export function MarksView({
             <button
               type="button"
               onClick={handleCreateExam}
-              className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
+              disabled={isSubmitting}
+              className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
             >
               New Exam
             </button>
@@ -418,7 +429,8 @@ export function MarksView({
           <button
             type="button"
             onClick={handleSave}
-            className="mt-4 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+            disabled={isSubmitting}
+            className="mt-4 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
           >
             Save Marks
           </button>

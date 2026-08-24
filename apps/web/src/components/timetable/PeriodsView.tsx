@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 interface PeriodRow {
   id: number;
@@ -24,6 +25,7 @@ export function PeriodsView({ initialPeriods }: { initialPeriods: PeriodRow[] })
   const [endTime, setEndTime] = useState("09:45");
   const [error, setError] = useState<string | null>(null);
   const [overrideDraft, setOverrideDraft] = useState<Record<number, { day: string; startTime: string; endTime: string }>>({});
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refresh() {
     const response = await fetch("/api/periods");
@@ -32,55 +34,65 @@ export function PeriodsView({ initialPeriods }: { initialPeriods: PeriodRow[] })
 
   async function handleCreate() {
     setError(null);
-    const response = await fetch("/api/periods", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ order: Number(order), label, isBreak, startTime, endTime }),
+    await run(async () => {
+      const response = await fetch("/api/periods", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ order: Number(order), label, isBreak, startTime, endTime }),
+      });
+      if (response.status === 201) {
+        setOrder("");
+        setLabel("");
+        setIsBreak(false);
+        await refresh();
+        return;
+      }
+      setError((await response.json()).error);
     });
-    if (response.status === 201) {
-      setOrder("");
-      setLabel("");
-      setIsBreak(false);
-      await refresh();
-      return;
-    }
-    setError((await response.json()).error);
   }
 
   async function handleDelete(id: number) {
     setError(null);
-    const response = await fetch(`/api/periods/${id}`, { method: "DELETE" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh();
+    await run(async () => {
+      const response = await fetch(`/api/periods/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await refresh();
+    });
   }
 
   async function handleSetOverride(periodId: number) {
     setError(null);
     const draft = overrideDraft[periodId];
     if (!draft?.day) return;
-    const response = await fetch(`/api/periods/${periodId}/overrides`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ dayOfWeek: Number(draft.day), startTime: draft.startTime, endTime: draft.endTime }),
+    await run(async () => {
+      const response = await fetch(`/api/periods/${periodId}/overrides`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dayOfWeek: Number(draft.day), startTime: draft.startTime, endTime: draft.endTime }),
+      });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await refresh();
     });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh();
   }
 
   async function handleClearOverride(periodId: number, dayOfWeek: number) {
     setError(null);
-    const response = await fetch(`/api/periods/${periodId}/overrides?dayOfWeek=${dayOfWeek}`, { method: "DELETE" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh();
+    await run(async () => {
+      const response = await fetch(`/api/periods/${periodId}/overrides?dayOfWeek=${dayOfWeek}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await refresh();
+    });
   }
 
   return (
@@ -120,7 +132,12 @@ export function PeriodsView({ initialPeriods }: { initialPeriods: PeriodRow[] })
           onChange={(event) => setEndTime(event.target.value)}
           className="rounded border border-gray-300 px-3 py-2"
         />
-        <button type="button" onClick={handleCreate} className="rounded bg-blue-600 px-3 py-2 text-white">
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={isSubmitting}
+          className="rounded bg-blue-600 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
           Add Period
         </button>
       </div>
@@ -134,7 +151,12 @@ export function PeriodsView({ initialPeriods }: { initialPeriods: PeriodRow[] })
               <span className="font-semibold text-gray-800">
                 {period.order}. {period.label} {period.isBreak && "(Break)"} — {period.startTime}–{period.endTime}
               </span>
-              <button type="button" onClick={() => handleDelete(period.id)} className="text-sm text-red-600 underline">
+              <button
+                type="button"
+                onClick={() => handleDelete(period.id)}
+                disabled={isSubmitting}
+                className="text-sm text-red-600 underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 Delete
               </button>
             </div>
@@ -148,7 +170,8 @@ export function PeriodsView({ initialPeriods }: { initialPeriods: PeriodRow[] })
                     <button
                       type="button"
                       onClick={() => handleClearOverride(period.id, day)}
-                      className="ml-1 underline"
+                      disabled={isSubmitting}
+                      className="ml-1 underline disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Clear
                     </button>
@@ -203,7 +226,8 @@ export function PeriodsView({ initialPeriods }: { initialPeriods: PeriodRow[] })
               <button
                 type="button"
                 onClick={() => handleSetOverride(period.id)}
-                className="rounded bg-neutral-900 px-2 py-1 text-xs text-white"
+                disabled={isSubmitting}
+                className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Set override
               </button>

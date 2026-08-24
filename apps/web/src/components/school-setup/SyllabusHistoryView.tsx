@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 interface SyllabusVersionRow {
   id: number;
@@ -41,7 +42,7 @@ export function SyllabusHistoryView({
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refresh() {
     const response = await fetch(`/api/subjects/${subjectId}/syllabus-versions`);
@@ -55,8 +56,7 @@ export function SyllabusHistoryView({
       return;
     }
 
-    setIsSubmitting(true);
-    try {
+    await run(async () => {
       let fileUrl: string | undefined;
       let fileName: string | undefined;
       if (file) {
@@ -82,9 +82,7 @@ export function SyllabusHistoryView({
         return;
       }
       setError((await response.json()).error);
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { formatMoney } from "@/lib/money";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
 interface ClassOption {
   id: number;
@@ -78,6 +79,7 @@ export function FeesView({
   const [expandedStudentId, setExpandedStudentId] = useState<number | null>(null);
   const [historyByStudent, setHistoryByStudent] = useState<Record<number, PaymentHistoryEntry[]>>({});
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refreshFeeStructures() {
     if (!classId) return;
@@ -126,31 +128,33 @@ export function FeesView({
   async function handleCreateFeeStructure() {
     setError(null);
     setMessage(null);
-    const response = await fetch("/api/fee-structures", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        classId: Number(classId),
-        term: newTerm,
-        amount: Number(newAmount),
-        dueDate: newDueDate,
-        discount: newDiscount ? Number(newDiscount) : 0,
-        fineAmount: newFineAmount ? Number(newFineAmount) : 0,
-      }),
-    });
+    await run(async () => {
+      const response = await fetch("/api/fee-structures", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          classId: Number(classId),
+          term: newTerm,
+          amount: Number(newAmount),
+          dueDate: newDueDate,
+          discount: newDiscount ? Number(newDiscount) : 0,
+          fineAmount: newFineAmount ? Number(newFineAmount) : 0,
+        }),
+      });
 
-    if (response.ok) {
-      setMessage("Fee structure created");
-      setNewTerm("");
-      setNewAmount("");
-      setNewDueDate("");
-      setNewDiscount("");
-      setNewFineAmount("");
-      await refreshFeeStructures();
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      if (response.ok) {
+        setMessage("Fee structure created");
+        setNewTerm("");
+        setNewAmount("");
+        setNewDueDate("");
+        setNewDiscount("");
+        setNewFineAmount("");
+        await refreshFeeStructures();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   async function handleRecordPayment(studentId: number) {
@@ -164,47 +168,49 @@ export function FeesView({
       return;
     }
 
-    const amount = Number(paymentEdits[studentId] ?? 0);
-    const reference = paymentReferenceEdits[studentId] ?? "";
-    const response = await fetch("/api/fee-payments", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        feeStructureId: Number(feeStructureId),
-        studentId,
-        amount,
-        mode,
-        reference: reference || undefined,
-      }),
-    });
-
-    if (response.ok) {
-      const body = await response.json();
-      setMessage("Payment recorded");
-      setStudents((prev) =>
-        prev.map((student) =>
-          student.studentId === studentId
-            ? { ...student, amountPaid: body.amountPaid, status: body.status }
-            : student
-        )
-      );
-      setPaymentEdits((prev) => ({ ...prev, [studentId]: "" }));
-      setPaymentModeEdits((prev) => ({ ...prev, [studentId]: "" }));
-      setPaymentReferenceEdits((prev) => ({ ...prev, [studentId]: "" }));
-      // Drop any cached history for this student so a collapsed-then-reopened
-      // row can't show a stale ledger from before this payment.
-      setHistoryByStudent((prev) => {
-        const next = { ...prev };
-        delete next[studentId];
-        return next;
+    await run(async () => {
+      const amount = Number(paymentEdits[studentId] ?? 0);
+      const reference = paymentReferenceEdits[studentId] ?? "";
+      const response = await fetch("/api/fee-payments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          feeStructureId: Number(feeStructureId),
+          studentId,
+          amount,
+          mode,
+          reference: reference || undefined,
+        }),
       });
-      if (expandedStudentId === studentId) {
-        await loadHistory(studentId);
+
+      if (response.ok) {
+        const body = await response.json();
+        setMessage("Payment recorded");
+        setStudents((prev) =>
+          prev.map((student) =>
+            student.studentId === studentId
+              ? { ...student, amountPaid: body.amountPaid, status: body.status }
+              : student
+          )
+        );
+        setPaymentEdits((prev) => ({ ...prev, [studentId]: "" }));
+        setPaymentModeEdits((prev) => ({ ...prev, [studentId]: "" }));
+        setPaymentReferenceEdits((prev) => ({ ...prev, [studentId]: "" }));
+        // Drop any cached history for this student so a collapsed-then-reopened
+        // row can't show a stale ledger from before this payment.
+        setHistoryByStudent((prev) => {
+          const next = { ...prev };
+          delete next[studentId];
+          return next;
+        });
+        if (expandedStudentId === studentId) {
+          await loadHistory(studentId);
+        }
+        return;
       }
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   async function loadHistory(studentId: number) {
@@ -306,7 +312,8 @@ export function FeesView({
             <button
               type="button"
               onClick={handleCreateFeeStructure}
-              className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
+              disabled={isSubmitting}
+              className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
             >
               New Fee Structure
             </button>
@@ -395,7 +402,8 @@ export function FeesView({
                       <button
                         type="button"
                         onClick={() => handleRecordPayment(student.studentId)}
-                        className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
+                        disabled={isSubmitting}
+                        className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Record Payment
                       </button>

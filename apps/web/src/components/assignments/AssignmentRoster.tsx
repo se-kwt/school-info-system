@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 interface Assignment {
   id: number;
@@ -65,10 +66,8 @@ export function AssignmentRoster({
   const [editDescription, setEditDescription] = useState(assignment.description ?? "");
   const [editDueDate, setEditDueDate] = useState(assignment.dueDate);
   const [editAttachmentFile, setEditAttachmentFile] = useState<File | null>(null);
-  const [isSavingStatuses, setIsSavingStatuses] = useState(false);
-  const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const isSavingStatusesRef = useRef(false);
-  const isSavingEditRef = useRef(false);
+  const { isSubmitting: isSavingStatuses, run: runSaveStatuses } = useSubmitGuard();
+  const { isSubmitting: isSavingEdit, run: runSaveEdit } = useSubmitGuard();
 
   async function refresh() {
     const response = await fetch(`/api/assignments/${assignment.id}/statuses`);
@@ -100,13 +99,9 @@ export function AssignmentRoster({
   }, [assignment.id]);
 
   async function handleSave() {
-    if (isSavingStatusesRef.current) return;
-
     setError(null);
     setMessage(null);
-    isSavingStatusesRef.current = true;
-    setIsSavingStatuses(true);
-    try {
+    await runSaveStatuses(async () => {
       const response = await fetch(`/api/assignments/${assignment.id}/statuses`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -126,15 +121,10 @@ export function AssignmentRoster({
       }
       const body = await response.json();
       setError(body.error);
-    } finally {
-      isSavingStatusesRef.current = false;
-      setIsSavingStatuses(false);
-    }
+    });
   }
 
   async function handleEditSave() {
-    if (isSavingEditRef.current) return;
-
     setError(null);
     setMessage(null);
 
@@ -143,9 +133,7 @@ export function AssignmentRoster({
       return;
     }
 
-    isSavingEditRef.current = true;
-    setIsSavingEdit(true);
-    try {
+    await runSaveEdit(async () => {
       let attachmentUrl: string | undefined;
       let attachmentName: string | undefined;
       if (editAttachmentFile) {
@@ -181,10 +169,7 @@ export function AssignmentRoster({
       }
       const body = await response.json();
       setError(body.error);
-    } finally {
-      isSavingEditRef.current = false;
-      setIsSavingEdit(false);
-    }
+    });
   }
 
   const canEdit = role === "teacher" && assignment.createdById === currentUserId;

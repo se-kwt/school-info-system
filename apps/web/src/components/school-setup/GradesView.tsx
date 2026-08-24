@@ -8,6 +8,7 @@ import { PageHeader } from "./PageHeader";
 import { GridToolbar } from "./GridToolbar";
 import { EntityCard } from "./EntityCard";
 import { Pagination } from "./Pagination";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 export interface GradeRow {
   id: number;
@@ -42,6 +43,7 @@ export function GradesView({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refresh(academicYearId: string) {
     const query = academicYearId !== "all" ? `?academicYearId=${academicYearId}` : "";
@@ -68,49 +70,53 @@ export function GradesView({
 
   async function handleSave() {
     setError(null);
-    if (modalState?.mode === "create") {
-      const response = await fetch("/api/grades", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      if (response.status === 201) {
-        closeModal();
-        await refresh(yearFilter);
+    await run(async () => {
+      if (modalState?.mode === "create") {
+        const response = await fetch("/api/grades", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (response.status === 201) {
+          closeModal();
+          await refresh(yearFilter);
+          return;
+        }
+        setError((await response.json()).error);
         return;
       }
-      setError((await response.json()).error);
-      return;
-    }
-    if (modalState?.mode === "edit") {
-      const response = await fetch(`/api/grades/${modalState.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      if (response.ok) {
-        closeModal();
-        await refresh(yearFilter);
-        return;
+      if (modalState?.mode === "edit") {
+        const response = await fetch(`/api/grades/${modalState.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (response.ok) {
+          closeModal();
+          await refresh(yearFilter);
+          return;
+        }
+        setError((await response.json()).error);
       }
-      setError((await response.json()).error);
-    }
+    });
   }
 
   async function handleDelete(id: number) {
     setError(null);
-    const response = await fetch(`/api/grades/${id}`, { method: "DELETE" });
-    if (response.ok) {
-      setDeleteBlockedId(null);
-      await refresh(yearFilter);
-      return;
-    }
-    const body = await response.json();
-    if (body.deletable === false) {
-      setDeleteBlockedId(id);
-      return;
-    }
-    setError(body.error);
+    await run(async () => {
+      const response = await fetch(`/api/grades/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        setDeleteBlockedId(null);
+        await refresh(yearFilter);
+        return;
+      }
+      const body = await response.json();
+      if (body.deletable === false) {
+        setDeleteBlockedId(id);
+        return;
+      }
+      setError(body.error);
+    });
   }
 
   async function handleYearFilterChange(value: string) {
@@ -239,7 +245,12 @@ export function GradesView({
                       <button type="button" onClick={() => openEdit(grade)} className="mr-3 text-blue-600 underline">
                         Edit
                       </button>
-                      <button type="button" onClick={() => handleDelete(grade.id)} className="text-red-600 underline">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(grade.id)}
+                        disabled={isSubmitting}
+                        className="text-red-600 underline disabled:cursor-not-allowed disabled:opacity-50"
+                      >
                         Delete
                       </button>
                     </>
@@ -274,7 +285,8 @@ export function GradesView({
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
+              disabled={isSubmitting}
+              className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
             >
               Save
             </button>

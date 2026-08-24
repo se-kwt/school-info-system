@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 interface AcademicYearOption {
   id: number;
@@ -84,6 +85,7 @@ export function PromotionWizard({
     feeStructures: true,
   });
   const [rolloverSummary, setRolloverSummary] = useState<RolloverSummary | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   function handleRolloverChange(key: keyof RolloverOptions, value: boolean) {
     setRollover((prev) => {
@@ -101,22 +103,24 @@ export function PromotionWizard({
 
   async function handleStart() {
     setError(null);
-    const response = await fetch("/api/promotion-runs", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ toAcademicYearId: Number(toAcademicYearId) }),
+    await run(async () => {
+      const response = await fetch("/api/promotion-runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ toAcademicYearId: Number(toAcademicYearId) }),
+      });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      const body = await response.json();
+      setRunId(body.id);
+      const initialMappings: Record<number, string> = {};
+      for (const mapping of body.mappings) {
+        initialMappings[mapping.fromClassId] = mapping.toClassId ? String(mapping.toClassId) : "";
+      }
+      setMappings(initialMappings);
     });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    const body = await response.json();
-    setRunId(body.id);
-    const initialMappings: Record<number, string> = {};
-    for (const mapping of body.mappings) {
-      initialMappings[mapping.fromClassId] = mapping.toClassId ? String(mapping.toClassId) : "";
-    }
-    setMappings(initialMappings);
   }
 
   async function handleLoadRoster() {
@@ -133,36 +137,40 @@ export function PromotionWizard({
   async function handleSaveMappings() {
     if (!runId) return;
     setError(null);
-    const response = await fetch(`/api/promotion-runs/${runId}/mappings`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        mappings: Object.entries(mappings).map(([fromClassId, toClassId]) => ({
-          fromClassId: Number(fromClassId),
-          toClassId: toClassId ? Number(toClassId) : null,
-        })),
-      }),
+    await run(async () => {
+      const response = await fetch(`/api/promotion-runs/${runId}/mappings`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mappings: Object.entries(mappings).map(([fromClassId, toClassId]) => ({
+            fromClassId: Number(fromClassId),
+            toClassId: toClassId ? Number(toClassId) : null,
+          })),
+        }),
+      });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await handleLoadRoster();
     });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await handleLoadRoster();
   }
 
   async function handleSetAction(studentId: number, action: RosterStudent["action"]) {
     if (!runId || !action) return;
     setError(null);
-    const response = await fetch(`/api/promotion-runs/${runId}/decisions`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ decisions: [{ studentId, action }] }),
+    await run(async () => {
+      const response = await fetch(`/api/promotion-runs/${runId}/decisions`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ decisions: [{ studentId, action }] }),
+      });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await handleLoadRoster();
     });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await handleLoadRoster();
   }
 
   async function handleLoadSummary() {
@@ -175,31 +183,35 @@ export function PromotionWizard({
   async function handleConfirm() {
     if (!runId) return;
     setError(null);
-    const response = await fetch(`/api/promotion-runs/${runId}/confirm`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ rollover }),
+    await run(async () => {
+      const response = await fetch(`/api/promotion-runs/${runId}/confirm`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ rollover }),
+      });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      const body = await response.json();
+      if (body.rollover) {
+        setRolloverSummary(body.rollover);
+      }
+      setConfirmed(true);
     });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    const body = await response.json();
-    if (body.rollover) {
-      setRolloverSummary(body.rollover);
-    }
-    setConfirmed(true);
   }
 
   async function handleUndo() {
     if (!runId) return;
     setError(null);
-    const response = await fetch(`/api/promotion-runs/${runId}/revert`, { method: "POST" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    setConfirmed(false);
+    await run(async () => {
+      const response = await fetch(`/api/promotion-runs/${runId}/revert`, { method: "POST" });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      setConfirmed(false);
+    });
   }
 
   return (
@@ -220,7 +232,12 @@ export function PromotionWizard({
               </option>
             ))}
           </select>
-          <button type="button" onClick={handleStart} className="rounded bg-blue-600 px-3 py-1 text-white">
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={isSubmitting}
+            className="rounded bg-blue-600 px-3 py-1 text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Start Promotion
           </button>
         </div>
@@ -250,7 +267,12 @@ export function PromotionWizard({
                 </select>
               </div>
             ))}
-            <button type="button" onClick={handleSaveMappings} className="mt-2 rounded bg-blue-600 px-3 py-1 text-white">
+            <button
+              type="button"
+              onClick={handleSaveMappings}
+              disabled={isSubmitting}
+              className="mt-2 rounded bg-blue-600 px-3 py-1 text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
               Save Mappings and Load Roster
             </button>
           </section>
@@ -273,7 +295,8 @@ export function PromotionWizard({
                               onChange={(event) =>
                                 handleSetAction(student.studentId, event.target.value as RosterStudent["action"])
                               }
-                              className="rounded border border-gray-300 px-2 py-1"
+                              disabled={isSubmitting}
+                              className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <option value="">Undecided</option>
                               {ACTIONS.map((action) => (
@@ -351,7 +374,12 @@ export function PromotionWizard({
                       Fee structures
                     </label>
                   </fieldset>
-                  <button type="button" onClick={handleConfirm} className="mt-2 rounded bg-green-700 px-3 py-1 text-white">
+                  <button
+                    type="button"
+                    onClick={handleConfirm}
+                    disabled={isSubmitting}
+                    className="mt-2 rounded bg-green-700 px-3 py-1 text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
                     Confirm Promotion
                   </button>
                 </>
@@ -367,7 +395,12 @@ export function PromotionWizard({
           {rolloverSummary && (
             <p className="mt-1 text-sm text-gray-600">{formatRolloverSummary(rolloverSummary)}</p>
           )}
-          <button type="button" onClick={handleUndo} className="mt-2 rounded bg-red-600 px-3 py-1 text-white">
+          <button
+            type="button"
+            onClick={handleUndo}
+            disabled={isSubmitting}
+            className="mt-2 rounded bg-red-600 px-3 py-1 text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Undo
           </button>
         </div>

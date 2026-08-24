@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AssignmentRoster } from "./AssignmentRoster";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 interface ClassOption {
   id: number;
@@ -66,8 +67,7 @@ export function AssignmentsView({
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const isSubmittingRef = useRef(false);
+  const { isSubmitting, run } = useSubmitGuard();
 
   const selectedClass = classes.find((c) => String(c.id) === classId) ?? null;
   const availableSubjects = selectedClass ? subjects.filter((s) => s.gradeId === selectedClass.gradeId) : [];
@@ -94,8 +94,6 @@ export function AssignmentsView({
   }, [classId]);
 
   async function handleCreate() {
-    if (isSubmittingRef.current) return;
-
     setError(null);
     setMessage(null);
 
@@ -104,9 +102,7 @@ export function AssignmentsView({
       return;
     }
 
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
-    try {
+    await run(async () => {
       let attachmentUrl: string | undefined;
       let attachmentName: string | undefined;
       if (attachmentFile) {
@@ -145,10 +141,7 @@ export function AssignmentsView({
       }
       const body = await response.json();
       setError(body.error);
-    } finally {
-      isSubmittingRef.current = false;
-      setIsSubmitting(false);
-    }
+    });
   }
 
   const selected = assignments.find((a) => a.id === selectedId) ?? null;

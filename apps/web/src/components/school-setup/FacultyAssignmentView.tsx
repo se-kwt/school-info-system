@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 interface FacultyAssignment {
   subjectId: number;
@@ -36,6 +37,7 @@ export function FacultyAssignmentView({
   const [subjectId, setSubjectId] = useState(subjects[0] ? String(subjects[0].id) : "");
   const [teacherUserId, setTeacherUserId] = useState(teachers[0] ? String(teachers[0].id) : "");
   const [error, setError] = useState<string | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refresh() {
     const response = await fetch(`/api/classes/${classId}/faculty`);
@@ -44,40 +46,48 @@ export function FacultyAssignmentView({
 
   async function handleAssign() {
     setError(null);
-    const response = await fetch(`/api/classes/${classId}/faculty`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ subjectId: Number(subjectId), teacherUserId: Number(teacherUserId) }),
+    await run(async () => {
+      const response = await fetch(`/api/classes/${classId}/faculty`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ subjectId: Number(subjectId), teacherUserId: Number(teacherUserId) }),
+      });
+      if (response.status === 201) {
+        await refresh();
+        return;
+      }
+      setError((await response.json()).error);
     });
-    if (response.status === 201) {
-      await refresh();
-      return;
-    }
-    setError((await response.json()).error);
   }
 
   async function handleUnassign(subjectId: number, teacherUserId: number) {
     setError(null);
-    const response = await fetch(`/api/classes/${classId}/faculty/${subjectId}/${teacherUserId}`, { method: "DELETE" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh();
+    await run(async () => {
+      const response = await fetch(`/api/classes/${classId}/faculty/${subjectId}/${teacherUserId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await refresh();
+    });
   }
 
   async function handleSetClassTeacher(teacherUserId: number) {
     setError(null);
-    const response = await fetch(`/api/classes/${classId}/class-teacher`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ teacherUserId }),
+    await run(async () => {
+      const response = await fetch(`/api/classes/${classId}/class-teacher`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ teacherUserId }),
+      });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await refresh();
     });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh();
   }
 
   const assignedTeacherIds = [...new Set(assignments.map((a) => a.teacherUserId))];
@@ -109,7 +119,12 @@ export function FacultyAssignmentView({
             </option>
           ))}
         </select>
-        <button type="button" onClick={handleAssign} className="rounded bg-blue-600 px-3 py-2 text-white">
+        <button
+          type="button"
+          onClick={handleAssign}
+          disabled={isSubmitting}
+          className="rounded bg-blue-600 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
           Assign
         </button>
       </div>
@@ -139,7 +154,8 @@ export function FacultyAssignmentView({
                   <button
                     type="button"
                     onClick={() => handleSetClassTeacher(assignment.teacherUserId)}
-                    className="text-xs text-blue-600 underline"
+                    disabled={isSubmitting}
+                    className="text-xs text-blue-600 underline disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Make class teacher
                   </button>
@@ -149,7 +165,8 @@ export function FacultyAssignmentView({
                 <button
                   type="button"
                   onClick={() => handleUnassign(assignment.subjectId, assignment.teacherUserId)}
-                  className="text-red-600 underline"
+                  disabled={isSubmitting}
+                  className="text-red-600 underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Remove
                 </button>

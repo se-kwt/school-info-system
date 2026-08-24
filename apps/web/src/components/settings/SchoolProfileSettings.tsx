@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SchoolLogo } from "@/components/SchoolLogo";
 import { Field } from "@/components/school-setup/Field";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
 export function SchoolProfileSettings({
   initialLogoUrl,
@@ -21,14 +22,14 @@ export function SchoolProfileSettings({
 }) {
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const { isSubmitting: uploading, run: runUpload } = useSubmitGuard();
 
   const [name, setName] = useState(schoolName);
   const [address, setAddress] = useState(initialAddress);
   const [phone, setPhone] = useState(initialPhone);
   const [email, setEmail] = useState(initialEmail);
   const [principalName, setPrincipalName] = useState(initialPrincipalName);
-  const [saving, setSaving] = useState(false);
+  const { isSubmitting: saving, run: runSave } = useSubmitGuard();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -36,28 +37,27 @@ export function SchoolProfileSettings({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
     setError(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await fetch("/api/school/logo", { method: "POST", body: formData });
-    const body = await response.json();
+    await runUpload(async () => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/school/logo", { method: "POST", body: formData });
+      const body = await response.json();
 
-    if (!response.ok) {
-      setError(body.error as string);
-    } else {
-      setLogoUrl(body.logoUrl as string);
-    }
-    setUploading(false);
+      if (!response.ok) {
+        setError(body.error as string);
+      } else {
+        setLogoUrl(body.logoUrl as string);
+      }
+    });
   }
 
   async function handleSave() {
-    setSaving(true);
     setSaveError(null);
     setSaved(false);
 
-    try {
+    await runSave(async () => {
       const response = await fetch("/api/school", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -70,9 +70,7 @@ export function SchoolProfileSettings({
       } else {
         setSaved(true);
       }
-    } finally {
-      setSaving(false);
-    }
+    });
   }
 
   return (

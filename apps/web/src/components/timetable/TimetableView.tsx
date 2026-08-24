@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 interface ClassOption {
   id: number;
@@ -74,6 +75,7 @@ export function TimetableView({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editSubject, setEditSubject] = useState("");
   const [editTeacher, setEditTeacher] = useState("");
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refresh() {
     if (!classId) return;
@@ -117,22 +119,24 @@ export function TimetableView({
     const periodId = Number(newPeriodId[day]);
     const teacherUserId = newTeacher[day] ? Number(newTeacher[day]) : undefined;
 
-    const response = await fetch("/api/timetable", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ classId: Number(classId), dayOfWeek: day, periodId, subjectId, teacherUserId }),
-    });
+    await run(async () => {
+      const response = await fetch("/api/timetable", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ classId: Number(classId), dayOfWeek: day, periodId, subjectId, teacherUserId }),
+      });
 
-    if (response.ok) {
-      setMessage("Period added");
-      setNewSubject((prev) => ({ ...prev, [day]: "" }));
-      setNewPeriodId((prev) => ({ ...prev, [day]: "" }));
-      setNewTeacher((prev) => ({ ...prev, [day]: "" }));
-      await refresh();
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      if (response.ok) {
+        setMessage("Period added");
+        setNewSubject((prev) => ({ ...prev, [day]: "" }));
+        setNewPeriodId((prev) => ({ ...prev, [day]: "" }));
+        setNewTeacher((prev) => ({ ...prev, [day]: "" }));
+        await refresh();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   function startEdit(entry: TimetableEntry) {
@@ -144,37 +148,41 @@ export function TimetableView({
   async function handleEditSave(entryId: number) {
     setError(null);
     setMessage(null);
-    const response = await fetch(`/api/timetable/${entryId}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        subjectId: Number(editSubject),
-        teacherUserId: editTeacher ? Number(editTeacher) : null,
-      }),
-    });
+    await run(async () => {
+      const response = await fetch(`/api/timetable/${entryId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          subjectId: Number(editSubject),
+          teacherUserId: editTeacher ? Number(editTeacher) : null,
+        }),
+      });
 
-    if (response.ok) {
-      setMessage("Period updated");
-      setEditingId(null);
-      await refresh();
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      if (response.ok) {
+        setMessage("Period updated");
+        setEditingId(null);
+        await refresh();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   async function handleDelete(entryId: number) {
     setError(null);
     setMessage(null);
-    const response = await fetch(`/api/timetable/${entryId}`, { method: "DELETE" });
+    await run(async () => {
+      const response = await fetch(`/api/timetable/${entryId}`, { method: "DELETE" });
 
-    if (response.ok) {
-      setMessage("Period deleted");
-      await refresh();
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      if (response.ok) {
+        setMessage("Period deleted");
+        await refresh();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   function renderDayColumn(day: number) {
@@ -241,7 +249,8 @@ export function TimetableView({
                         <button
                           type="button"
                           onClick={() => handleAdd(day)}
-                          className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
+                          disabled={isSubmitting}
+                          className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Add
                         </button>
@@ -283,7 +292,8 @@ export function TimetableView({
                     <button
                       type="button"
                       onClick={() => handleEditSave(entry.id)}
-                      className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white transition-all hover:bg-black"
+                      disabled={isSubmitting}
+                      className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Save
                     </button>
@@ -299,7 +309,12 @@ export function TimetableView({
                         <button type="button" onClick={() => startEdit(entry)} className="text-[10px] font-semibold text-indigo-600 hover:underline">
                           Edit
                         </button>
-                        <button type="button" onClick={() => handleDelete(entry.id)} className="text-[10px] font-semibold text-red-500 hover:underline">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(entry.id)}
+                          disabled={isSubmitting}
+                          className="text-[10px] font-semibold text-red-500 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                        >
                           Delete
                         </button>
                       </div>

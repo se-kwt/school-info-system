@@ -8,6 +8,7 @@ import { GridToolbar } from "./GridToolbar";
 import { EntityCard } from "./EntityCard";
 import { Pagination } from "./Pagination";
 import type { KebabMenuItem } from "./KebabMenu";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 export interface ClassRow {
   id: number;
@@ -62,6 +63,7 @@ export function ClassesView({
   const [room, setRoom] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refresh(academicYearIdFilter: string) {
     const params = new URLSearchParams({ includeArchived: "true" });
@@ -95,80 +97,88 @@ export function ClassesView({
 
   async function handleSave() {
     setError(null);
-    if (modalState?.mode === "create") {
-      const response = await fetch("/api/classes", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          gradeId: Number(gradeId),
-          section,
-          academicYearId: Number(academicYearId),
-          capacity: capacity ? Number(capacity) : undefined,
-          room: room || undefined,
-        }),
-      });
-      if (response.status === 201) {
-        closeModal();
-        await refresh(yearFilter);
+    await run(async () => {
+      if (modalState?.mode === "create") {
+        const response = await fetch("/api/classes", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            gradeId: Number(gradeId),
+            section,
+            academicYearId: Number(academicYearId),
+            capacity: capacity ? Number(capacity) : undefined,
+            room: room || undefined,
+          }),
+        });
+        if (response.status === 201) {
+          closeModal();
+          await refresh(yearFilter);
+          return;
+        }
+        setError((await response.json()).error);
         return;
       }
-      setError((await response.json()).error);
-      return;
-    }
-    if (modalState?.mode === "edit") {
-      const response = await fetch(`/api/classes/${modalState.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          section,
-          capacity: capacity ? Number(capacity) : undefined,
-          room: room || undefined,
-        }),
-      });
-      if (response.ok) {
-        closeModal();
-        await refresh(yearFilter);
-        return;
+      if (modalState?.mode === "edit") {
+        const response = await fetch(`/api/classes/${modalState.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            section,
+            capacity: capacity ? Number(capacity) : undefined,
+            room: room || undefined,
+          }),
+        });
+        if (response.ok) {
+          closeModal();
+          await refresh(yearFilter);
+          return;
+        }
+        setError((await response.json()).error);
       }
-      setError((await response.json()).error);
-    }
+    });
   }
 
   async function handleDelete(id: number) {
     setError(null);
-    const response = await fetch(`/api/classes/${id}`, { method: "DELETE" });
-    if (response.ok) {
-      setDeleteBlockedId(null);
-      await refresh(yearFilter);
-      return;
-    }
-    const body = await response.json();
-    if (body.deletable === false) {
-      setDeleteBlockedId(id);
-      return;
-    }
-    setError(body.error);
+    await run(async () => {
+      const response = await fetch(`/api/classes/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        setDeleteBlockedId(null);
+        await refresh(yearFilter);
+        return;
+      }
+      const body = await response.json();
+      if (body.deletable === false) {
+        setDeleteBlockedId(id);
+        return;
+      }
+      setError(body.error);
+    });
   }
 
   async function handleArchive(id: number) {
     setError(null);
-    const response = await fetch(`/api/classes/${id}/archive`, { method: "PATCH" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    setDeleteBlockedId(null);
-    await refresh(yearFilter);
+    await run(async () => {
+      const response = await fetch(`/api/classes/${id}/archive`, { method: "PATCH" });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      setDeleteBlockedId(null);
+      await refresh(yearFilter);
+    });
   }
 
   async function handleUnarchive(id: number) {
     setError(null);
-    const response = await fetch(`/api/classes/${id}/unarchive`, { method: "PATCH" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh(yearFilter);
+    await run(async () => {
+      const response = await fetch(`/api/classes/${id}/unarchive`, { method: "PATCH" });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await refresh(yearFilter);
+    });
   }
 
   async function handleYearFilterChange(value: string) {
@@ -259,7 +269,8 @@ export function ClassesView({
                       <button
                         type="button"
                         onClick={() => handleArchive(klass.id)}
-                        className="rounded bg-amber-600 px-2 py-1 text-[11px] text-white"
+                        disabled={isSubmitting}
+                        className="rounded bg-amber-600 px-2 py-1 text-[11px] text-white disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Archive instead
                       </button>
@@ -314,7 +325,8 @@ export function ClassesView({
                       <button
                         type="button"
                         onClick={() => handleArchive(klass.id)}
-                        className="rounded bg-amber-600 px-2 py-1 text-[11px] text-white"
+                        disabled={isSubmitting}
+                        className="rounded bg-amber-600 px-2 py-1 text-[11px] text-white disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Archive instead
                       </button>
@@ -331,7 +343,12 @@ export function ClassesView({
                       <button type="button" onClick={() => openEdit(klass)} className="mr-3 text-blue-600 underline">
                         Edit
                       </button>
-                      <button type="button" onClick={() => handleDelete(klass.id)} className="text-red-600 underline">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(klass.id)}
+                        disabled={isSubmitting}
+                        className="text-red-600 underline disabled:cursor-not-allowed disabled:opacity-50"
+                      >
                         Delete
                       </button>
                     </>
@@ -408,7 +425,8 @@ export function ClassesView({
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
+              disabled={isSubmitting}
+              className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
             >
               Save
             </button>

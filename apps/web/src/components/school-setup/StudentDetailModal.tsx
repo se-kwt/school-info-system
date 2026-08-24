@@ -46,6 +46,7 @@ export function StudentDetailModal({
   defaultClassId,
   serverError,
   deleteBlocked,
+  isSubmitting = false,
   onClose,
   onSave,
   onDelete,
@@ -67,6 +68,7 @@ export function StudentDetailModal({
   defaultClassId?: number;
   serverError: string | null;
   deleteBlocked: boolean;
+  isSubmitting?: boolean;
   onClose: () => void;
   onSave: (fields: SaveStudentFields) => void;
   onDelete: () => void;
@@ -666,7 +668,8 @@ export function StudentDetailModal({
               <button
                 type="button"
                 onClick={onDelete}
-                className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition-all hover:bg-red-50"
+                disabled={isSubmitting}
+                className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition-all hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Delete
               </button>
@@ -675,7 +678,8 @@ export function StudentDetailModal({
               <button
                 type="button"
                 onClick={onActivate}
-                className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-50"
+                disabled={isSubmitting}
+                className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Activate
               </button>
@@ -684,7 +688,8 @@ export function StudentDetailModal({
           <button
             type="button"
             onClick={handleSave}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+            disabled={isSubmitting}
+            className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
           >
             Save
           </button>
@@ -698,7 +703,8 @@ export function StudentDetailModal({
             <button
               type="button"
               onClick={onDeactivate}
-              className="rounded bg-amber-600 px-2 py-1 text-xs font-semibold text-white"
+              disabled={isSubmitting}
+              className="rounded bg-amber-600 px-2 py-1 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               Deactivate instead
             </button>

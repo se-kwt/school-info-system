@@ -8,6 +8,7 @@ import { PageHeader } from "./PageHeader";
 import { GridToolbar } from "./GridToolbar";
 import { EntityCard } from "./EntityCard";
 import { Pagination } from "./Pagination";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 export interface SubjectRow {
   id: number;
@@ -52,6 +53,7 @@ export function GradeDetailView({
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
   const [deleteBlockedMessage, setDeleteBlockedMessage] = useState<string | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refresh() {
     const response = await fetch(`/api/grades/${gradeId}/subjects`);
@@ -76,42 +78,46 @@ export function GradeDetailView({
 
   async function handleCreate() {
     setError(null);
-    const response = await fetch(`/api/grades/${gradeId}/subjects`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name,
-        code: code || undefined,
-        creditHours: creditHours ? Number(creditHours) : undefined,
-        weeklyPeriods: weeklyPeriods ? Number(weeklyPeriods) : undefined,
-        isPractical,
-        isElective,
-      }),
+    await run(async () => {
+      const response = await fetch(`/api/grades/${gradeId}/subjects`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          code: code || undefined,
+          creditHours: creditHours ? Number(creditHours) : undefined,
+          weeklyPeriods: weeklyPeriods ? Number(weeklyPeriods) : undefined,
+          isPractical,
+          isElective,
+        }),
+      });
+      if (response.status === 201) {
+        closeModal();
+        await refresh();
+        return;
+      }
+      setError((await response.json()).error);
     });
-    if (response.status === 201) {
-      closeModal();
-      await refresh();
-      return;
-    }
-    setError((await response.json()).error);
   }
 
   async function handleDelete(id: number) {
     setError(null);
-    const response = await fetch(`/api/subjects/${id}`, { method: "DELETE" });
-    if (response.ok) {
-      setDeleteBlockedId(null);
-      setDeleteBlockedMessage(null);
-      await refresh();
-      return;
-    }
-    const body = await response.json();
-    if (body.deletable === false) {
-      setDeleteBlockedId(id);
-      setDeleteBlockedMessage(body.error);
-      return;
-    }
-    setError(body.error);
+    await run(async () => {
+      const response = await fetch(`/api/subjects/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        setDeleteBlockedId(null);
+        setDeleteBlockedMessage(null);
+        await refresh();
+        return;
+      }
+      const body = await response.json();
+      if (body.deletable === false) {
+        setDeleteBlockedId(id);
+        setDeleteBlockedMessage(body.error);
+        return;
+      }
+      setError(body.error);
+    });
   }
 
   const filteredSubjects = useMemo(
@@ -232,7 +238,12 @@ export function GradeDetailView({
                       </button>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => handleDelete(subject.id)} className="text-red-600 underline">
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(subject.id)}
+                      disabled={isSubmitting}
+                      className="text-red-600 underline disabled:cursor-not-allowed disabled:opacity-50"
+                    >
                       Delete
                     </button>
                   )}
@@ -309,7 +320,8 @@ export function GradeDetailView({
             <button
               type="button"
               onClick={handleCreate}
-              className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
+              disabled={isSubmitting}
+              className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
             >
               Save
             </button>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { StaffCard, type StaffRow } from "./StaffCard";
 import { StaffDetailModal, type SaveStaffFields } from "./StaffDetailModal";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 type Role = "teacher" | "admin" | "accountant";
 type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
@@ -35,6 +36,7 @@ export function StaffView({
   const [modalState, setModalState] = useState<ModalState>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   const filteredStaff = roleFilter === "all" ? staff : staff.filter((member) => member.role === roleFilter);
 
@@ -64,125 +66,136 @@ export function StaffView({
   async function handleSave(fields: SaveStaffFields) {
     setError(null);
 
-    let photoUrl: string | undefined;
-    if (fields.photoFile) {
-      const uploadResult = await uploadPhoto(fields.photoFile);
-      if (!uploadResult.ok) {
-        setError(uploadResult.error);
+    await run(async () => {
+      let photoUrl: string | undefined;
+      if (fields.photoFile) {
+        const uploadResult = await uploadPhoto(fields.photoFile);
+        if (!uploadResult.ok) {
+          setError(uploadResult.error);
+          return;
+        }
+        photoUrl = uploadResult.photoUrl;
+      }
+
+      if (modalState?.mode === "create") {
+        const response = await fetch("/api/staff", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: fields.name,
+            phone: fields.phone,
+            role: fields.role,
+            classId: fields.classId ?? undefined,
+            subjectId: fields.subjectId ?? undefined,
+            email: fields.email || undefined,
+            qualification: fields.qualification || undefined,
+            designation: fields.designation || undefined,
+            joiningDate: fields.joiningDate || undefined,
+            salary: fields.salary !== "" ? Number(fields.salary) : undefined,
+            address: fields.address || undefined,
+            photoUrl,
+          }),
+        });
+        if (response.status === 201) {
+          await refresh();
+          closeModal();
+          return;
+        }
+        setError((await response.json()).error);
         return;
       }
-      photoUrl = uploadResult.photoUrl;
-    }
 
-    if (modalState?.mode === "create") {
-      const response = await fetch("/api/staff", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+      if (modalState?.mode === "edit") {
+        const body: {
+          name: string;
+          phone: string;
+          role: Role;
+          classId: number | null;
+          subjectId: number | null;
+          email?: string;
+          qualification?: string;
+          designation?: string;
+          joiningDate?: string;
+          salary?: number;
+          address?: string;
+          photoUrl?: string;
+        } = {
           name: fields.name,
           phone: fields.phone,
           role: fields.role,
-          classId: fields.classId ?? undefined,
-          subjectId: fields.subjectId ?? undefined,
-          email: fields.email || undefined,
-          qualification: fields.qualification || undefined,
-          designation: fields.designation || undefined,
-          joiningDate: fields.joiningDate || undefined,
-          salary: fields.salary !== "" ? Number(fields.salary) : undefined,
-          address: fields.address || undefined,
-          photoUrl,
-        }),
-      });
-      if (response.status === 201) {
-        await refresh();
-        closeModal();
-        return;
-      }
-      setError((await response.json()).error);
-      return;
-    }
+          classId: fields.classId,
+          subjectId: fields.subjectId,
+        };
+        if (fields.email) body.email = fields.email;
+        if (fields.qualification) body.qualification = fields.qualification;
+        if (fields.designation) body.designation = fields.designation;
+        if (fields.joiningDate) body.joiningDate = fields.joiningDate;
+        if (fields.salary !== "") body.salary = Number(fields.salary);
+        if (fields.address) body.address = fields.address;
+        if (photoUrl) body.photoUrl = photoUrl;
 
-    if (modalState?.mode === "edit") {
-      const body: {
-        name: string;
-        phone: string;
-        role: Role;
-        classId: number | null;
-        subjectId: number | null;
-        email?: string;
-        qualification?: string;
-        designation?: string;
-        joiningDate?: string;
-        salary?: number;
-        address?: string;
-        photoUrl?: string;
-      } = {
-        name: fields.name,
-        phone: fields.phone,
-        role: fields.role,
-        classId: fields.classId,
-        subjectId: fields.subjectId,
-      };
-      if (fields.email) body.email = fields.email;
-      if (fields.qualification) body.qualification = fields.qualification;
-      if (fields.designation) body.designation = fields.designation;
-      if (fields.joiningDate) body.joiningDate = fields.joiningDate;
-      if (fields.salary !== "") body.salary = Number(fields.salary);
-      if (fields.address) body.address = fields.address;
-      if (photoUrl) body.photoUrl = photoUrl;
-
-      const response = await fetch(`/api/staff/${modalState.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (response.ok) {
-        await refresh();
-        closeModal();
-        return;
+        const response = await fetch(`/api/staff/${modalState.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (response.ok) {
+          await refresh();
+          closeModal();
+          return;
+        }
+        setError((await response.json()).error);
       }
-      setError((await response.json()).error);
-    }
+    });
   }
 
   async function handleDelete() {
     if (modalState?.mode !== "edit") return;
     setError(null);
-    const response = await fetch(`/api/staff/${modalState.id}`, { method: "DELETE" });
-    if (response.ok) {
-      await refresh();
-      closeModal();
-      return;
-    }
-    const body = await response.json();
-    if (body.deletable === false) {
-      setDeleteBlockedId(modalState.id);
-      return;
-    }
-    setError(body.error);
+    await run(async () => {
+      if (modalState.mode !== "edit") return;
+      const response = await fetch(`/api/staff/${modalState.id}`, { method: "DELETE" });
+      if (response.ok) {
+        await refresh();
+        closeModal();
+        return;
+      }
+      const body = await response.json();
+      if (body.deletable === false) {
+        setDeleteBlockedId(modalState.id);
+        return;
+      }
+      setError(body.error);
+    });
   }
 
   async function handleDeactivate() {
     if (modalState?.mode !== "edit") return;
     setError(null);
-    const response = await fetch(`/api/staff/${modalState.id}/deactivate`, { method: "PATCH" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh();
-    closeModal();
+    await run(async () => {
+      if (modalState.mode !== "edit") return;
+      const response = await fetch(`/api/staff/${modalState.id}/deactivate`, { method: "PATCH" });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await refresh();
+      closeModal();
+    });
   }
 
   async function handleActivate() {
     if (modalState?.mode !== "edit") return;
     setError(null);
-    const response = await fetch(`/api/staff/${modalState.id}/activate`, { method: "PATCH" });
-    if (!response.ok) {
-      setError((await response.json()).error);
-      return;
-    }
-    await refresh();
+    await run(async () => {
+      if (modalState.mode !== "edit") return;
+      const response = await fetch(`/api/staff/${modalState.id}/activate`, { method: "PATCH" });
+      if (!response.ok) {
+        setError((await response.json()).error);
+        return;
+      }
+      await refresh();
+    });
   }
 
   const editingStaff = modalState?.mode === "edit" ? staff.find((member) => member.id === modalState.id) : undefined;
@@ -225,6 +238,7 @@ export function StaffView({
           isSelf={modalState.mode === "edit" && modalState.id === currentUserId}
           serverError={error}
           deleteBlocked={modalState.mode === "edit" && deleteBlockedId === modalState.id}
+          isSubmitting={isSubmitting}
           onClose={closeModal}
           onSave={handleSave}
           onDelete={handleDelete}

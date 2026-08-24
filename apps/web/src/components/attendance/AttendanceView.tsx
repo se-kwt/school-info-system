@@ -5,6 +5,7 @@ import { StudentAttendanceCard } from "./StudentAttendanceCard";
 import { AttendanceReviewPanel } from "./AttendanceReviewPanel";
 import { cycleAttendanceStatus, type AttendanceStatusValue } from "@/lib/attendance-status";
 import { getSchoolLocalToday } from "@/lib/date-utils";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
 interface ClassOption {
   id: number;
@@ -44,6 +45,7 @@ export function AttendanceView({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const { isSubmitting, run } = useSubmitGuard();
 
   const isEditable = role === "admin" || (role === "teacher" && date === todayDateString());
 
@@ -99,32 +101,34 @@ export function AttendanceView({
   async function handleConfirmSubmit() {
     setError(null);
     setMessage(null);
-    const response = await fetch("/api/attendance", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        classId: Number(classId),
-        date,
-        entries: students.map((student) => ({
-          studentId: student.studentId,
-          status: statusMap[student.studentId] ?? null,
-          note: notes[student.studentId] || undefined,
-        })),
-      }),
-    });
+    await run(async () => {
+      const response = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          classId: Number(classId),
+          date,
+          entries: students.map((student) => ({
+            studentId: student.studentId,
+            status: statusMap[student.studentId] ?? null,
+            note: notes[student.studentId] || undefined,
+          })),
+        }),
+      });
 
-    if (response.ok) {
-      setMessage("Attendance submitted");
-      setReviewOpen(false);
-      const refreshed = await fetch(`/api/attendance?classId=${classId}&date=${date}`);
-      if (refreshed.ok) {
-        const body = await refreshed.json();
-        applyRoster(body.students as RosterEntry[]);
+      if (response.ok) {
+        setMessage("Attendance submitted");
+        setReviewOpen(false);
+        const refreshed = await fetch(`/api/attendance?classId=${classId}&date=${date}`);
+        if (refreshed.ok) {
+          const body = await refreshed.json();
+          applyRoster(body.students as RosterEntry[]);
+        }
+        return;
       }
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
+      const body = await response.json();
+      setError(body.error);
+    });
   }
 
   const reviewEntries = students
@@ -234,6 +238,7 @@ export function AttendanceView({
           onCycle={cycleStudent}
           onBack={() => setReviewOpen(false)}
           onConfirm={handleConfirmSubmit}
+          isSubmitting={isSubmitting}
         />
       )}
     </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 type Step = "phone" | "otp";
 
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [testOtp, setTestOtp] = useState<string | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   useEffect(() => {
     if (!testOtp) return;
@@ -23,49 +25,53 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
 
-    const response = await fetch("/api/auth/send-otp", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ phone }),
-    });
+    await run(async () => {
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
 
-    if (response.status === 200) {
-      const body = await response.json();
-      setTestOtp(typeof body.code === "string" ? body.code : null);
-      setStep("otp");
-      return;
-    }
-    if (response.status === 404) {
-      setError("Phone number is not registered");
-      return;
-    }
-    setError("Enter a phone number");
+      if (response.status === 200) {
+        const body = await response.json();
+        setTestOtp(typeof body.code === "string" ? body.code : null);
+        setStep("otp");
+        return;
+      }
+      if (response.status === 404) {
+        setError("Phone number is not registered");
+        return;
+      }
+      setError("Enter a phone number");
+    });
   }
 
   async function handleVerifyCode(event: FormEvent) {
     event.preventDefault();
     setError(null);
 
-    const response = await fetch("/api/auth/session", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ phone, code }),
-    });
+    await run(async () => {
+      const response = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phone, code }),
+      });
 
-    if (response.status === 200) {
-      const body = await response.json();
-      router.push(body.role === "parent" ? "/parent" : "/dashboard");
-      return;
-    }
-    if (response.status === 429) {
-      setError("Too many incorrect attempts. Request a new code.");
-      return;
-    }
-    if (response.status === 401) {
-      setError("Incorrect or expired code. Try again");
-      return;
-    }
-    setError("Enter the code");
+      if (response.status === 200) {
+        const body = await response.json();
+        router.push(body.role === "parent" ? "/parent" : "/dashboard");
+        return;
+      }
+      if (response.status === 429) {
+        setError("Too many incorrect attempts. Request a new code.");
+        return;
+      }
+      if (response.status === 401) {
+        setError("Incorrect or expired code. Try again");
+        return;
+      }
+      setError("Enter the code");
+    });
   }
 
   function handleChangeNumber() {
@@ -107,7 +113,11 @@ export default function LoginPage() {
             className="rounded border border-gray-300 px-3 py-2"
             placeholder="Phone number"
           />
-          <button type="submit" className="rounded bg-blue-600 px-3 py-2 text-white">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded bg-blue-600 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Send code
           </button>
           {error && <p className="text-sm text-red-600">{error}</p>}
@@ -129,7 +139,11 @@ export default function LoginPage() {
           className="rounded border border-gray-300 px-3 py-2"
           placeholder="6-digit code"
         />
-        <button type="submit" className="rounded bg-blue-600 px-3 py-2 text-white">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="rounded bg-blue-600 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
           Verify
         </button>
         <button

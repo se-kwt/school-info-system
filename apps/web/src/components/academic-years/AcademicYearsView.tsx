@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 interface AcademicYearRow {
   id: number;
@@ -16,6 +17,7 @@ export function AcademicYearsView({ initialYears }: { initialYears: AcademicYear
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const { isSubmitting, run } = useSubmitGuard();
 
   async function refresh() {
     const response = await fetch("/api/academic-years");
@@ -25,35 +27,39 @@ export function AcademicYearsView({ initialYears }: { initialYears: AcademicYear
 
   async function handleCreate() {
     setError(null);
-    const response = await fetch("/api/academic-years", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, startDate, endDate }),
+    await run(async () => {
+      const response = await fetch("/api/academic-years", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, startDate, endDate }),
+      });
+      if (response.ok) {
+        setName("");
+        setStartDate("");
+        setEndDate("");
+        await refresh();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
     });
-    if (response.ok) {
-      setName("");
-      setStartDate("");
-      setEndDate("");
-      await refresh();
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
   }
 
   async function handleTransition(id: number, action: "activate" | "archive") {
     setError(null);
-    const response = await fetch(`/api/academic-years/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action }),
+    await run(async () => {
+      const response = await fetch(`/api/academic-years/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (response.ok) {
+        await refresh();
+        return;
+      }
+      const body = await response.json();
+      setError(body.error);
     });
-    if (response.ok) {
-      await refresh();
-      return;
-    }
-    const body = await response.json();
-    setError(body.error);
   }
 
   return (
@@ -81,7 +87,12 @@ export function AcademicYearsView({ initialYears }: { initialYears: AcademicYear
           onChange={(event) => setEndDate(event.target.value)}
           className="rounded border border-gray-300 px-2 py-1"
         />
-        <button type="button" onClick={handleCreate} className="rounded bg-blue-600 px-3 py-1 text-white">
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={isSubmitting}
+          className="rounded bg-blue-600 px-3 py-1 text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
           Create Academic Year
         </button>
       </div>
@@ -127,14 +138,16 @@ export function AcademicYearsView({ initialYears }: { initialYears: AcademicYear
                     <button
                       type="button"
                       onClick={() => handleTransition(year.id, "activate")}
-                      className="rounded bg-blue-600 px-2 py-1 text-xs text-white"
+                      disabled={isSubmitting}
+                      className="rounded bg-blue-600 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Activate {year.name}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleTransition(year.id, "archive")}
-                      className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
+                      disabled={isSubmitting}
+                      className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Archive {year.name}
                     </button>

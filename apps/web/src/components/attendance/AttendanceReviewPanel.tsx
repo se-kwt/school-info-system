@@ -15,11 +15,13 @@ export function AttendanceReviewPanel({
   onCycle,
   onBack,
   onConfirm,
+  isSubmitting = false,
 }: {
   entries: ReviewEntry[];
   onCycle: (studentId: number) => void;
   onBack: () => void;
   onConfirm: () => void;
+  isSubmitting?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -59,7 +61,8 @@ export function AttendanceReviewPanel({
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
+            disabled={isSubmitting}
+            className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
           >
             Confirm & Submit
           </button>
