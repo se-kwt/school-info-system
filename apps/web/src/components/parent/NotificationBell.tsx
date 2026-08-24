@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 
 interface NotificationEntry {
@@ -13,7 +14,19 @@ interface NotificationEntry {
   createdAt: string;
 }
 
+function notificationHref(notification: { type: string; relatedId: number | null }): string {
+  switch (notification.type) {
+    case "assignment_published":
+      return notification.relatedId
+        ? `/parent/assignments/${notification.relatedId}`
+        : "/parent/assignments";
+    default:
+      return "/parent";
+  }
+}
+
 export function NotificationBell() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -55,7 +68,7 @@ export function NotificationBell() {
       await fetch(`/api/notifications/${notification.id}/read`, { method: "POST" });
     }
     setOpen(false);
-    window.location.href = "/parent/assignments";
+    router.push(notificationHref(notification));
   }
 
   return (
