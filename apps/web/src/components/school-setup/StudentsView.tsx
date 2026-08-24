@@ -39,10 +39,7 @@ export function StudentsView({
   const filteredStudents =
     classFilter === "all"
       ? students
-      : students.filter(
-          (student) =>
-            selectedClass && student.class?.gradeName === selectedClass.gradeName && student.class?.section === selectedClass.section
-        );
+      : students.filter((student) => selectedClass && student.classId === selectedClass.id);
 
   async function refresh() {
     const response = await fetch("/api/students");

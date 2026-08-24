@@ -21,6 +21,7 @@ const existingStudent = {
   gender: "male" as const,
   studentIdNumber: "STU-1",
   dateOfJoin: "2026-06-01",
+  classId: 1,
   class: { gradeName: "Grade 5", section: "A" },
   parents: [],
   siblings: [],

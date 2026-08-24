@@ -20,6 +20,7 @@ export interface StudentRow {
   emergencyContactPhone?: string | null;
   category?: string | null;
   admissionDate?: string | null;
+  classId: number | null;
   class: { gradeName: string; section: string } | null;
   parents: { relationship: string; name: string; phone: string; email: string | null }[];
   siblings: {

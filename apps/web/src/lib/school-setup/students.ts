@@ -22,6 +22,7 @@ export interface StudentSummary {
   emergencyContactPhone: string | null;
   category: string | null;
   admissionDate: string | null;
+  classId: number | null;
   class: { gradeName: string; section: string } | null;
   parents: { relationship: GuardianRelationship; name: string; phone: string; email: string | null }[];
   siblings: { id: number; name: string; admissionNo: string; gender: "male" | "female" | "other" | null; class: { gradeName: string; section: string } | null }[];
@@ -134,6 +135,7 @@ export async function listStudents(
       emergencyContactPhone: student.emergencyContactPhone,
       category: student.category,
       admissionDate: student.admissionDate ? student.admissionDate.toISOString().slice(0, 10) : null,
+      classId: enrollment ? enrollment.classId : null,
       class: enrollment ? { gradeName: enrollment.class.grade.name, section: enrollment.class.section } : null,
       parents: student.parentLinks.map((link) => ({
         relationship: link.relationship,

@@ -19,6 +19,7 @@ describe("StudentCard", () => {
     gender: null,
     studentIdNumber: null,
     dateOfJoin: null,
+    classId: 1,
     class: { gradeName: "Grade 5", section: "A" },
     parents: [],
     siblings: [],

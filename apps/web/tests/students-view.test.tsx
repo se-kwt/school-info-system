@@ -22,6 +22,7 @@ const students = [
     gender: null as null,
     studentIdNumber: null as null,
     dateOfJoin: null as null,
+    classId: 1,
     class: { gradeName: "Grade 5", section: "A" },
     parents: [] as { relationship: string; name: string; phone: string; email: string | null }[],
     siblings: [] as { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { gradeName: string; section: string } | null }[],
@@ -37,6 +38,7 @@ const students = [
     gender: null as null,
     studentIdNumber: null as null,
     dateOfJoin: null as null,
+    classId: 2,
     class: { gradeName: "Grade 6", section: "B" },
     parents: [] as { relationship: string; name: string; phone: string; email: string | null }[],
     siblings: [] as { id: number; name: string; admissionNo: string; gender: "male" | "female" | null; class: { gradeName: string; section: string } | null }[],
@@ -57,6 +59,36 @@ describe("StudentsView", () => {
     await userEvent.selectOptions(screen.getByLabelText("Filter by class"), "1");
     expect(screen.getByText("Existing Student")).toBeInTheDocument();
     expect(screen.queryByText("Other Class Student")).not.toBeInTheDocument();
+  });
+
+  it("filters by class id, so identically-named classes stay distinct", async () => {
+    const sameNameClasses = [
+      { id: 10, gradeName: "Grade 5", section: "A" },
+      { id: 20, gradeName: "Grade 5", section: "A" },
+    ];
+    const sameNameStudents = [
+      {
+        ...students[0],
+        id: 3,
+        name: "Current Year Student",
+        classId: 10,
+        class: { gradeName: "Grade 5", section: "A" },
+      },
+      {
+        ...students[0],
+        id: 4,
+        name: "Prior Year Student",
+        classId: 20,
+        class: { gradeName: "Grade 5", section: "A" },
+      },
+    ];
+
+    render(<StudentsView initialStudents={sameNameStudents} classes={sameNameClasses} isAdmin={true} />);
+
+    await userEvent.selectOptions(screen.getByLabelText(/filter by class/i), "10");
+
+    expect(screen.getByText("Current Year Student")).toBeInTheDocument();
+    expect(screen.queryByText("Prior Year Student")).toBeNull();
   });
 
   it("uploads the selected photo first, then includes the returned photoUrl in the create request", async () => {
