@@ -167,6 +167,37 @@ describe("classes lib", () => {
     expect(classes[0].enrolledCount).toBe(1);
   });
 
+  it("does not count an active enrollment tagged with a different academicYearId than the class's own (retained-student promotion case)", async () => {
+    // confirmPromotionRun deliberately creates a "retained" student's
+    // enrollment with classId = their current (from-year) class but
+    // academicYearId = the promotion run's target year. That enrollment
+    // must not be counted as belonging to the from-year class's own
+    // (older) academicYearId.
+    const created = await createClass(prisma, schoolId, { gradeId, section: "A", academicYearId: yearId });
+    if (!created.ok) throw new Error("setup failed");
+    const nextYear = await prisma.academicYear.create({
+      data: { schoolId, name: "2027-28", startDate: new Date("2027-06-01"), endDate: new Date("2028-04-30"), status: "upcoming" },
+    });
+
+    const retainedStudent = await prisma.student.create({
+      data: { schoolId, name: "Retained Student", dob: new Date("2015-01-01"), admissionNo: "RET-1" },
+    });
+    // Simulates the row confirmPromotionRun produces for a retained student:
+    // classId stays on the from-year class, but academicYearId is bumped to
+    // the target year.
+    await prisma.enrollment.create({
+      data: { studentId: retainedStudent.id, classId: created.class.id, academicYearId: nextYear.id, status: "active" },
+    });
+
+    const classesInFromYear = await listClasses(prisma, schoolId, { academicYearId: yearId });
+    expect(classesInFromYear).toHaveLength(1);
+    expect(classesInFromYear[0].enrolledCount).toBe(0);
+
+    const allClasses = await listClasses(prisma, schoolId);
+    expect(allClasses).toHaveLength(1);
+    expect(allClasses[0].enrolledCount).toBe(0);
+  });
+
   it("stores and reads back capacity and room on create and edit", async () => {
     const created = await createClass(prisma, schoolId, { gradeId, section: "A", academicYearId: yearId, capacity: 30, room: "Block B-101" });
     expect(created.ok).toBe(true);

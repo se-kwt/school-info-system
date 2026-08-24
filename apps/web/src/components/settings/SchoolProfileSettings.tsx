@@ -57,19 +57,22 @@ export function SchoolProfileSettings({
     setSaveError(null);
     setSaved(false);
 
-    const response = await fetch("/api/school", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, address, phone, email, principalName }),
-    });
-    const body = await response.json();
+    try {
+      const response = await fetch("/api/school", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, address, phone, email, principalName }),
+      });
+      const body = await response.json();
 
-    if (!response.ok) {
-      setSaveError(body.error as string);
-    } else {
-      setSaved(true);
+      if (!response.ok) {
+        setSaveError(body.error as string);
+      } else {
+        setSaved(true);
+      }
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   return (

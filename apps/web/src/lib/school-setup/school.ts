@@ -25,6 +25,12 @@ export async function updateSchoolProfile(
     return { ok: false, error: "INVALID_NAME" };
   }
 
+  // Unlike other edit paths in this phase (which send `undefined` for a
+  // field the caller doesn't want to touch, and rely on that to mean
+  // "leave as-is"), the school profile form always sends the field's
+  // current typed value, including an empty string when the admin has
+  // cleared it. So here — deliberately, only for this surface — an empty
+  // string is a real "clear this field" instruction, not a no-op.
   const data: Record<string, string | null> = {};
   if (params.fields.name !== undefined) data.name = params.fields.name.trim();
   if (params.fields.address !== undefined) data.address = params.fields.address || null;
