@@ -60,7 +60,7 @@ describe("AssignmentsCard", () => {
     );
     expect(screen.getByText("Worksheet 3")).toBeInTheDocument();
     expect(screen.getByText("Lab Report")).toBeInTheDocument();
-    expect(screen.getByText("2026-07-05 · overdue")).toBeInTheDocument();
+    expect(screen.getByText("5 Jul 2026 · overdue")).toBeInTheDocument();
   });
 });
 
@@ -100,6 +100,6 @@ describe("FeesCard", () => {
   it("shows the outstanding amount and nearest due date", () => {
     render(<FeesCard fees={{ amount: 3000, nearestDueDate: "2026-09-01" }} />);
     expect(screen.getByText("₹3,000.00")).toBeInTheDocument();
-    expect(screen.getByText("Due 2026-09-01")).toBeInTheDocument();
+    expect(screen.getByText("Due 1 Sep 2026")).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import type { AssignmentDueEntry } from "@/lib/dashboard/overview";
+import { formatDate } from "@/lib/format";
 
 const STATUS_CLASSES: Record<AssignmentDueEntry["status"], string> = {
   pending: "bg-amber-50 text-amber-600",
@@ -36,7 +37,7 @@ export function AssignmentsDueTable({ assignmentsDue }: { assignmentsDue: Assign
                   <span className="ml-1 text-neutral-400">({assignment.subjectName})</span>
                 </td>
                 <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
-                  {assignment.dueDate}
+                  {formatDate(assignment.dueDate)}
                 </td>
                 <td className="border-b border-neutral-50 py-2 pr-4">
                   <span

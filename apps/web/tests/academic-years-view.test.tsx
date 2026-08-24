@@ -48,6 +48,19 @@ describe("AcademicYearsView", () => {
     );
   });
 
+  it("renders the start and end dates in a human-readable format", () => {
+    render(
+      <AcademicYearsView
+        initialYears={[
+          { id: 1, name: "2026-27", startDate: "2026-04-01", endDate: "2027-03-31", status: "active" },
+        ]}
+      />
+    );
+
+    expect(screen.getByText("1 Apr 2026")).toBeInTheDocument();
+    expect(screen.getByText("31 Mar 2027")).toBeInTheDocument();
+  });
+
   it("shows no Activate button for the already-active year", () => {
     render(
       <AcademicYearsView

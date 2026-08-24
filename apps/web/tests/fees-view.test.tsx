@@ -104,6 +104,14 @@ describe("FeesView", () => {
     expect(body.reference).toBe("UPI-9981");
   });
 
+  it("renders the fee structure's due date in a human-readable format", async () => {
+    stubRosterFetch();
+
+    render(<FeesView classes={classes} role="admin" />);
+
+    await waitFor(() => expect(screen.getByText(/due 1 Sep 2026/)).toBeInTheDocument());
+  });
+
   it("shows instalment history with mode, receipt number, reference and recorder", async () => {
     stubRosterFetch({
       record: (url) => {
@@ -135,6 +143,7 @@ describe("FeesView", () => {
     expect(screen.getByText("UPI-9981")).toBeInTheDocument();
     expect(screen.getByText("Priya Iyer")).toBeInTheDocument();
     expect(screen.getByText("₹2,000.00")).toBeInTheDocument();
+    expect(screen.getByText("1 Aug 2026")).toBeInTheDocument();
   });
 
   it("renders roster amounts with separators and two decimals", async () => {

@@ -1,4 +1,5 @@
 import type { ParentAttendanceDay } from "@/lib/parent/overview";
+import { formatDate } from "@/lib/format";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -60,7 +61,7 @@ export function MonthCalendar({ days }: { days: ParentAttendanceDay[] }) {
         <ul className="mt-3 space-y-1 border-t border-neutral-100 pt-2">
           {daysWithNotes.map((day) => (
             <li key={day.date} className="text-[11px] text-neutral-500">
-              <span className="font-semibold text-neutral-700">{day.date}</span>: {day.note}
+              <span className="font-semibold text-neutral-700">{formatDate(day.date)}</span>: {day.note}
             </li>
           ))}
         </ul>

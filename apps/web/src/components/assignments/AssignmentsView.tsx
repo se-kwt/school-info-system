@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AssignmentRoster } from "./AssignmentRoster";
 import { useSubmitGuard } from "../../hooks/useSubmitGuard";
+import { formatDate } from "../../lib/format";
 
 interface ClassOption {
   id: number;
@@ -242,7 +243,7 @@ export function AssignmentsView({
                   {assignment.subjectName}
                 </td>
                 <td className="border-b border-neutral-50 py-2 pr-4 text-neutral-700">
-                  {assignment.dueDate}
+                  {formatDate(assignment.dueDate)}
                 </td>
                 <td className="border-b border-neutral-50 py-2 pr-4">
                   <span

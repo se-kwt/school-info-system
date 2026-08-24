@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSubmitGuard } from "../../hooks/useSubmitGuard";
+import { formatDate } from "../../lib/format";
 
 interface AcademicYearRow {
   id: number;
@@ -133,8 +134,8 @@ export function AcademicYearsView({ initialYears }: { initialYears: AcademicYear
           {years.map((year) => (
             <tr key={year.id}>
               <td className="border-b border-gray-100 py-2">{year.name}</td>
-              <td className="border-b border-gray-100 py-2">{year.startDate}</td>
-              <td className="border-b border-gray-100 py-2">{year.endDate}</td>
+              <td className="border-b border-gray-100 py-2">{formatDate(year.startDate)}</td>
+              <td className="border-b border-gray-100 py-2">{formatDate(year.endDate)}</td>
               <td
                 className={`border-b border-gray-100 py-2 ${
                   year.status === "active"

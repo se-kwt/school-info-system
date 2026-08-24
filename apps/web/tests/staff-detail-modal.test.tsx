@@ -127,6 +127,28 @@ describe("StaffDetailModal", () => {
     expect((screen.getByLabelText("Phone") as HTMLInputElement).value).toBe("+15550001111");
   });
 
+  it("edit mode: renders the staff member's joining date in a human-readable format", () => {
+    render(
+      <StaffDetailModal
+        mode="edit"
+        staff={{ ...existingStaff, joiningDate: "2024-06-15" }}
+        classes={classes}
+        subjects={subjects}
+        isSelf={false}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={noop}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+
+    expect(screen.getByText("Joining date: 15 Jun 2024")).toBeInTheDocument();
+  });
+
   it("edit mode: hides Delete when isSelf is true", () => {
     render(
       <StaffDetailModal

@@ -52,7 +52,7 @@ describe("MonthCalendar", () => {
     expect(unnotedCell).not.toHaveAttribute("title");
     expect(unnotedCell).not.toHaveClass("ring-1");
 
-    expect(screen.getByText("2026-08-05")).toBeInTheDocument();
+    expect(screen.getByText("5 Aug 2026")).toBeInTheDocument();
     expect(screen.getByText(/Left early, dentist/)).toBeInTheDocument();
   });
 });

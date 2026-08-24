@@ -2,6 +2,7 @@ import type { ParentAssignmentEntry, ParentAttendanceDay, ParentOverview } from 
 import { MonthCalendar } from "./MonthCalendar";
 import { ExamBreakdown } from "./ExamBreakdown";
 import { formatMoney } from "@/lib/money";
+import { formatDate } from "@/lib/format";
 
 const cardClass =
   "rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]";
@@ -35,7 +36,7 @@ export function AssignmentsCard({ assignments }: { assignments: ParentAssignment
             <li key={assignment.id} className="text-xs">
               <p className="font-semibold text-neutral-800">{assignment.title}</p>
               <p className={assignment.status === "overdue" ? "text-red-600" : "text-neutral-400"}>
-                {assignment.dueDate} · {assignment.status}
+                {formatDate(assignment.dueDate)} · {assignment.status}
               </p>
             </li>
           ))}
@@ -70,7 +71,7 @@ export function FeesCard({ fees }: { fees: ParentOverview["feesOutstanding"] }) 
             {formatMoney(fees.amount)}
           </span>
           {fees.nearestDueDate && (
-            <span className="text-[11px] font-semibold text-amber-600">Due {fees.nearestDueDate}</span>
+            <span className="text-[11px] font-semibold text-amber-600">Due {formatDate(fees.nearestDueDate)}</span>
           )}
         </div>
       )}

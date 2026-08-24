@@ -5,6 +5,7 @@ import { getParentChildren } from "@/lib/parent/overview";
 import { resolveActiveChild } from "@/lib/parent/resolve-child";
 import { getParentAssignmentHistory } from "@/lib/parent/assignments-history";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
+import { formatDate } from "@/lib/format";
 
 export default async function ParentCompletedAssignmentsPage(
   props: {
@@ -56,7 +57,7 @@ export default async function ParentCompletedAssignmentsPage(
                 >
                   <p className="font-semibold text-neutral-800">{assignment.title}</p>
                   <p className="text-neutral-400">
-                    {assignment.subjectName} · {assignment.className} · {assignment.dueDate}
+                    {assignment.subjectName} · {assignment.className} · {formatDate(assignment.dueDate)}
                   </p>
                 </Link>
               </li>

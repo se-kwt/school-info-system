@@ -6,6 +6,7 @@ import type { StaffRow } from "./StaffCard";
 import { FormSection } from "./FormSection";
 import { Field } from "./Field";
 import { formatMoney } from "@/lib/money";
+import { formatDate } from "@/lib/format";
 
 type Role = "teacher" | "admin" | "accountant";
 
@@ -111,7 +112,7 @@ export function StaffDetailModal({
           {staff.email && <p>Email: {staff.email}</p>}
           {staff.qualification && <p>Qualification: {staff.qualification}</p>}
           {staff.designation && <p>Designation: {staff.designation}</p>}
-          {staff.joiningDate && <p>Joining date: {staff.joiningDate}</p>}
+          {staff.joiningDate && <p>Joining date: {formatDate(staff.joiningDate)}</p>}
           {staff.salary != null && <p>Salary: {formatMoney(staff.salary)}</p>}
           {staff.address && <p>Address: {staff.address}</p>}
         </div>

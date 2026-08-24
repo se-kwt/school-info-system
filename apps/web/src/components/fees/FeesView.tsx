@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { formatMoney } from "@/lib/money";
+import { formatDate } from "@/lib/format";
 import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
 interface ClassOption {
@@ -271,7 +272,7 @@ export function FeesView({
         >
           {feeStructures.map((fs) => (
             <option key={fs.id} value={fs.id}>
-              {fs.term} — {formatMoney(fs.amount)}, due {fs.dueDate}
+              {fs.term} — {formatMoney(fs.amount)}, due {formatDate(fs.dueDate)}
             </option>
           ))}
         </select>
@@ -455,7 +456,7 @@ export function FeesView({
                           <tbody>
                             {(historyByStudent[student.studentId] ?? []).map((entry) => (
                               <tr key={entry.id}>
-                                <td className="py-1 pr-4 text-neutral-700">{entry.paidDate}</td>
+                                <td className="py-1 pr-4 text-neutral-700">{formatDate(entry.paidDate)}</td>
                                 <td className="py-1 pr-4 text-neutral-700">{formatMoney(entry.amountPaid)}</td>
                                 <td className="py-1 pr-4 text-neutral-700">{entry.mode}</td>
                                 <td className="py-1 pr-4 text-neutral-700">{entry.receiptNo}</td>
