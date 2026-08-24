@@ -15,5 +15,10 @@ export default defineConfig({
     hookTimeout: 20000,
     testTimeout: 20000,
     fileParallelism: false,
+    env: {
+      // Pin the timezone so date-formatting tests are deterministic across
+      // machines/CI, matching the en-IN locale convention used in format.ts.
+      TZ: "Asia/Kolkata",
+    },
   },
 });

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { formatDate, formatDateTime } from "../src/lib/format";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { formatDate, formatDateTime, formatRelativeTime } from "../src/lib/format";
 
 describe("formatDate", () => {
   it("formats an ISO date as a readable date", () => {
@@ -30,5 +30,42 @@ describe("formatDateTime", () => {
 
   it("returns an em dash for null", () => {
     expect(formatDateTime(null)).toBe("—");
+  });
+});
+
+describe("formatRelativeTime", () => {
+  const NOW = new Date("2026-08-24T12:00:00.000Z");
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("formats a recent past timestamp as '... ago'", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const fiveMinutesAgo = new Date(NOW.getTime() - 5 * 60 * 1000);
+    expect(formatRelativeTime(fiveMinutesAgo)).toBe("5 minutes ago");
+  });
+
+  it("formats a future timestamp as 'in ...'", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const inTenMinutes = new Date(NOW.getTime() + 10 * 60 * 1000);
+    expect(formatRelativeTime(inTenMinutes)).toBe("in 10 minutes");
+  });
+
+  it("returns 'just now' for timestamps under 60 seconds old", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const thirtySecondsAgo = new Date(NOW.getTime() - 30 * 1000);
+    expect(formatRelativeTime(thirtySecondsAgo)).toBe("just now");
+  });
+
+  it("returns an em dash for null", () => {
+    expect(formatRelativeTime(null)).toBe("—");
+  });
+
+  it("returns an em dash for an unparseable string", () => {
+    expect(formatRelativeTime("not-a-date")).toBe("—");
   });
 });

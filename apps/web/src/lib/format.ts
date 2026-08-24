@@ -8,16 +8,32 @@ const SHORT_MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
+// A bare `YYYY-MM-DD` string is parsed by `new Date()` as UTC midnight, but
+// the getters below (`getDate`/`getMonth`/`getFullYear`) read it back in the
+// viewer's local timezone. In any timezone west of UTC that rolls the
+// calendar date back by one day. Appending a local-time component makes the
+// same string parse as local midnight instead, per the ECMAScript Date
+// Time String Format spec, so the displayed calendar date matches the input
+// regardless of the viewer's timezone.
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseDateInput(value: string | Date): Date {
+  if (typeof value === "string" && DATE_ONLY_PATTERN.test(value)) {
+    return new Date(`${value}T00:00:00`);
+  }
+  return typeof value === "string" ? new Date(value) : value;
+}
+
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
-  const date = typeof value === "string" ? new Date(value) : value;
+  const date = parseDateInput(value);
   if (Number.isNaN(date.getTime())) return "—";
   return `${date.getDate()} ${SHORT_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 export function formatDateTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
-  const date = typeof value === "string" ? new Date(value) : value;
+  const date = parseDateInput(value);
   if (Number.isNaN(date.getTime())) return "—";
   return `${formatDate(date)}, ${date.toLocaleTimeString("en-IN", {
     hour: "2-digit",

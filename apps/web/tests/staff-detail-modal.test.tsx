@@ -170,6 +170,27 @@ describe("StaffDetailModal", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
+  it("edit mode: hides Deactivate when isSelf is true", () => {
+    render(
+      <StaffDetailModal
+        mode="edit"
+        staff={existingStaff}
+        classes={classes}
+        subjects={subjects}
+        isSelf={true}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={noop}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+  });
+
   it("edit mode: clicking Delete calls onDelete", async () => {
     const onDelete = vi.fn();
     render(

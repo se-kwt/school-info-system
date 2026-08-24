@@ -271,7 +271,7 @@ export function StaffDetailModal({
               Delete
             </button>
           )}
-          {mode === "edit" && staff?.status === "active" && (
+          {mode === "edit" && !isSelf && staff?.status === "active" && (
             <button
               type="button"
               onClick={onDeactivate}

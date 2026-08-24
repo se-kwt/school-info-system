@@ -77,7 +77,7 @@ describe("AttendanceView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Submit All" }));
 
-    expect(screen.getByText("Review Before Submitting")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Review Before Submitting" })).toBeInTheDocument();
     expect(screen.getAllByText("Asha Verma")).toHaveLength(2);
     expect(screen.getAllByText("Beena Rao")).toHaveLength(1);
   });
