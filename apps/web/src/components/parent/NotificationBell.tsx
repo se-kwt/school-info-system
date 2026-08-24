@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
+import { notificationHref } from "@/lib/notifications";
 
 interface NotificationEntry {
   id: number;
@@ -12,17 +13,6 @@ interface NotificationEntry {
   relatedId: number | null;
   readAt: string | null;
   createdAt: string;
-}
-
-function notificationHref(notification: { type: string; relatedId: number | null }): string {
-  switch (notification.type) {
-    case "assignment_published":
-      return notification.relatedId
-        ? `/parent/assignments/${notification.relatedId}`
-        : "/parent/assignments";
-    default:
-      return "/parent";
-  }
 }
 
 export function NotificationBell() {

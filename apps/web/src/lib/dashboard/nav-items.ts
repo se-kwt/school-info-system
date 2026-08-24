@@ -37,12 +37,11 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/timetable", label: "Timetable", icon: "Calendar" },
   { href: "/dashboard/fees", label: "Fees", icon: "Wallet" },
   { href: "/dashboard/academic-years", label: "Academic Years", icon: "CalendarRange" },
+  { href: "/dashboard/academic-years/promote", label: "Promotion", icon: "CalendarRange" },
 ];
 
 export const WORKSPACE_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/notifications", label: "Notifications", icon: "Bell" },
-  { href: "/dashboard/reports", label: "Reports", icon: "FileBarChart" },
-  { href: "/dashboard/resources", label: "Resources", icon: "FolderOpen" },
   { href: "/dashboard/settings", label: "Settings", icon: "Settings" },
 ];
 
@@ -68,6 +67,7 @@ const NAV_HREFS_BY_ROLE: Record<SessionClaims["role"], string[]> = {
     "/dashboard/timetable",
     "/dashboard/fees",
     "/dashboard/academic-years",
+    "/dashboard/academic-years/promote",
   ],
   accountant: ["/dashboard", "/dashboard/fees"],
   parent: [],
