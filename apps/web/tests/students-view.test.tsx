@@ -314,4 +314,22 @@ describe("StudentsView", () => {
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.getByText("Existing Student")).toBeInTheDocument();
   });
+
+  it("offers Deactivate without a failed delete first", async () => {
+    render(<StudentsView initialStudents={students} classes={classes} isAdmin={true} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
+
+    expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
+  });
+
+  it("offers Activate instead for an inactive student", async () => {
+    const inactiveStudents = [{ ...students[0], id: 5, name: "Former Student", status: "inactive" as const }];
+    render(<StudentsView initialStudents={inactiveStudents} classes={classes} isAdmin={true} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Former Student/ }));
+
+    expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deactivate" })).toBeNull();
+  });
 });

@@ -115,6 +115,22 @@ describe("StaffView", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
+  it("offers Deactivate without a failed delete first", async () => {
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
+    await userEvent.click(screen.getByRole("button", { name: /Jane Teacher/ }));
+
+    expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
+  });
+
+  it("offers Activate instead for an inactive staff member", async () => {
+    const inactiveStaff = [{ ...staff[1], id: 9, name: "Former Staffer", status: "inactive" as const }];
+    render(<StaffView initialStaff={inactiveStaff} classes={classes} subjects={subjects} currentUserId={1} />);
+    await userEvent.click(screen.getByRole("button", { name: /Former Staffer/ }));
+
+    expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deactivate" })).toBeNull();
+  });
+
   it("sends email and HR fields on create", async () => {
     const fetchMock = vi
       .fn()
