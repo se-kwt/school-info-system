@@ -160,7 +160,11 @@ export function StudentDetailModal({
   }
 
   return (
-    <Modal onClose={onClose} maxWidthClassName="max-w-2xl">
+    <Modal
+      onClose={onClose}
+      maxWidthClassName="max-w-2xl"
+      title={mode === "create" ? "Add new student" : student?.name ?? "Edit student"}
+    >
       <h2 className="text-sm font-bold text-neutral-800">
         {mode === "create" ? "Add new student" : student?.name}
       </h2>

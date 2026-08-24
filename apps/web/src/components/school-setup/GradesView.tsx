@@ -254,7 +254,10 @@ export function GradesView({
       <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filteredGrades.length} onPageChange={setPage} itemLabel="grades" />
 
       {modalState && (
-        <Modal onClose={closeModal}>
+        <Modal
+          onClose={closeModal}
+          title={modalState.mode === "create" ? "Create Grade" : editingGrade?.name ?? "Edit Grade"}
+        >
           <h2 className="text-sm font-bold text-neutral-800">
             {modalState.mode === "create" ? "Create Grade" : editingGrade?.name}
           </h2>

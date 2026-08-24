@@ -346,7 +346,7 @@ export function ClassesView({
       <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filteredClasses.length} onPageChange={setPage} itemLabel="classes" />
 
       {modalState && (
-        <Modal onClose={closeModal}>
+        <Modal onClose={closeModal} title={modalState.mode === "create" ? "Create Class" : "Edit Class"}>
           <h2 className="text-sm font-bold text-neutral-800">
             {modalState.mode === "create" ? "Create Class" : "Edit Class"}
           </h2>

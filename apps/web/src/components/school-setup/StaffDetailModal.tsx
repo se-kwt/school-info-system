@@ -99,7 +99,7 @@ export function StaffDetailModal({
   }
 
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={onClose} title={mode === "create" ? "Add new staff" : staff?.name ?? "Edit staff"}>
       <h2 className="text-sm font-bold text-neutral-800">
         {mode === "create" ? "Add new staff" : staff?.name}
       </h2>

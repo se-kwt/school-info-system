@@ -252,7 +252,7 @@ export function GradeDetailView({
       />
 
       {modalState && (
-        <Modal onClose={closeModal}>
+        <Modal onClose={closeModal} title="Add Subject">
           <h2 className="text-sm font-bold text-neutral-800">Add Subject</h2>
           <input
             type="text"
