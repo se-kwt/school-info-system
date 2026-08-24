@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StaffCard, type StaffRow } from "./StaffCard";
 import { StaffDetailModal, type SaveStaffFields } from "./StaffDetailModal";
+import { GridToolbar } from "./GridToolbar";
+import { Pagination } from "./Pagination";
 import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 type Role = "teacher" | "admin" | "accountant";
 type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
+
+const PAGE_SIZE = 8;
 
 async function uploadPhoto(file: File): Promise<{ ok: true; photoUrl: string } | { ok: false; error: string }> {
   const formData = new FormData();
@@ -33,12 +37,37 @@ export function StaffView({
 }) {
   const [staff, setStaff] = useState(initialStaff);
   const [roleFilter, setRoleFilter] = useState<"all" | Role>("all");
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [page, setPage] = useState(1);
   const [modalState, setModalState] = useState<ModalState>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
   const { isSubmitting, run } = useSubmitGuard();
 
-  const filteredStaff = roleFilter === "all" ? staff : staff.filter((member) => member.role === roleFilter);
+  const roleFilteredStaff = roleFilter === "all" ? staff : staff.filter((member) => member.role === roleFilter);
+
+  const filteredStaff = useMemo(() => {
+    const term = search.toLowerCase();
+    if (!term) return roleFilteredStaff;
+    return roleFilteredStaff.filter(
+      (member) => member.name.toLowerCase().includes(term) || member.phone.toLowerCase().includes(term)
+    );
+  }, [roleFilteredStaff, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredStaff.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStaff = filteredStaff.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  function handleRoleFilterChange(value: "all" | Role) {
+    setRoleFilter(value);
+    setPage(1);
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
 
   async function refresh() {
     const response = await fetch("/api/staff");
@@ -206,7 +235,7 @@ export function StaffView({
         <select
           aria-label="Filter by role"
           value={roleFilter}
-          onChange={(event) => setRoleFilter(event.target.value as "all" | Role)}
+          onChange={(event) => handleRoleFilterChange(event.target.value as "all" | Role)}
           className="rounded border border-gray-300 px-3 py-2 text-sm"
         >
           <option value="all">All roles</option>
@@ -223,10 +252,32 @@ export function StaffView({
         </button>
       </div>
 
+      <div className="mt-4">
+        <GridToolbar
+          searchValue={search}
+          onSearchChange={handleSearchChange}
+          searchLabel="Search staff..."
+          view={view}
+          onViewChange={setView}
+        />
+      </div>
+
+      {pageStaff.length === 0 && <p className="py-8 text-center text-sm text-neutral-400">No staff found</p>}
+
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {filteredStaff.map((member) => (
+        {pageStaff.map((member) => (
           <StaffCard key={member.id} member={member} onClick={() => openEdit(member.id)} />
         ))}
+      </div>
+
+      <div className="mt-4">
+        <Pagination
+          page={currentPage}
+          pageSize={PAGE_SIZE}
+          total={filteredStaff.length}
+          onPageChange={setPage}
+          itemLabel="staff"
+        />
       </div>
 
       {modalState && (

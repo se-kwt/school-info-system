@@ -173,4 +173,61 @@ describe("StaffView", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("filters the staff list by search term", async () => {
+    const searchStaff = [
+      { ...staff[0], id: 1, name: "Anita Menon", phone: "+15550001111" },
+      { ...staff[1], id: 2, name: "Bhavesh Kumar", phone: "+15550007777" },
+    ];
+    render(<StaffView initialStaff={searchStaff} classes={classes} subjects={subjects} currentUserId={1} />);
+
+    await userEvent.type(screen.getByLabelText(/search/i), "anita");
+
+    expect(screen.getByText("Anita Menon")).toBeInTheDocument();
+    expect(screen.queryByText("Bhavesh Kumar")).toBeNull();
+  });
+
+  it("searches phone as well as name", async () => {
+    const searchStaff = [
+      { ...staff[0], id: 1, name: "Anita Menon", phone: "+15550001111" },
+      { ...staff[1], id: 2, name: "Bhavesh Kumar", phone: "+15550007777" },
+    ];
+    render(<StaffView initialStaff={searchStaff} classes={classes} subjects={subjects} currentUserId={1} />);
+
+    await userEvent.type(screen.getByLabelText(/search/i), "7777");
+
+    expect(screen.getByText("Bhavesh Kumar")).toBeInTheDocument();
+    expect(screen.queryByText("Anita Menon")).toBeNull();
+  });
+
+  it("paginates a long list", async () => {
+    const many = Array.from({ length: 45 }, (_, i) => ({
+      ...staff[0],
+      id: i + 1,
+      name: `Staff ${i + 1}`,
+      phone: `+1555000${String(i + 1).padStart(4, "0")}`,
+    }));
+
+    render(<StaffView initialStaff={many} classes={classes} subjects={subjects} currentUserId={1} />);
+
+    expect(screen.queryByText("Staff 9")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(screen.getByText("Staff 9")).toBeInTheDocument();
+  });
+
+  it("returns to the first page when the search changes", async () => {
+    const many = Array.from({ length: 45 }, (_, i) => ({
+      ...staff[0],
+      id: i + 1,
+      name: `Staff ${i + 1}`,
+      phone: `+1555000${String(i + 1).padStart(4, "0")}`,
+    }));
+
+    render(<StaffView initialStaff={many} classes={classes} subjects={subjects} currentUserId={1} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.type(screen.getByLabelText(/search/i), "Staff 1");
+
+    expect(screen.getByText("Staff 1")).toBeInTheDocument();
+  });
 });

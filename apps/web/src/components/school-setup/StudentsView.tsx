@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StudentCard, type StudentRow } from "./StudentCard";
 import { StudentDetailModal, type SaveStudentFields } from "./StudentDetailModal";
+import { GridToolbar } from "./GridToolbar";
+import { Pagination } from "./Pagination";
 import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
 type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
+
+const PAGE_SIZE = 8;
 
 async function uploadPhoto(file: File): Promise<{ ok: true; photoUrl: string } | { ok: false; error: string }> {
   const formData = new FormData();
@@ -30,16 +34,42 @@ export function StudentsView({
 }) {
   const [students, setStudents] = useState(initialStudents);
   const [classFilter, setClassFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [page, setPage] = useState(1);
   const [modalState, setModalState] = useState<ModalState>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteBlockedId, setDeleteBlockedId] = useState<number | null>(null);
   const { isSubmitting, run } = useSubmitGuard();
 
   const selectedClass = classFilter === "all" ? null : classes.find((klass) => String(klass.id) === classFilter);
-  const filteredStudents =
+  const classFilteredStudents =
     classFilter === "all"
       ? students
       : students.filter((student) => selectedClass && student.classId === selectedClass.id);
+
+  const filteredStudents = useMemo(() => {
+    const term = search.toLowerCase();
+    if (!term) return classFilteredStudents;
+    return classFilteredStudents.filter(
+      (student) =>
+        student.name.toLowerCase().includes(term) || student.admissionNo.toLowerCase().includes(term)
+    );
+  }, [classFilteredStudents, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStudents = filteredStudents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  function handleClassFilterChange(value: string) {
+    setClassFilter(value);
+    setPage(1);
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
 
   async function refresh() {
     const response = await fetch("/api/students");
@@ -242,7 +272,7 @@ export function StudentsView({
         <select
           aria-label="Filter by class"
           value={classFilter}
-          onChange={(event) => setClassFilter(event.target.value)}
+          onChange={(event) => handleClassFilterChange(event.target.value)}
           className="rounded border border-gray-300 px-3 py-2 text-sm"
         >
           <option value="all">All classes</option>
@@ -263,10 +293,34 @@ export function StudentsView({
         )}
       </div>
 
+      <div className="mt-4">
+        <GridToolbar
+          searchValue={search}
+          onSearchChange={handleSearchChange}
+          searchLabel="Search students..."
+          view={view}
+          onViewChange={setView}
+        />
+      </div>
+
+      {pageStudents.length === 0 && (
+        <p className="py-8 text-center text-sm text-neutral-400">No students found</p>
+      )}
+
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {filteredStudents.map((student) => (
+        {pageStudents.map((student) => (
           <StudentCard key={student.id} student={student} onClick={() => openEdit(student.id)} />
         ))}
+      </div>
+
+      <div className="mt-4">
+        <Pagination
+          page={currentPage}
+          pageSize={PAGE_SIZE}
+          total={filteredStudents.length}
+          onPageChange={setPage}
+          itemLabel="students"
+        />
       </div>
 
       {modalState && (

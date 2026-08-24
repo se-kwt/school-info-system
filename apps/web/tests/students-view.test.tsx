@@ -235,4 +235,65 @@ describe("StudentsView", () => {
     await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
+
+  it("filters the student list by search term", async () => {
+    const searchStudents = [
+      { ...students[0], id: 1, name: "Anita Menon", admissionNo: "ADM-001" },
+      { ...students[1], id: 2, name: "Bhavesh Kumar", admissionNo: "ADM-777" },
+    ];
+    render(<StudentsView initialStudents={searchStudents} classes={classes} isAdmin={true} />);
+
+    await userEvent.type(screen.getByLabelText(/search/i), "anita");
+
+    expect(screen.getByText("Anita Menon")).toBeInTheDocument();
+    expect(screen.queryByText("Bhavesh Kumar")).toBeNull();
+  });
+
+  it("searches admission number as well as name", async () => {
+    const searchStudents = [
+      { ...students[0], id: 1, name: "Anita Menon", admissionNo: "ADM-001" },
+      { ...students[1], id: 2, name: "Bhavesh Kumar", admissionNo: "ADM-777" },
+    ];
+    render(<StudentsView initialStudents={searchStudents} classes={classes} isAdmin={true} />);
+
+    await userEvent.type(screen.getByLabelText(/search/i), "ADM-777");
+
+    expect(screen.getByText("Bhavesh Kumar")).toBeInTheDocument();
+    expect(screen.queryByText("Anita Menon")).toBeNull();
+  });
+
+  it("paginates a long list", async () => {
+    const many = Array.from({ length: 45 }, (_, i) => ({
+      ...students[0],
+      id: i + 1,
+      name: `Student ${i + 1}`,
+      admissionNo: `A${i + 1}`,
+      classId: 1,
+      class: { gradeName: "Grade 5", section: "A" },
+    }));
+
+    render(<StudentsView initialStudents={many} classes={classes} isAdmin={true} />);
+
+    expect(screen.queryByText("Student 9")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(screen.getByText("Student 9")).toBeInTheDocument();
+  });
+
+  it("returns to the first page when the search changes", async () => {
+    const many = Array.from({ length: 45 }, (_, i) => ({
+      ...students[0],
+      id: i + 1,
+      name: `Student ${i + 1}`,
+      admissionNo: `A${i + 1}`,
+      classId: 1,
+      class: { gradeName: "Grade 5", section: "A" },
+    }));
+
+    render(<StudentsView initialStudents={many} classes={classes} isAdmin={true} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.type(screen.getByLabelText(/search/i), "Student 1");
+
+    expect(screen.getByText("Student 1")).toBeInTheDocument();
+  });
 });
