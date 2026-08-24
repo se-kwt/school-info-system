@@ -264,11 +264,46 @@ export function StaffView({
 
       {pageStaff.length === 0 && <p className="py-8 text-center text-sm text-neutral-400">No staff found</p>}
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {pageStaff.map((member) => (
-          <StaffCard key={member.id} member={member} onClick={() => openEdit(member.id)} />
-        ))}
-      </div>
+      {pageStaff.length > 0 && view === "grid" && (
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {pageStaff.map((member) => (
+            <StaffCard key={member.id} member={member} onClick={() => openEdit(member.id)} />
+          ))}
+        </div>
+      )}
+
+      {pageStaff.length > 0 && view === "list" && (
+        <table className="mt-6 w-full text-left text-sm">
+          <thead>
+            <tr>
+              <th className="border-b border-gray-200 pb-2">Name</th>
+              <th className="border-b border-gray-200 pb-2">Phone</th>
+              <th className="border-b border-gray-200 pb-2">Role</th>
+              <th className="border-b border-gray-200 pb-2">Status</th>
+              <th className="border-b border-gray-200 pb-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageStaff.map((member) => (
+              <tr key={member.id}>
+                <td className="border-b border-gray-100 py-2">{member.name}</td>
+                <td className="border-b border-gray-100 py-2">{member.phone}</td>
+                <td className="border-b border-gray-100 py-2 capitalize">{member.role}</td>
+                <td className="border-b border-gray-100 py-2">
+                  {member.status === "inactive" && (
+                    <span className="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-600">Inactive</span>
+                  )}
+                </td>
+                <td className="border-b border-gray-100 py-2">
+                  <button type="button" onClick={() => openEdit(member.id)} className="text-blue-600 underline">
+                    Edit
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <div className="mt-4">
         <Pagination

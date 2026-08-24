@@ -307,11 +307,54 @@ export function StudentsView({
         <p className="py-8 text-center text-sm text-neutral-400">No students found</p>
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {pageStudents.map((student) => (
-          <StudentCard key={student.id} student={student} onClick={() => openEdit(student.id)} />
-        ))}
-      </div>
+      {pageStudents.length > 0 && view === "grid" && (
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {pageStudents.map((student) => (
+            <StudentCard key={student.id} student={student} onClick={() => openEdit(student.id)} />
+          ))}
+        </div>
+      )}
+
+      {pageStudents.length > 0 && view === "list" && (
+        <table className="mt-6 w-full text-left text-sm">
+          <thead>
+            <tr>
+              <th className="border-b border-gray-200 pb-2">Name</th>
+              <th className="border-b border-gray-200 pb-2">Class</th>
+              <th className="border-b border-gray-200 pb-2">Admission No.</th>
+              <th className="border-b border-gray-200 pb-2">Status</th>
+              <th className="border-b border-gray-200 pb-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageStudents.map((student) => (
+              <tr key={student.id}>
+                <td className="border-b border-gray-100 py-2">{student.name}</td>
+                <td className="border-b border-gray-100 py-2">
+                  {student.class ? `${student.class.gradeName} ${student.class.section}` : "Unassigned"}
+                </td>
+                <td className="border-b border-gray-100 py-2">{student.admissionNo}</td>
+                <td className="border-b border-gray-100 py-2">
+                  {student.status !== "active" && (
+                    <span className="rounded bg-gray-200 px-2 py-0.5 text-xs capitalize text-gray-600">
+                      {student.status}
+                    </span>
+                  )}
+                </td>
+                <td className="border-b border-gray-100 py-2">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(student.id)}
+                    className="text-blue-600 underline"
+                  >
+                    {isAdmin ? "Edit" : "View"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <div className="mt-4">
         <Pagination

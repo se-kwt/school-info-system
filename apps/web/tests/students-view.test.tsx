@@ -296,4 +296,22 @@ describe("StudentsView", () => {
 
     expect(screen.getByText("Student 1")).toBeInTheDocument();
   });
+
+  it("switches to a real list-table view when List is clicked", async () => {
+    render(<StudentsView initialStudents={students} classes={classes} isAdmin={true} />);
+
+    expect(screen.queryByRole("table")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /list view/i }));
+
+    const table = screen.getByRole("table");
+    expect(table).toBeInTheDocument();
+    expect(within(table).getByText("Existing Student")).toBeInTheDocument();
+    expect(within(table).getByText("Other Class Student")).toBeInTheDocument();
+    expect(within(table).getByText("SCH-1")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /grid view/i }));
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("Existing Student")).toBeInTheDocument();
+  });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, within, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StaffView } from "../src/components/school-setup/StaffView";
 
@@ -229,5 +229,23 @@ describe("StaffView", () => {
     await userEvent.type(screen.getByLabelText(/search/i), "Staff 1");
 
     expect(screen.getByText("Staff 1")).toBeInTheDocument();
+  });
+
+  it("switches to a real list-table view when List is clicked", async () => {
+    render(<StaffView initialStaff={staff} classes={classes} subjects={subjects} currentUserId={1} />);
+
+    expect(screen.queryByRole("table")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /list view/i }));
+
+    const table = screen.getByRole("table");
+    expect(table).toBeInTheDocument();
+    expect(within(table).getByText("Current Admin")).toBeInTheDocument();
+    expect(within(table).getByText("Jane Teacher")).toBeInTheDocument();
+    expect(within(table).getByText("+15550001111")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /grid view/i }));
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("Current Admin")).toBeInTheDocument();
   });
 });
