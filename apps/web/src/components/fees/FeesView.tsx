@@ -128,6 +128,16 @@ export function FeesView({
   async function handleCreateFeeStructure() {
     setError(null);
     setMessage(null);
+
+    if (!newAmount || Number(newAmount) <= 0) {
+      setError("Amount must be greater than 0");
+      return;
+    }
+    if (!newDueDate) {
+      setError("Due date is required");
+      return;
+    }
+
     await run(async () => {
       const response = await fetch("/api/fee-structures", {
         method: "POST",

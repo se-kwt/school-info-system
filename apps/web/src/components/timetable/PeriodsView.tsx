@@ -34,6 +34,16 @@ export function PeriodsView({ initialPeriods }: { initialPeriods: PeriodRow[] })
 
   async function handleCreate() {
     setError(null);
+
+    if (!label.trim()) {
+      setError("Label is required");
+      return;
+    }
+    if (startTime >= endTime) {
+      setError("Start time must be before end time");
+      return;
+    }
+
     await run(async () => {
       const response = await fetch("/api/periods", {
         method: "POST",

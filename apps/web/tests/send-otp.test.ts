@@ -11,6 +11,14 @@ class FakeSmsSender implements SmsSender {
   }
 }
 
+// A minimal no-op SmsSender for tests that don't care about the sent message,
+// only about whether sendOtp's result shape exposes the plaintext code.
+class NoopSmsSender implements SmsSender {
+  async send(): Promise<void> {
+    // intentionally does nothing
+  }
+}
+
 describe("sendOtp", () => {
   beforeEach(async () => {
     await resetDb();
@@ -144,6 +152,44 @@ describe("sendOtp", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body).toEqual({ error: "Invalid request body" });
+  });
+
+  // Regression test for a mis-filed audit finding: the finding claimed the
+  // test-OTP affordance was an exploitable vulnerability, but sendOtp already
+  // gates the plaintext code behind an explicit exposeCodeForTesting flag
+  // (and the route only ever passes that flag when EXPOSE_OTP_FOR_TESTING ===
+  // "true"). These tests pin that behavior down at the sendOtp level so the
+  // gate can't silently regress.
+  it("does not return the code unless explicitly asked to expose it", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: { phone: "+919876543210", role: "parent", name: "Test Parent", schoolId: school.id },
+    });
+
+    const result = await sendOtp("+919876543210", {
+      prisma,
+      smsSender: new NoopSmsSender(),
+    });
+
+    expect(result).toEqual({ success: true });
+    expect("code" in result).toBe(false);
+  });
+
+  it("returns the code only when exposeCodeForTesting is true", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    await prisma.user.create({
+      data: { phone: "+919876543211", role: "parent", name: "Test Parent", schoolId: school.id },
+    });
+
+    const result = await sendOtp("+919876543211", {
+      prisma,
+      smsSender: new NoopSmsSender(),
+      exposeCodeForTesting: true,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(typeof result.code).toBe("string");
   });
 
   describe("EXPOSE_OTP_FOR_TESTING gating", () => {

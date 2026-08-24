@@ -27,6 +27,20 @@ export function AcademicYearsView({ initialYears }: { initialYears: AcademicYear
 
   async function handleCreate() {
     setError(null);
+
+    if (!name.trim()) {
+      setError("Name is required");
+      return;
+    }
+    if (!startDate || !endDate) {
+      setError("Start date and end date are required");
+      return;
+    }
+    if (startDate >= endDate) {
+      setError("Start date must be before end date");
+      return;
+    }
+
     await run(async () => {
       const response = await fetch("/api/academic-years", {
         method: "POST",

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSubmitGuard } from "../../hooks/useSubmitGuard";
+import { formatDate } from "../../lib/format";
 
 interface SyllabusVersionRow {
   id: number;
@@ -139,7 +140,7 @@ export function SyllabusHistoryView({
                 )}
               </span>
               <span className="text-xs text-gray-400">
-                {version.createdByName} · {new Date(version.createdAt).toLocaleDateString()}
+                {version.createdByName} · {formatDate(version.createdAt)}
               </span>
             </div>
             <p className="mt-1 whitespace-pre-wrap text-sm text-gray-600">{version.content}</p>

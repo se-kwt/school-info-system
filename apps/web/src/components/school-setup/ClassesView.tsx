@@ -97,6 +97,16 @@ export function ClassesView({
 
   async function handleSave() {
     setError(null);
+
+    if (!section.trim()) {
+      setError("Section is required");
+      return;
+    }
+    if (capacity && Number(capacity) <= 0) {
+      setError("Capacity must be greater than 0");
+      return;
+    }
+
     await run(async () => {
       if (modalState?.mode === "create") {
         const response = await fetch("/api/classes", {

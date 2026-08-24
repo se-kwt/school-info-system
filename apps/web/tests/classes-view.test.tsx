@@ -52,6 +52,34 @@ describe("ClassesView", () => {
     vi.unstubAllGlobals();
   });
 
+  it("rejects a class create with an empty section", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    await userEvent.click(screen.getByRole("button", { name: "+ Create Class" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/section is required/i)).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects a non-positive capacity on class create", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    await userEvent.click(screen.getByRole("button", { name: "+ Create Class" }));
+    await userEvent.type(screen.getByLabelText("Section"), "C");
+    await userEvent.type(screen.getByLabelText("Capacity"), "0");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/capacity must be greater than 0/i)).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
   it("sends capacity and room on class create", async () => {
     const fetchMock = vi
       .fn()

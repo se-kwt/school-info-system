@@ -12,6 +12,10 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // `testOtp` is only ever non-null when the server chose to return the code,
+  // which it does exclusively when EXPOSE_OTP_FOR_TESTING === "true"
+  // (see src/app/api/auth/send-otp/route.ts and src/lib/auth/send-otp.ts).
+  // In production the field is absent and this affordance never renders.
   const [testOtp, setTestOtp] = useState<string | null>(null);
   const { isSubmitting, run } = useSubmitGuard();
 

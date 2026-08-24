@@ -42,6 +42,23 @@ describe("FeesView", () => {
     vi.unstubAllGlobals();
   });
 
+  it("rejects a negative fee amount", async () => {
+    const fetchMock = stubRosterFetch();
+
+    render(<FeesView classes={classes} role="admin" />);
+
+    await waitFor(() => expect(screen.getByText("Asha Rao")).toBeInTheDocument());
+    const callsBeforeSubmit = fetchMock.mock.calls.length;
+
+    await userEvent.type(screen.getByLabelText("New term"), "Term 2");
+    await userEvent.type(screen.getByLabelText("New amount"), "-100");
+    await userEvent.type(screen.getByLabelText("New due date"), "2026-10-01");
+    await userEvent.click(screen.getByRole("button", { name: /new fee structure/i }));
+
+    expect(fetchMock.mock.calls.length).toBe(callsBeforeSubmit);
+    expect(screen.getByText(/amount must be greater than 0/i)).toBeInTheDocument();
+  });
+
   it("requires a payment mode before submitting", async () => {
     const fetchMock = stubRosterFetch();
 

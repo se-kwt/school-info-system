@@ -84,6 +84,35 @@ describe("AcademicYearsView", () => {
     ).toBeInTheDocument();
   });
 
+  it("rejects an academic year whose end date precedes its start", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AcademicYearsView initialYears={[]} />);
+
+    await userEvent.type(screen.getByLabelText("Name"), "2026-27");
+    await userEvent.type(screen.getByLabelText("Start date"), "2027-03-31");
+    await userEvent.type(screen.getByLabelText("End date"), "2026-04-01");
+    await userEvent.click(screen.getByRole("button", { name: /create academic year/i }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/start date must be before/i)).toBeInTheDocument();
+  });
+
+  it("rejects an academic year with an empty name", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AcademicYearsView initialYears={[]} />);
+
+    await userEvent.type(screen.getByLabelText("Start date"), "2026-04-01");
+    await userEvent.type(screen.getByLabelText("End date"), "2027-03-31");
+    await userEvent.click(screen.getByRole("button", { name: /create academic year/i }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/name is required/i)).toBeInTheDocument();
+  });
+
   it("shows no Activate button for an archived year", () => {
     render(
       <AcademicYearsView
