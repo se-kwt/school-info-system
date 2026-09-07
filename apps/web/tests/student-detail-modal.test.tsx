@@ -417,4 +417,26 @@ describe("StudentDetailModal", () => {
 
     expect(onSave.mock.calls[0][0].siblingStudentIds).toEqual([3]);
   });
+
+  it("variant page: renders fields without the modal dialog wrapper", () => {
+    render(
+      <StudentDetailModal
+        mode="create"
+        variant="page"
+        classes={classes}
+        allStudents={allStudents}
+        isAdmin={true}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={noop}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("First name")).toBeInTheDocument();
+  });
 });

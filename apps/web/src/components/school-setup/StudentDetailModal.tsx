@@ -39,6 +39,7 @@ interface ParentRow {
 
 export function StudentDetailModal({
   mode,
+  variant = "modal",
   student,
   classes,
   allStudents,
@@ -55,6 +56,7 @@ export function StudentDetailModal({
   onActivate,
 }: {
   mode: "create" | "edit";
+  variant?: "modal" | "page";
   student?: StudentRow;
   classes: { id: number; gradeName: string; section: string }[];
   allStudents: {
@@ -161,12 +163,8 @@ export function StudentDetailModal({
     setParentRows((rows) => rows.filter((_, i) => i !== index));
   }
 
-  return (
-    <Modal
-      onClose={onClose}
-      maxWidthClassName="max-w-2xl"
-      title={mode === "create" ? "Add new student" : student?.name ?? "Edit student"}
-    >
+  const content = (
+    <>
       <h2 className="text-sm font-bold text-neutral-800">
         {mode === "create" ? "Add new student" : student?.name}
       </h2>
@@ -720,6 +718,24 @@ export function StudentDetailModal({
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (variant === "page") {
+    return (
+      <div className="rounded-2xl border border-neutral-200/60 bg-white p-6 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Modal
+      onClose={onClose}
+      maxWidthClassName="max-w-2xl"
+      title={mode === "create" ? "Add new student" : student?.name ?? "Edit student"}
+    >
+      {content}
     </Modal>
   );
 }

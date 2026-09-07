@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { StudentCard, type StudentRow } from "./StudentCard";
 import { StudentDetailModal, type SaveStudentFields } from "./StudentDetailModal";
 import { GridToolbar } from "./GridToolbar";
 import { Pagination } from "./Pagination";
 import { useSubmitGuard } from "../../hooks/useSubmitGuard";
 
-type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
+type ModalState = { id: number } | null;
 
 const PAGE_SIZE = 8;
 
@@ -76,14 +77,8 @@ export function StudentsView({
     setStudents(await response.json());
   }
 
-  function openCreate() {
-    setModalState({ mode: "create" });
-    setError(null);
-    setDeleteBlockedId(null);
-  }
-
   function openEdit(id: number) {
-    setModalState({ mode: "edit", id });
+    setModalState({ id });
     setError(null);
     setDeleteBlockedId(null);
   }
@@ -95,6 +90,7 @@ export function StudentsView({
   }
 
   async function handleSave(fields: SaveStudentFields) {
+    if (!modalState) return;
     setError(null);
 
     await run(async () => {
@@ -108,117 +104,74 @@ export function StudentsView({
         photoUrl = uploadResult.photoUrl;
       }
 
-      if (modalState?.mode === "create") {
-        const response = await fetch("/api/students", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            name: fields.name,
-            dob: fields.dob,
-            classId: fields.classId ?? undefined,
-            admissionNo: fields.admissionNo,
-            rollNumber: fields.rollNumber || undefined,
-            photoUrl,
-            gender: fields.gender || undefined,
-            studentIdNumber: fields.studentIdNumber || undefined,
-            dateOfJoin: fields.dateOfJoin || undefined,
-            address: fields.address || undefined,
-            bloodGroup: fields.bloodGroup || undefined,
-            nationality: fields.nationality || undefined,
-            religion: fields.religion || undefined,
-            previousSchool: fields.previousSchool || undefined,
-            emergencyContactName: fields.emergencyContactName || undefined,
-            emergencyContactPhone: fields.emergencyContactPhone || undefined,
-            category: fields.category || undefined,
-            admissionDate: fields.admissionDate || undefined,
-            parents: fields.parents.map((p) => ({
-              relationship: p.relationship,
-              name: `${p.firstName} ${p.lastName}`.trim(),
-              phone: p.phone,
-              email: p.email || undefined,
-            })),
-            siblingStudentIds: fields.siblingStudentIds,
-          }),
-        });
-        if (response.status === 201) {
-          await refresh();
-          closeModal();
-          return;
-        }
-        setError((await response.json()).error);
+      const body: {
+        name: string;
+        admissionNo: string;
+        dob?: string;
+        classId?: number;
+        rollNumber?: string;
+        photoUrl?: string;
+        gender?: "male" | "female" | "other";
+        studentIdNumber?: string;
+        dateOfJoin?: string;
+        address?: string;
+        bloodGroup?: string;
+        nationality?: string;
+        religion?: string;
+        previousSchool?: string;
+        emergencyContactName?: string;
+        emergencyContactPhone?: string;
+        category?: string;
+        admissionDate?: string;
+        parents?: { relationship: string; name: string; phone: string; email?: string }[];
+        siblingStudentIds?: number[];
+      } = {
+        name: fields.name,
+        admissionNo: fields.admissionNo,
+      };
+      if (fields.dob) body.dob = fields.dob;
+      if (fields.classId) body.classId = fields.classId;
+      if (fields.rollNumber) body.rollNumber = fields.rollNumber;
+      if (photoUrl) body.photoUrl = photoUrl;
+      if (fields.gender) body.gender = fields.gender;
+      if (fields.studentIdNumber) body.studentIdNumber = fields.studentIdNumber;
+      if (fields.dateOfJoin) body.dateOfJoin = fields.dateOfJoin;
+      if (fields.address) body.address = fields.address;
+      if (fields.bloodGroup) body.bloodGroup = fields.bloodGroup;
+      if (fields.nationality) body.nationality = fields.nationality;
+      if (fields.religion) body.religion = fields.religion;
+      if (fields.previousSchool) body.previousSchool = fields.previousSchool;
+      if (fields.emergencyContactName) body.emergencyContactName = fields.emergencyContactName;
+      if (fields.emergencyContactPhone) body.emergencyContactPhone = fields.emergencyContactPhone;
+      if (fields.category) body.category = fields.category;
+      if (fields.admissionDate) body.admissionDate = fields.admissionDate;
+      body.parents = fields.parents.map((p) => ({
+        relationship: p.relationship,
+        name: `${p.firstName} ${p.lastName}`.trim(),
+        phone: p.phone,
+        email: p.email || undefined,
+      }));
+      body.siblingStudentIds = fields.siblingStudentIds;
+
+      const response = await fetch(`/api/students/${modalState.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (response.ok) {
+        await refresh();
+        closeModal();
         return;
       }
-
-      if (modalState?.mode === "edit") {
-        const body: {
-          name: string;
-          admissionNo: string;
-          dob?: string;
-          classId?: number;
-          rollNumber?: string;
-          photoUrl?: string;
-          gender?: "male" | "female" | "other";
-          studentIdNumber?: string;
-          dateOfJoin?: string;
-          address?: string;
-          bloodGroup?: string;
-          nationality?: string;
-          religion?: string;
-          previousSchool?: string;
-          emergencyContactName?: string;
-          emergencyContactPhone?: string;
-          category?: string;
-          admissionDate?: string;
-          parents?: { relationship: string; name: string; phone: string; email?: string }[];
-          siblingStudentIds?: number[];
-        } = {
-          name: fields.name,
-          admissionNo: fields.admissionNo,
-        };
-        if (fields.dob) body.dob = fields.dob;
-        if (fields.classId) body.classId = fields.classId;
-        if (fields.rollNumber) body.rollNumber = fields.rollNumber;
-        if (photoUrl) body.photoUrl = photoUrl;
-        if (fields.gender) body.gender = fields.gender;
-        if (fields.studentIdNumber) body.studentIdNumber = fields.studentIdNumber;
-        if (fields.dateOfJoin) body.dateOfJoin = fields.dateOfJoin;
-        if (fields.address) body.address = fields.address;
-        if (fields.bloodGroup) body.bloodGroup = fields.bloodGroup;
-        if (fields.nationality) body.nationality = fields.nationality;
-        if (fields.religion) body.religion = fields.religion;
-        if (fields.previousSchool) body.previousSchool = fields.previousSchool;
-        if (fields.emergencyContactName) body.emergencyContactName = fields.emergencyContactName;
-        if (fields.emergencyContactPhone) body.emergencyContactPhone = fields.emergencyContactPhone;
-        if (fields.category) body.category = fields.category;
-        if (fields.admissionDate) body.admissionDate = fields.admissionDate;
-        body.parents = fields.parents.map((p) => ({
-          relationship: p.relationship,
-          name: `${p.firstName} ${p.lastName}`.trim(),
-          phone: p.phone,
-          email: p.email || undefined,
-        }));
-        body.siblingStudentIds = fields.siblingStudentIds;
-
-        const response = await fetch(`/api/students/${modalState.id}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (response.ok) {
-          await refresh();
-          closeModal();
-          return;
-        }
-        setError((await response.json()).error);
-      }
+      setError((await response.json()).error);
     });
   }
 
   async function handleDelete() {
-    if (modalState?.mode !== "edit") return;
+    if (!modalState) return;
     setError(null);
     await run(async () => {
-      if (modalState.mode !== "edit") return;
+      if (!modalState) return;
       const response = await fetch(`/api/students/${modalState.id}`, { method: "DELETE" });
       if (response.ok) {
         await refresh();
@@ -235,10 +188,10 @@ export function StudentsView({
   }
 
   async function handleDeactivate() {
-    if (modalState?.mode !== "edit") return;
+    if (!modalState) return;
     setError(null);
     await run(async () => {
-      if (modalState.mode !== "edit") return;
+      if (!modalState) return;
       const response = await fetch(`/api/students/${modalState.id}/deactivate`, { method: "PATCH" });
       if (!response.ok) {
         setError((await response.json()).error);
@@ -250,10 +203,10 @@ export function StudentsView({
   }
 
   async function handleActivate() {
-    if (modalState?.mode !== "edit") return;
+    if (!modalState) return;
     setError(null);
     await run(async () => {
-      if (modalState.mode !== "edit") return;
+      if (!modalState) return;
       const response = await fetch(`/api/students/${modalState.id}/activate`, { method: "PATCH" });
       if (!response.ok) {
         setError((await response.json()).error);
@@ -263,8 +216,7 @@ export function StudentsView({
     });
   }
 
-  const editingStudent =
-    modalState?.mode === "edit" ? students.find((student) => student.id === modalState.id) : undefined;
+  const editingStudent = modalState ? students.find((student) => student.id === modalState.id) : undefined;
 
   return (
     <div className="mt-4">
@@ -283,13 +235,12 @@ export function StudentsView({
           ))}
         </select>
         {isAdmin && (
-          <button
-            type="button"
-            onClick={openCreate}
+          <Link
+            href="/dashboard/students/add"
             className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-black"
           >
             Add new student
-          </button>
+          </Link>
         )}
       </div>
 
@@ -368,14 +319,14 @@ export function StudentsView({
 
       {modalState && (
         <StudentDetailModal
-          mode={modalState.mode}
+          mode="edit"
           student={editingStudent}
           classes={classes}
           allStudents={students}
           isAdmin={isAdmin}
           defaultClassId={selectedClass?.id}
           serverError={error}
-          deleteBlocked={modalState.mode === "edit" && deleteBlockedId === modalState.id}
+          deleteBlocked={deleteBlockedId === modalState.id}
           isSubmitting={isSubmitting}
           onClose={closeModal}
           onSave={handleSave}
