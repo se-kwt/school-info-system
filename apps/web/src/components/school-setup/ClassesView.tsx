@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { Modal } from "./Modal";
 import { PageHeader } from "./PageHeader";
@@ -22,17 +23,12 @@ export interface ClassRow {
   enrolledCount?: number;
 }
 
-interface GradeOption {
-  id: number;
-  name: string;
-}
-
 interface AcademicYearOption {
   id: number;
   name: string;
 }
 
-type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
+type ModalState = { id: number } | null;
 
 const PAGE_SIZE = 8;
 
@@ -43,11 +39,9 @@ function enrollmentLabel(klass: ClassRow): string | undefined {
 
 export function ClassesView({
   initialClasses,
-  grades,
   academicYears,
 }: {
   initialClasses: ClassRow[];
-  grades: GradeOption[];
   academicYears: AcademicYearOption[];
 }) {
   const [classes, setClasses] = useState(initialClasses);
@@ -56,9 +50,7 @@ export function ClassesView({
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
   const [modalState, setModalState] = useState<ModalState>(null);
-  const [gradeId, setGradeId] = useState(grades[0] ? String(grades[0].id) : "");
   const [section, setSection] = useState("");
-  const [academicYearId, setAcademicYearId] = useState(academicYears[0] ? String(academicYears[0].id) : "");
   const [capacity, setCapacity] = useState("");
   const [room, setRoom] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -72,18 +64,8 @@ export function ClassesView({
     setClasses(await response.json());
   }
 
-  function openCreate() {
-    setModalState({ mode: "create" });
-    setGradeId(grades[0] ? String(grades[0].id) : "");
-    setSection("");
-    setAcademicYearId(academicYears[0] ? String(academicYears[0].id) : "");
-    setCapacity("");
-    setRoom("");
-    setError(null);
-  }
-
   function openEdit(klass: ClassRow) {
-    setModalState({ mode: "edit", id: klass.id });
+    setModalState({ id: klass.id });
     setSection(klass.section);
     setCapacity(klass.capacity != null ? String(klass.capacity) : "");
     setRoom(klass.room ?? "");
@@ -96,6 +78,7 @@ export function ClassesView({
   }
 
   async function handleSave() {
+    if (!modalState) return;
     setError(null);
 
     if (!section.trim()) {
@@ -108,43 +91,21 @@ export function ClassesView({
     }
 
     await run(async () => {
-      if (modalState?.mode === "create") {
-        const response = await fetch("/api/classes", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            gradeId: Number(gradeId),
-            section,
-            academicYearId: Number(academicYearId),
-            capacity: capacity ? Number(capacity) : undefined,
-            room: room || undefined,
-          }),
-        });
-        if (response.status === 201) {
-          closeModal();
-          await refresh(yearFilter);
-          return;
-        }
-        setError((await response.json()).error);
+      const response = await fetch(`/api/classes/${modalState.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          section,
+          capacity: capacity ? Number(capacity) : undefined,
+          room: room || undefined,
+        }),
+      });
+      if (response.ok) {
+        closeModal();
+        await refresh(yearFilter);
         return;
       }
-      if (modalState?.mode === "edit") {
-        const response = await fetch(`/api/classes/${modalState.id}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            section,
-            capacity: capacity ? Number(capacity) : undefined,
-            room: room || undefined,
-          }),
-        });
-        if (response.ok) {
-          closeModal();
-          await refresh(yearFilter);
-          return;
-        }
-        setError((await response.json()).error);
-      }
+      setError((await response.json()).error);
     });
   }
 
@@ -215,13 +176,12 @@ export function ClassesView({
         title="Classes"
         subtitle="Manage and organize all classes in your school"
         action={
-          <button
-            type="button"
-            onClick={openCreate}
+          <Link
+            href="/dashboard/classes/add"
             className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
           >
             + Create Class
-          </button>
+          </Link>
         }
       />
 
@@ -373,24 +333,8 @@ export function ClassesView({
       <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filteredClasses.length} onPageChange={setPage} itemLabel="classes" />
 
       {modalState && (
-        <Modal onClose={closeModal} title={modalState.mode === "create" ? "Create Class" : "Edit Class"}>
-          <h2 className="text-sm font-bold text-neutral-800">
-            {modalState.mode === "create" ? "Create Class" : "Edit Class"}
-          </h2>
-          {modalState.mode === "create" && (
-            <select
-              aria-label="Grade"
-              value={gradeId}
-              onChange={(event) => setGradeId(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm"
-            >
-              {grades.map((grade) => (
-                <option key={grade.id} value={grade.id}>
-                  {grade.name}
-                </option>
-              ))}
-            </select>
-          )}
+        <Modal onClose={closeModal} title="Edit Class">
+          <h2 className="text-sm font-bold text-neutral-800">Edit Class</h2>
           <input
             type="text"
             aria-label="Section"
@@ -399,20 +343,6 @@ export function ClassesView({
             className="rounded border border-gray-300 px-3 py-2 text-sm"
             placeholder="e.g. B"
           />
-          {modalState.mode === "create" && (
-            <select
-              aria-label="Academic year"
-              value={academicYearId}
-              onChange={(event) => setAcademicYearId(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm"
-            >
-              {academicYears.map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.name}
-                </option>
-              ))}
-            </select>
-          )}
           <input
             type="number"
             min="1"

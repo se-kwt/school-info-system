@@ -5,7 +5,6 @@ import { render, screen, cleanup, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ClassesView } from "../src/components/school-setup/ClassesView";
 
-const grades = [{ id: 1, name: "Grade 1" }];
 const academicYears = [{ id: 1, name: "2026-27" }];
 
 const classes = [
@@ -17,18 +16,18 @@ describe("ClassesView", () => {
   afterEach(() => cleanup());
 
   it("renders a card per class with the grade/section title and year subtitle", () => {
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    render(<ClassesView initialClasses={classes} academicYears={academicYears} />);
     expect(screen.getByRole("link", { name: "Grade 1 · Section A" })).toBeInTheDocument();
     expect(screen.getAllByText("2026-27", { ignore: "option" })).toHaveLength(2);
   });
 
   it("shows an Archived badge only on archived classes", () => {
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    render(<ClassesView initialClasses={classes} academicYears={academicYears} />);
     expect(screen.getAllByText("Archived")).toHaveLength(1);
   });
 
   it("filters cards by the search box", async () => {
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    render(<ClassesView initialClasses={classes} academicYears={academicYears} />);
     await userEvent.type(screen.getByLabelText("Search classes..."), "Section A");
     expect(screen.getByRole("link", { name: "Grade 1 · Section A" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Grade 1 · Section B" })).not.toBeInTheDocument();
@@ -43,7 +42,7 @@ describe("ClassesView", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    render(<ClassesView initialClasses={classes} academicYears={academicYears} />);
     const card = screen.getByRole("link", { name: "Grade 1 · Section A" }).closest("div")!.parentElement!;
     await userEvent.click(within(card).getByRole("button", { name: "Actions for Grade 1 · Section A" }));
     await userEvent.click(within(card).getByText("Delete"));
@@ -52,58 +51,9 @@ describe("ClassesView", () => {
     vi.unstubAllGlobals();
   });
 
-  it("rejects a class create with an empty section", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
-    await userEvent.click(screen.getByRole("button", { name: "+ Create Class" }));
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/section is required/i)).toBeInTheDocument();
-    vi.unstubAllGlobals();
-  });
-
-  it("rejects a non-positive capacity on class create", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
-    await userEvent.click(screen.getByRole("button", { name: "+ Create Class" }));
-    await userEvent.type(screen.getByLabelText("Section"), "C");
-    await userEvent.type(screen.getByLabelText("Capacity"), "0");
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/capacity must be greater than 0/i)).toBeInTheDocument();
-    vi.unstubAllGlobals();
-  });
-
-  it("sends capacity and room on class create", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ id: 3, gradeId: 1, gradeName: "Grade 1", section: "C", academicYearId: 1, archived: false, capacity: 40, room: "B-204" }),
-          { status: 201 }
-        )
-      )
-      .mockResolvedValueOnce(new Response(JSON.stringify(classes), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
-    await userEvent.click(screen.getByRole("button", { name: "+ Create Class" }));
-    await userEvent.type(screen.getByLabelText("Section"), "C");
-    await userEvent.type(screen.getByLabelText("Capacity"), "40");
-    await userEvent.type(screen.getByLabelText("Room"), "B-204");
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(fetchMock).toHaveBeenCalled();
-    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
-    expect(body.capacity).toBe(40);
-    expect(body.room).toBe("B-204");
-    vi.unstubAllGlobals();
+  it("links Create Class to the dedicated Add Class page", () => {
+    render(<ClassesView initialClasses={classes} academicYears={academicYears} />);
+    expect(screen.getByRole("link", { name: "+ Create Class" })).toHaveAttribute("href", "/dashboard/classes/add");
   });
 
   it("shows how full a class is when capacity is set", () => {
@@ -112,7 +62,6 @@ describe("ClassesView", () => {
         initialClasses={[
           { id: 1, gradeId: 1, gradeName: "Grade 1", section: "A", academicYearId: 1, archived: false, capacity: 40, enrolledCount: 38, room: "B-204" },
         ]}
-        grades={grades}
         academicYears={academicYears}
       />
     );
@@ -121,7 +70,7 @@ describe("ClassesView", () => {
   });
 
   it("switches to list view and shows the same classes in a table", async () => {
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    render(<ClassesView initialClasses={classes} academicYears={academicYears} />);
     await userEvent.click(screen.getByRole("button", { name: "List view" }));
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getAllByRole("cell", { name: "Grade 1" })).toHaveLength(2);
@@ -133,7 +82,7 @@ describe("ClassesView", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<ClassesView initialClasses={classes} grades={grades} academicYears={academicYears} />);
+    render(<ClassesView initialClasses={classes} academicYears={academicYears} />);
     const card = screen.getByRole("link", { name: "Grade 1 · Section A" }).closest("div")!.parentElement!;
     await userEvent.click(within(card).getByRole("button", { name: "Actions for Grade 1 · Section A" }));
     await userEvent.click(within(card).getByText("Delete"));
@@ -157,7 +106,7 @@ describe("ClassesView", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(manyClasses.slice(0, 8)), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<ClassesView initialClasses={manyClasses} grades={grades} academicYears={academicYears} />);
+    render(<ClassesView initialClasses={manyClasses} academicYears={academicYears} />);
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getByRole("link", { name: "Grade 1 · Section I" })).toBeInTheDocument();
 
