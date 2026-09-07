@@ -6,57 +6,65 @@ import { usePathname } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   LayoutDashboard,
-  Building2,
   Layers,
-  Users,
+  Building2,
+  BookMarked,
+  ScrollText,
+  Clock,
+  CalendarClock,
   GraduationCap,
+  Users,
   ClipboardCheck,
   BookOpen,
   Award,
-  Calendar,
-  Clock,
   Wallet,
   CalendarRange,
+  TrendingUp,
+  CalendarDays,
   Bell,
   FileBarChart,
-  FolderOpen,
   Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { IconName } from "@/lib/dashboard/nav-items";
+import type { IconName, NavSection, NavEntry, NavGroup, NavTopLeaf, NavChildLeaf } from "@/lib/dashboard/nav-items";
 import { SchoolLogo } from "@/components/SchoolLogo";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: IconName;
-}
 
 const ICON_MAP: Record<IconName, LucideIcon> = {
   LayoutDashboard,
-  Building2,
   Layers,
-  Users,
+  Building2,
+  BookMarked,
+  ScrollText,
+  Clock,
+  CalendarClock,
   GraduationCap,
+  Users,
   ClipboardCheck,
   BookOpen,
   Award,
-  Calendar,
-  Clock,
   Wallet,
   CalendarRange,
+  TrendingUp,
+  CalendarDays,
   Bell,
   FileBarChart,
-  FolderOpen,
   Settings,
 };
 
 const STORAGE_KEY = "sidebar-collapsed";
 
+function isGroup(entry: NavEntry): entry is NavGroup {
+  return "children" in entry;
+}
+
+function flattenHrefs(items: NavEntry[]): string[] {
+  return items.flatMap((entry) => (isGroup(entry) ? entry.children.map((c) => c.href) : [entry.href]));
+}
+
 export function Sidebar({
-  navItems,
-  workspaceItems,
+  sections,
   pinnedClasses,
   userName,
   userInitials,
@@ -64,8 +72,7 @@ export function Sidebar({
   schoolName,
   schoolLogoUrl,
 }: {
-  navItems: NavItem[];
-  workspaceItems: NavItem[];
+  sections: NavSection[];
   pinnedClasses: { id: number; gradeName: string; section: string }[];
   userName: string;
   userInitials: string;
@@ -73,22 +80,43 @@ export function Sidebar({
   schoolName: string;
   schoolLogoUrl: string | null;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
-  // Among all nav hrefs, the "active" one is the longest href that either
-  // exactly matches the current pathname or is a parent route of it. Using
-  // the longest match (rather than any match) avoids a shorter parent route
-  // like "/dashboard" being marked active alongside a more specific child
-  // route like "/dashboard/grades".
-  const allHrefs = [...navItems, ...workspaceItems].map((item) => item.href);
+  // Among all leaf hrefs (including those nested inside groups), the "active"
+  // one is the longest href that either exactly matches the current pathname
+  // or is a parent route of it -- the longest match wins so a shorter parent
+  // route like "/dashboard/students" isn't marked active alongside a more
+  // specific child route like "/dashboard/students/add". The dashboard root
+  // ("/dashboard") is excluded from prefix matching: it's a leaf page, not a
+  // section prefix, and every dashboard route starts with "/dashboard/" so
+  // it would otherwise always win by default when no other href matches.
+  function hrefMatchesPathname(href: string): boolean {
+    if (pathname === href) return true;
+    if (href === "/dashboard") return false;
+    return pathname?.startsWith(`${href}/`) ?? false;
+  }
+
+  const allHrefs = sections.flatMap((section) => flattenHrefs(section.items));
   const activeHref = allHrefs
-    .filter((href) => pathname === href || (pathname?.startsWith(`${href}/`) ?? false))
+    .filter((href) => hrefMatchesPathname(href))
     .sort((a, b) => b.length - a.length)[0];
 
   function isActive(href: string): boolean {
     return href === activeHref;
   }
+
+  const [collapsed, setCollapsed] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    for (const section of sections) {
+      for (const entry of section.items) {
+        if (isGroup(entry) && entry.children.some((child) => child.href === activeHref)) {
+          initial.add(`${section.label}:${entry.label}`);
+        }
+      }
+    }
+    return initial;
+  });
 
   useEffect(() => {
     setCollapsed(localStorage.getItem(STORAGE_KEY) === "true");
@@ -100,12 +128,94 @@ export function Sidebar({
     localStorage.setItem(STORAGE_KEY, String(next));
   }
 
+  function toggleGroup(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
   function navLinkClass(active: boolean): string {
     return `flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
       active
         ? "bg-indigo-50 text-indigo-700"
         : "text-neutral-500 hover:bg-[#EAECF0]/30 hover:text-neutral-800"
     }`;
+  }
+
+  function renderTopLeaf(item: NavTopLeaf) {
+    const Icon = ICON_MAP[item.icon];
+    const active = isActive(item.href);
+    return (
+      <li key={item.href}>
+        <Link
+          href={item.href}
+          className={navLinkClass(active)}
+          title={collapsed ? item.label : undefined}
+          aria-current={active ? "page" : undefined}
+        >
+          <Icon className={`h-4 w-4 shrink-0 ${active ? "text-indigo-600" : "text-neutral-400"}`} />
+          {!collapsed && <span>{item.label}</span>}
+        </Link>
+      </li>
+    );
+  }
+
+  // Children carry no icon of their own (the source mockup only puts an icon
+  // on the top-level row). When the sidebar is collapsed to its icon rail, a
+  // flattened child still needs *some* icon, so it borrows its parent
+  // group's -- see the two call sites below.
+  function renderChild(item: NavChildLeaf, groupIcon: IconName) {
+    const Icon = ICON_MAP[groupIcon];
+    const active = isActive(item.href);
+    return (
+      <li key={`${item.href}:${item.label}`}>
+        <Link
+          href={item.href}
+          className={`${navLinkClass(active)} ${collapsed ? "" : "pl-8"}`}
+          title={collapsed ? item.label : undefined}
+          aria-current={active ? "page" : undefined}
+        >
+          {collapsed && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-indigo-600" : "text-neutral-400"}`} />}
+          {!collapsed && <span>{item.label}</span>}
+        </Link>
+      </li>
+    );
+  }
+
+  function renderGroup(sectionLabel: string, group: NavGroup) {
+    const key = `${sectionLabel}:${group.label}`;
+    const expanded = expandedGroups.has(key);
+    const Icon = ICON_MAP[group.icon];
+    const groupActive = group.children.some((child) => isActive(child.href));
+    return (
+      <li key={key}>
+        <button
+          type="button"
+          onClick={() => toggleGroup(key)}
+          aria-expanded={expanded}
+          className={`${navLinkClass(groupActive && !expanded)} w-full justify-between`}
+        >
+          <span className="flex items-center gap-2.5">
+            <Icon className={`h-4 w-4 shrink-0 ${groupActive ? "text-indigo-600" : "text-neutral-400"}`} />
+            <span>{group.label}</span>
+          </span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform ${expanded ? "rotate-180" : ""}`}
+          />
+        </button>
+        {expanded && (
+          <ul className="mt-0.5 space-y-0.5">
+            {group.children.map((child) => renderChild(child, group.icon))}
+          </ul>
+        )}
+      </li>
+    );
   }
 
   return (
@@ -137,57 +247,24 @@ export function Sidebar({
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-3 py-1">
-        <div>
-          {!collapsed && (
-            <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-              Main Menu
-            </p>
-          )}
-          <ul className="space-y-0.5">
-            {navItems.map((item) => {
-              const Icon = ICON_MAP[item.icon];
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={navLinkClass(isActive(item.href))}
-                    title={collapsed ? item.label : undefined}
-                    aria-current={isActive(item.href) ? "page" : undefined}
-                  >
-                    <Icon className={`h-4 w-4 shrink-0 ${isActive(item.href) ? "text-indigo-600" : "text-neutral-400"}`} />
-                    {!collapsed && <span>{item.label}</span>}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        <div>
-          {!collapsed && (
-            <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-              Workspace
-            </p>
-          )}
-          <ul className="space-y-0.5">
-            {workspaceItems.map((item) => {
-              const Icon = ICON_MAP[item.icon];
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={navLinkClass(isActive(item.href))}
-                    title={collapsed ? item.label : undefined}
-                    aria-current={isActive(item.href) ? "page" : undefined}
-                  >
-                    <Icon className={`h-4 w-4 shrink-0 ${isActive(item.href) ? "text-indigo-600" : "text-neutral-400"}`} />
-                    {!collapsed && <span>{item.label}</span>}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        {sections.map((section) => (
+          <div key={section.label}>
+            {!collapsed && (
+              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                {section.label}
+              </p>
+            )}
+            <ul className="space-y-0.5">
+              {section.items.map((entry) =>
+                isGroup(entry)
+                  ? collapsed
+                    ? entry.children.map((child) => renderChild(child, entry.icon))
+                    : renderGroup(section.label, entry)
+                  : renderTopLeaf(entry)
+              )}
+            </ul>
+          </div>
+        ))}
 
         {pinnedClasses.length > 0 && (
           <div>
