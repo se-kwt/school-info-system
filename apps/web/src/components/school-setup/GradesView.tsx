@@ -23,7 +23,7 @@ interface AcademicYearOption {
   name: string;
 }
 
-type ModalState = { mode: "create" } | { mode: "edit"; id: number } | null;
+type ModalState = { id: number } | null;
 
 const PAGE_SIZE = 8;
 
@@ -51,14 +51,8 @@ export function GradesView({
     setGrades(await response.json());
   }
 
-  function openCreate() {
-    setModalState({ mode: "create" });
-    setName("");
-    setError(null);
-  }
-
   function openEdit(grade: GradeRow) {
-    setModalState({ mode: "edit", id: grade.id });
+    setModalState({ id: grade.id });
     setName(grade.name);
     setError(null);
   }
@@ -69,35 +63,20 @@ export function GradesView({
   }
 
   async function handleSave() {
+    if (!modalState) return;
     setError(null);
     await run(async () => {
-      if (modalState?.mode === "create") {
-        const response = await fetch("/api/grades", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name }),
-        });
-        if (response.status === 201) {
-          closeModal();
-          await refresh(yearFilter);
-          return;
-        }
-        setError((await response.json()).error);
+      const response = await fetch(`/api/grades/${modalState.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (response.ok) {
+        closeModal();
+        await refresh(yearFilter);
         return;
       }
-      if (modalState?.mode === "edit") {
-        const response = await fetch(`/api/grades/${modalState.id}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name }),
-        });
-        if (response.ok) {
-          closeModal();
-          await refresh(yearFilter);
-          return;
-        }
-        setError((await response.json()).error);
-      }
+      setError((await response.json()).error);
     });
   }
 
@@ -132,7 +111,7 @@ export function GradesView({
   const totalPages = Math.max(1, Math.ceil(filteredGrades.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageGrades = filteredGrades.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const editingGrade = modalState?.mode === "edit" ? grades.find((grade) => grade.id === modalState.id) : undefined;
+  const editingGrade = modalState ? grades.find((grade) => grade.id === modalState.id) : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -141,13 +120,12 @@ export function GradesView({
         title="Grades"
         subtitle="Manage and organize all grades in your school"
         action={
-          <button
-            type="button"
-            onClick={openCreate}
+          <Link
+            href="/dashboard/grades/add"
             className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
           >
             + Create Grade
-          </button>
+          </Link>
         }
       />
 
@@ -265,13 +243,8 @@ export function GradesView({
       <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filteredGrades.length} onPageChange={setPage} itemLabel="grades" />
 
       {modalState && (
-        <Modal
-          onClose={closeModal}
-          title={modalState.mode === "create" ? "Create Grade" : editingGrade?.name ?? "Edit Grade"}
-        >
-          <h2 className="text-sm font-bold text-neutral-800">
-            {modalState.mode === "create" ? "Create Grade" : editingGrade?.name}
-          </h2>
+        <Modal onClose={closeModal} title={editingGrade?.name ?? "Edit Grade"}>
+          <h2 className="text-sm font-bold text-neutral-800">{editingGrade?.name}</h2>
           <input
             type="text"
             aria-label="Grade name"

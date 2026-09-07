@@ -30,24 +30,9 @@ describe("GradesView", () => {
     expect(screen.queryByRole("link", { name: "Grade 2" })).not.toBeInTheDocument();
   });
 
-  it("creates a grade through the modal", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 3, name: "Grade 3" }), { status: 201 }))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify([...grades, { id: 3, name: "Grade 3", subjectCount: 0, classCount: 0, subjectNames: [] }]), {
-          status: 200,
-        })
-      );
-    vi.stubGlobal("fetch", fetchMock);
-
+  it("links Create Grade to the dedicated Add Grade page", () => {
     render(<GradesView initialGrades={grades} academicYears={academicYears} />);
-    await userEvent.click(screen.getByRole("button", { name: "+ Create Grade" }));
-    await userEvent.type(screen.getByLabelText("Grade name"), "Grade 3");
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(await screen.findByRole("link", { name: "Grade 3" })).toBeInTheDocument();
-    vi.unstubAllGlobals();
+    expect(screen.getByRole("link", { name: "+ Create Grade" })).toHaveAttribute("href", "/dashboard/grades/add");
   });
 
   it("shows the delete-blocked banner in place of the footer on a 400 deletable:false response", async () => {
