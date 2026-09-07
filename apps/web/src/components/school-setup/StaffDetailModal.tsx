@@ -29,6 +29,7 @@ export interface SaveStaffFields {
 
 export function StaffDetailModal({
   mode,
+  variant = "modal",
   staff,
   classes,
   subjects,
@@ -44,6 +45,7 @@ export function StaffDetailModal({
   onActivate,
 }: {
   mode: "create" | "edit";
+  variant?: "modal" | "page";
   staff?: StaffRow;
   classes: { id: number; gradeId: number; gradeName: string; section: string }[];
   subjects: { id: number; name: string; gradeId: number }[];
@@ -101,8 +103,8 @@ export function StaffDetailModal({
     });
   }
 
-  return (
-    <Modal onClose={onClose} title={mode === "create" ? "Add new staff" : staff?.name ?? "Edit staff"}>
+  const content = (
+    <>
       <h2 className="text-sm font-bold text-neutral-800">
         {mode === "create" ? "Add new staff" : staff?.name}
       </h2>
@@ -316,6 +318,20 @@ export function StaffDetailModal({
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (variant === "page") {
+    return (
+      <div className="rounded-2xl border border-neutral-200/60 bg-white p-6 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Modal onClose={onClose} title={mode === "create" ? "Add new staff" : staff?.name ?? "Edit staff"}>
+      {content}
     </Modal>
   );
 }

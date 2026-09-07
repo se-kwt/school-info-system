@@ -286,4 +286,26 @@ describe("StaffDetailModal", () => {
     );
     expect(screen.getByText("This phone number is already registered")).toBeInTheDocument();
   });
+
+  it("variant page: renders fields without the modal dialog wrapper", () => {
+    render(
+      <StaffDetailModal
+        mode="create"
+        variant="page"
+        classes={classes}
+        subjects={subjects}
+        isSelf={false}
+        serverError={null}
+        deleteBlocked={false}
+        onClose={noop}
+        onSave={noop}
+        onDelete={noop}
+        onDeactivate={noop}
+        onCancelDelete={noop}
+        onActivate={noop}
+      />
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
+  });
 });
