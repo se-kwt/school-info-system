@@ -892,7 +892,7 @@ In `apps/web/tests/grades-view.test.tsx`, replace:
 
 - [ ] **Step 3: Run the updated GradesView tests**
 
-Run: `cd apps/web && npx vitest run tests/grades-view.test.tsx` → PASS (5 tests: the 4 untouched ones plus the new link test).
+Run: `cd apps/web && npx vitest run tests/grades-view.test.tsx` → PASS (7 tests: the 6 untouched ones plus the new link test).
 
 - [ ] **Step 4: Write the failing test for the new Add Grade page**
 
@@ -4462,7 +4462,7 @@ export function Sidebar({
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd apps/web && npx vitest run tests/sidebar.test.tsx` → PASS (10 tests)
+Run: `cd apps/web && npx vitest run tests/sidebar.test.tsx` → PASS (9 tests)
 
 - [ ] **Step 5: Commit**
 
