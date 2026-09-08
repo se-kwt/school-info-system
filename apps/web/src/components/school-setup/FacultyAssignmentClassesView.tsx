@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { UserCog } from "lucide-react";
 import { PageHeader } from "./PageHeader";
@@ -41,10 +41,14 @@ export function FacultyAssignmentClassesView({
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
 
+  const requestIdRef = useRef(0);
+
   async function refresh(academicYearIdFilter: string) {
+    const requestId = ++requestIdRef.current;
     const params = new URLSearchParams();
     if (academicYearIdFilter !== "all") params.set("academicYearId", academicYearIdFilter);
     const response = await fetch(`/api/classes?${params.toString()}`);
+    if (!response.ok || requestId !== requestIdRef.current) return;
     setClasses(await response.json());
   }
 

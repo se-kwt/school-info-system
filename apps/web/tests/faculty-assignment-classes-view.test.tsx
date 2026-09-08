@@ -120,4 +120,88 @@ describe("FacultyAssignmentClassesView", () => {
     expect(await screen.findByRole("link", { name: "Grade 1 · Section C" })).toBeInTheDocument();
     vi.unstubAllGlobals();
   });
+
+  it("does not crash or replace displayed classes when the refetch response is not OK", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const twoYears = [
+      { id: 1, name: "2025-26", status: "active" as const },
+      { id: 2, name: "2026-27", status: "upcoming" as const },
+    ];
+    render(<FacultyAssignmentClassesView initialClasses={classes} academicYears={twoYears} />);
+    await userEvent.selectOptions(screen.getByLabelText("Filter by academic year"), "2");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/classes?academicYearId=2");
+    // The bad response must never be applied to state: the original classes should still render.
+    expect(await screen.findByRole("link", { name: "Grade 1 · Section A" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Grade 2 · Section B" })).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("applies only the latest-issued request's response when requests race", async () => {
+    const firstYearClasses = [
+      {
+        id: 40,
+        gradeId: 1,
+        gradeName: "Grade 1",
+        section: "Stale",
+        academicYearId: 2,
+        archived: false,
+        capacity: 30,
+        room: null,
+        enrolledCount: 5,
+      },
+    ];
+    const secondYearClasses = [
+      {
+        id: 50,
+        gradeId: 1,
+        gradeName: "Grade 1",
+        section: "Fresh",
+        academicYearId: 3,
+        archived: false,
+        capacity: 30,
+        room: null,
+        enrolledCount: 5,
+      },
+    ];
+
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(new Response(JSON.stringify(firstYearClasses), { status: 200 })), 50)
+          )
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(new Response(JSON.stringify(secondYearClasses), { status: 200 })), 0)
+          )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const threeYears = [
+      { id: 1, name: "2024-25", status: "active" as const },
+      { id: 2, name: "2025-26", status: "upcoming" as const },
+      { id: 3, name: "2026-27", status: "upcoming" as const },
+    ];
+    render(<FacultyAssignmentClassesView initialClasses={classes} academicYears={threeYears} />);
+
+    // Fire the first (slower-resolving) request, then immediately the second (faster-resolving,
+    // later-issued) request, before the first has resolved.
+    await userEvent.selectOptions(screen.getByLabelText("Filter by academic year"), "2");
+    await userEvent.selectOptions(screen.getByLabelText("Filter by academic year"), "3");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole("link", { name: "Grade 1 · Section Fresh" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Grade 1 · Section Stale" })).not.toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
 });
