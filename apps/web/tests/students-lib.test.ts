@@ -118,6 +118,32 @@ describe("students.ts scalar fields", () => {
     });
     expect(result).toMatchObject({ ok: false, error: "DUPLICATE_STUDENT_ID" });
   });
+
+  it("filters students by classId, matching only that class's active enrollment", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const year = await createActiveYear(prisma, school.id);
+    const classA = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, name: "Grade 7", section: "A" });
+    const classB = await createClass(prisma, { schoolId: school.id, academicYearId: year.id, gradeId: classA.gradeId, section: "B" });
+    await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: classA.id,
+      academicYearId: year.id,
+      name: "Student A",
+      dob: new Date("2015-01-01"),
+      admissionNo: "SCH-200",
+    });
+    await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: classB.id,
+      academicYearId: year.id,
+      name: "Student B",
+      dob: new Date("2015-01-01"),
+      admissionNo: "SCH-201",
+    });
+
+    const result = await listStudents(prisma, school.id, { classId: classA.id });
+    expect(result.map((s) => s.admissionNo)).toEqual(["SCH-200"]);
+  });
 });
 
 describe("students.ts multiple parents", () => {

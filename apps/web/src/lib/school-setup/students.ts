@@ -31,11 +31,16 @@ export interface StudentSummary {
 export async function listStudents(
   prisma: PrismaClient,
   schoolId: number,
-  options?: { page?: number; pageSize?: number }
+  options?: { page?: number; pageSize?: number; classId?: number }
 ): Promise<StudentSummary[]> {
   const activeYear = await prisma.academicYear.findFirst({ where: { schoolId, status: "active" } });
   const students = await prisma.student.findMany({
-    where: { schoolId },
+    where: {
+      schoolId,
+      ...(options?.classId
+        ? { enrollments: { some: { academicYearId: activeYear?.id ?? -1, classId: options.classId } } }
+        : {}),
+    },
     include: {
       parentLinks: { include: { parent: true } },
       enrollments: {
