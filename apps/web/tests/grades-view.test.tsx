@@ -17,7 +17,7 @@ describe("GradesView", () => {
 
   it("renders a card per grade with subject names and class count badge", () => {
     render(<GradesView initialGrades={grades} academicYears={academicYears} />);
-    expect(screen.getByRole("link", { name: "Grade 1" })).toBeInTheDocument();
+    expect(screen.getByText("Grade 1")).toBeInTheDocument();
     expect(screen.getByText("English, Math")).toBeInTheDocument();
     expect(screen.getByText("No subjects yet")).toBeInTheDocument();
     expect(screen.getByText("Classes 2")).toBeInTheDocument();
@@ -26,8 +26,8 @@ describe("GradesView", () => {
   it("filters cards by the search box", async () => {
     render(<GradesView initialGrades={grades} academicYears={academicYears} />);
     await userEvent.type(screen.getByLabelText("Search grades..."), "Grade 1");
-    expect(screen.getByRole("link", { name: "Grade 1" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Grade 2" })).not.toBeInTheDocument();
+    expect(screen.getByText("Grade 1")).toBeInTheDocument();
+    expect(screen.queryByText("Grade 2")).not.toBeInTheDocument();
   });
 
   it("links Create Grade to the dedicated Add Grade page", () => {
@@ -44,7 +44,7 @@ describe("GradesView", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<GradesView initialGrades={grades} academicYears={academicYears} />);
-    const grade1Card = screen.getByRole("link", { name: "Grade 1" }).closest("div")!.parentElement!;
+    const grade1Card = screen.getByText("Grade 1").closest("div")!.parentElement!;
     await userEvent.click(within(grade1Card).getByRole("button", { name: "Actions for Grade 1" }));
     await userEvent.click(within(grade1Card).getByText("Delete"));
 
@@ -68,7 +68,7 @@ describe("GradesView", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<GradesView initialGrades={grades} academicYears={academicYears} />);
-    const grade1Card = screen.getByRole("link", { name: "Grade 1" }).closest("div")!.parentElement!;
+    const grade1Card = screen.getByText("Grade 1").closest("div")!.parentElement!;
     await userEvent.click(within(grade1Card).getByRole("button", { name: "Actions for Grade 1" }));
     await userEvent.click(within(grade1Card).getByText("Delete"));
 
@@ -92,13 +92,13 @@ describe("GradesView", () => {
 
     render(<GradesView initialGrades={manyGrades} academicYears={academicYears} />);
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByRole("link", { name: "Grade 9" })).toBeInTheDocument();
+    expect(screen.getByText("Grade 9")).toBeInTheDocument();
 
-    const grade9Card = screen.getByRole("link", { name: "Grade 9" }).closest("div")!.parentElement!;
+    const grade9Card = screen.getByText("Grade 9").closest("div")!.parentElement!;
     await userEvent.click(within(grade9Card).getByRole("button", { name: "Actions for Grade 9" }));
     await userEvent.click(within(grade9Card).getByText("Delete"));
 
-    expect(await screen.findByRole("link", { name: "Grade 1" })).toBeInTheDocument();
+    expect(await screen.findByText("Grade 1")).toBeInTheDocument();
     expect(screen.queryByText("No grades found")).not.toBeInTheDocument();
     vi.unstubAllGlobals();
   });

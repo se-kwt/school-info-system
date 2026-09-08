@@ -156,7 +156,6 @@ export function GradesView({
             <EntityCard
               key={grade.id}
               icon={Layers}
-              href={`/dashboard/grades/${grade.id}`}
               title={grade.name}
               subtitle={`${grade.subjectCount} Subjects • ${grade.classCount} Classes`}
               tagLine={grade.subjectNames.length > 0 ? grade.subjectNames.join(", ") : "No subjects yet"}
@@ -197,11 +196,7 @@ export function GradesView({
           <tbody>
             {pageGrades.map((grade) => (
               <tr key={grade.id}>
-                <td className="border-b border-gray-100 py-2">
-                  <Link href={`/dashboard/grades/${grade.id}`} className="text-blue-600 underline">
-                    {grade.name}
-                  </Link>
-                </td>
+                <td className="border-b border-gray-100 py-2">{grade.name}</td>
                 <td className="border-b border-gray-100 py-2">{grade.subjectCount}</td>
                 <td className="border-b border-gray-100 py-2">{grade.classCount}</td>
                 <td className="border-b border-gray-100 py-2">
