@@ -59,8 +59,15 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return "children" in entry;
 }
 
-function flattenHrefs(items: NavEntry[]): string[] {
-  return items.flatMap((entry) => (isGroup(entry) ? entry.children.map((c) => c.href) : [entry.href]));
+// A "leaf" is a rendered link -- either a top-level entry or one child of a
+// group. Several leaves can legitimately share the same href (e.g. "Exams"
+// and "Marks" both point at /dashboard/marks), so leaves are tracked as
+// object references rather than by href alone: that's what lets us pick out
+// exactly ONE leaf as "active" even when its href is shared by a sibling.
+type NavLeaf = NavTopLeaf | NavChildLeaf;
+
+function collectLeaves(items: NavEntry[]): NavLeaf[] {
+  return items.flatMap((entry) => (isGroup(entry) ? entry.children : [entry]));
 }
 
 export function Sidebar({
@@ -96,21 +103,28 @@ export function Sidebar({
     return pathname?.startsWith(`${href}/`) ?? false;
   }
 
-  const allHrefs = sections.flatMap((section) => flattenHrefs(section.items));
-  const activeHref = allHrefs
+  // All rendered leaves, in the same order they're rendered in the DOM
+  // (across every section and group). This is computed fresh each render
+  // from the current `sections` prop, so object identity within `leaves` is
+  // consistent with the identity of the entries/children we render below.
+  const leaves: NavLeaf[] = sections.flatMap((section) => collectLeaves(section.items));
+  const activeHref = leaves
+    .map((leaf) => leaf.href)
     .filter((href) => hrefMatchesPathname(href))
     .sort((a, b) => b.length - a.length)[0];
 
-  function isActive(href: string): boolean {
-    return href === activeHref;
-  }
+  // Multiple leaves can share `activeHref` by design (see NavLeaf comment
+  // above). `.find` walks `leaves` in DOM order and stops at the FIRST match,
+  // so `activeLeaf` identifies one specific leaf instance -- not just an
+  // href -- and only that instance should render as active.
+  const activeLeaf: NavLeaf | undefined = leaves.find((leaf) => leaf.href === activeHref);
 
   const [collapsed, setCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
     const initial = new Set<string>();
     for (const section of sections) {
       for (const entry of section.items) {
-        if (isGroup(entry) && entry.children.some((child) => child.href === activeHref)) {
+        if (isGroup(entry) && entry.children.some((child) => child === activeLeaf)) {
           initial.add(`${section.label}:${entry.label}`);
         }
       }
@@ -121,6 +135,32 @@ export function Sidebar({
   useEffect(() => {
     setCollapsed(localStorage.getItem(STORAGE_KEY) === "true");
   }, []);
+
+  // `expandedGroups` above only seeds the *initial* render. Sidebar lives in
+  // a persistent App Router layout that doesn't remount across client-side
+  // navigations within /dashboard/**, so when `activeLeaf` changes after
+  // mount (the user clicked a link rather than hard-refreshing), the group
+  // containing the newly-active leaf needs to expand too. This only ADDS
+  // keys -- it must never collapse a group the user expanded manually.
+  useEffect(() => {
+    if (!activeLeaf) return;
+    setExpandedGroups((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const section of sections) {
+        for (const entry of section.items) {
+          if (isGroup(entry) && entry.children.some((child) => child === activeLeaf)) {
+            const key = `${section.label}:${entry.label}`;
+            if (!next.has(key)) {
+              next.add(key);
+              changed = true;
+            }
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [activeLeaf, sections]);
 
   function toggle() {
     const next = !collapsed;
@@ -148,9 +188,8 @@ export function Sidebar({
     }`;
   }
 
-  function renderTopLeaf(item: NavTopLeaf) {
+  function renderTopLeaf(item: NavTopLeaf, active: boolean) {
     const Icon = ICON_MAP[item.icon];
-    const active = isActive(item.href);
     return (
       <li key={item.href}>
         <Link
@@ -170,9 +209,8 @@ export function Sidebar({
   // on the top-level row). When the sidebar is collapsed to its icon rail, a
   // flattened child still needs *some* icon, so it borrows its parent
   // group's -- see the two call sites below.
-  function renderChild(item: NavChildLeaf, groupIcon: IconName) {
+  function renderChild(item: NavChildLeaf, groupIcon: IconName, active: boolean) {
     const Icon = ICON_MAP[groupIcon];
-    const active = isActive(item.href);
     return (
       <li key={`${item.href}:${item.label}`}>
         <Link
@@ -192,7 +230,7 @@ export function Sidebar({
     const key = `${sectionLabel}:${group.label}`;
     const expanded = expandedGroups.has(key);
     const Icon = ICON_MAP[group.icon];
-    const groupActive = group.children.some((child) => isActive(child.href));
+    const groupActive = group.children.some((child) => child === activeLeaf);
     return (
       <li key={key}>
         <button
@@ -211,7 +249,7 @@ export function Sidebar({
         </button>
         {expanded && (
           <ul className="mt-0.5 space-y-0.5">
-            {group.children.map((child) => renderChild(child, group.icon))}
+            {group.children.map((child) => renderChild(child, group.icon, child === activeLeaf))}
           </ul>
         )}
       </li>
@@ -258,9 +296,9 @@ export function Sidebar({
               {section.items.map((entry) =>
                 isGroup(entry)
                   ? collapsed
-                    ? entry.children.map((child) => renderChild(child, entry.icon))
+                    ? entry.children.map((child) => renderChild(child, entry.icon, child === activeLeaf))
                     : renderGroup(section.label, entry)
-                  : renderTopLeaf(entry)
+                  : renderTopLeaf(entry, entry === activeLeaf)
               )}
             </ul>
           </div>

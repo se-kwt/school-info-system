@@ -14,8 +14,8 @@ const baseSections: NavSection[] = [
   { label: "Main Menu", items: [{ href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" }] },
 ];
 
-function renderSidebar(sections: NavSection[] = baseSections) {
-  return render(
+function sidebarElement(sections: NavSection[]) {
+  return (
     <Sidebar
       sections={sections}
       pinnedClasses={[]}
@@ -26,6 +26,10 @@ function renderSidebar(sections: NavSection[] = baseSections) {
       schoolLogoUrl={null}
     />
   );
+}
+
+function renderSidebar(sections: NavSection[] = baseSections) {
+  return render(sidebarElement(sections));
 }
 
 describe("Sidebar", () => {
@@ -161,5 +165,74 @@ describe("Sidebar", () => {
     await userEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     expect(screen.getByTitle("Class Timetable")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Timetable/ })).not.toBeInTheDocument();
+  });
+
+  it("marks only the first of two sibling leaves that share an href as active", () => {
+    mockPathname = "/dashboard/marks";
+    renderSidebar([
+      {
+        label: "Progress",
+        items: [
+          {
+            label: "Exams & Marks",
+            icon: "Award",
+            children: [
+              { href: "/dashboard/marks", label: "Exams" },
+              { href: "/dashboard/marks", label: "Marks" },
+            ],
+          },
+        ],
+      },
+    ]);
+    // The group auto-expands because one of its children matches the pathname.
+    expect(screen.getByRole("link", { name: "Exams" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Marks" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("expands a newly-active group after a client-side navigation (no unmount), without collapsing a group the user expanded manually", async () => {
+    mockPathname = "/dashboard/other";
+    const sections: NavSection[] = [
+      {
+        label: "Academic",
+        items: [
+          {
+            label: "Grades",
+            icon: "Layers",
+            children: [
+              { href: "/dashboard/grades", label: "All Grades" },
+              { href: "/dashboard/grades/add", label: "Add Grade" },
+            ],
+          },
+          {
+            label: "Classes",
+            icon: "Building2",
+            children: [
+              { href: "/dashboard/classes", label: "All Classes" },
+              { href: "/dashboard/classes/add", label: "Add Class" },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const { rerender } = renderSidebar(sections);
+
+    // Neither group's child matches the pathname yet, so both start collapsed.
+    expect(screen.getByRole("button", { name: /Grades/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: /Classes/ })).toHaveAttribute("aria-expanded", "false");
+
+    // The user manually expands "Classes" (unrelated to the upcoming navigation).
+    await userEvent.click(screen.getByRole("button", { name: /Classes/ }));
+    expect(screen.getByRole("button", { name: /Classes/ })).toHaveAttribute("aria-expanded", "true");
+
+    // Simulate a client-side navigation to a "Grades" child -- the pathname
+    // changes but Sidebar does NOT unmount (rerender, not a fresh render).
+    mockPathname = "/dashboard/grades/add";
+    rerender(sidebarElement(sections));
+
+    expect(screen.getByRole("link", { name: "Add Grade" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: /Grades/ })).toHaveAttribute("aria-expanded", "true");
+    // "Classes" stays expanded -- the update only adds, never removes.
+    expect(screen.getByRole("button", { name: /Classes/ })).toHaveAttribute("aria-expanded", "true");
   });
 });
