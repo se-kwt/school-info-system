@@ -28,10 +28,12 @@ export function StudentsView({
   initialStudents,
   classes,
   isAdmin,
+  hideClassFilter,
 }: {
   initialStudents: StudentRow[];
   classes: { id: number; gradeName: string; section: string }[];
   isAdmin: boolean;
+  hideClassFilter?: boolean;
 }) {
   const [students, setStudents] = useState(initialStudents);
   const [classFilter, setClassFilter] = useState("all");
@@ -221,19 +223,21 @@ export function StudentsView({
   return (
     <div className="mt-4">
       <div className="flex items-center justify-between gap-3">
-        <select
-          aria-label="Filter by class"
-          value={classFilter}
-          onChange={(event) => handleClassFilterChange(event.target.value)}
-          className="rounded border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="all">All classes</option>
-          {classes.map((klass) => (
-            <option key={klass.id} value={klass.id}>
-              {klass.gradeName} {klass.section}
-            </option>
-          ))}
-        </select>
+        {!hideClassFilter && (
+          <select
+            aria-label="Filter by class"
+            value={classFilter}
+            onChange={(event) => handleClassFilterChange(event.target.value)}
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="all">All classes</option>
+            {classes.map((klass) => (
+              <option key={klass.id} value={klass.id}>
+                {klass.gradeName} {klass.section}
+              </option>
+            ))}
+          </select>
+        )}
         {isAdmin && (
           <Link
             href="/dashboard/students/add"

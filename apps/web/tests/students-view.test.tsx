@@ -254,4 +254,14 @@ describe("StudentsView", () => {
     expect(screen.queryByRole("button", { name: "Deactivate instead" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Deactivate" })).toHaveLength(1);
   });
+
+  it("shows the class filter by default", () => {
+    render(<StudentsView initialStudents={students} classes={classes} isAdmin={true} />);
+    expect(screen.getByLabelText("Filter by class")).toBeInTheDocument();
+  });
+
+  it("hides the class filter when hideClassFilter is set", () => {
+    render(<StudentsView initialStudents={students} classes={classes} isAdmin={true} hideClassFilter />);
+    expect(screen.queryByLabelText("Filter by class")).not.toBeInTheDocument();
+  });
 });
