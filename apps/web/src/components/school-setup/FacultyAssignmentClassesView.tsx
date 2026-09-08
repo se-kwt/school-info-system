@@ -9,6 +9,11 @@ import { EntityCard } from "./EntityCard";
 import { Pagination } from "./Pagination";
 import type { ClassRow } from "./ClassesView";
 
+interface AcademicYearOption {
+  id: number;
+  name: string;
+}
+
 const PAGE_SIZE = 8;
 
 function enrollmentLabel(klass: ClassRow): string | undefined {
@@ -20,7 +25,13 @@ function classTitle(klass: ClassRow): string {
   return `${klass.gradeName} · Section ${klass.section}`;
 }
 
-export function FacultyAssignmentClassesView({ initialClasses }: { initialClasses: ClassRow[] }) {
+export function FacultyAssignmentClassesView({
+  initialClasses,
+  academicYears,
+}: {
+  initialClasses: ClassRow[];
+  academicYears: AcademicYearOption[];
+}) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
@@ -62,7 +73,8 @@ export function FacultyAssignmentClassesView({ initialClasses }: { initialClasse
               icon={UserCog}
               href={`/dashboard/faculty-assignment/${klass.id}`}
               title={classTitle(klass)}
-              subtitle={enrollmentLabel(klass) ?? "No enrollment data"}
+              subtitle={academicYears.find((year) => year.id === klass.academicYearId)?.name ?? String(klass.academicYearId)}
+              tagLine={enrollmentLabel(klass)}
               menuItems={[]}
             />
           ))}
@@ -75,6 +87,7 @@ export function FacultyAssignmentClassesView({ initialClasses }: { initialClasse
             <tr>
               <th className="border-b border-gray-200 pb-2">Grade</th>
               <th className="border-b border-gray-200 pb-2">Section</th>
+              <th className="border-b border-gray-200 pb-2">Year</th>
             </tr>
           </thead>
           <tbody>
@@ -86,6 +99,9 @@ export function FacultyAssignmentClassesView({ initialClasses }: { initialClasse
                   </Link>
                 </td>
                 <td className="border-b border-gray-100 py-2">{klass.section}</td>
+                <td className="border-b border-gray-100 py-2">
+                  {academicYears.find((year) => year.id === klass.academicYearId)?.name ?? klass.academicYearId}
+                </td>
               </tr>
             ))}
           </tbody>

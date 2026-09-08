@@ -144,6 +144,59 @@ describe("students.ts scalar fields", () => {
     const result = await listStudents(prisma, school.id, { classId: classA.id });
     expect(result.map((s) => s.admissionNo)).toEqual(["SCH-200"]);
   });
+
+  it("excludes a student enrolled in the target class under a non-active academic year", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const activeYear = await createActiveYear(prisma, school.id, "2026-27");
+    const archivedYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2025-26",
+        startDate: new Date("2025-06-01"),
+        endDate: new Date("2026-04-30"),
+        status: "archived",
+      },
+    });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: activeYear.id, name: "Grade 8", section: "A" });
+    // Enroll the student in the SAME class id, but under the non-active year.
+    await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: archivedYear.id,
+      name: "Archived Year Student",
+      dob: new Date("2015-01-01"),
+      admissionNo: "SCH-300",
+    });
+
+    const result = await listStudents(prisma, school.id, { classId: klass.id });
+    expect(result.map((s) => s.admissionNo)).not.toContain("SCH-300");
+    expect(result).toEqual([]);
+  });
+
+  it("returns an empty list for a classId filter when no active academic year is configured", async () => {
+    const school = await prisma.school.create({ data: { name: "Test School" } });
+    const nonActiveYear = await prisma.academicYear.create({
+      data: {
+        schoolId: school.id,
+        name: "2025-26",
+        startDate: new Date("2025-06-01"),
+        endDate: new Date("2026-04-30"),
+        status: "archived",
+      },
+    });
+    const klass = await createClass(prisma, { schoolId: school.id, academicYearId: nonActiveYear.id, name: "Grade 9", section: "A" });
+    await createEnrolledStudent(prisma, {
+      schoolId: school.id,
+      classId: klass.id,
+      academicYearId: nonActiveYear.id,
+      name: "No Active Year Student",
+      dob: new Date("2015-01-01"),
+      admissionNo: "SCH-301",
+    });
+
+    const result = await listStudents(prisma, school.id, { classId: klass.id });
+    expect(result).toEqual([]);
+  });
 });
 
 describe("students.ts multiple parents", () => {

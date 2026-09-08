@@ -29,11 +29,15 @@ export function StudentsView({
   classes,
   isAdmin,
   hideClassFilter,
+  scopeClassId,
+  siblingCandidates,
 }: {
   initialStudents: StudentRow[];
   classes: { id: number; gradeName: string; section: string }[];
   isAdmin: boolean;
   hideClassFilter?: boolean;
+  scopeClassId?: number;
+  siblingCandidates?: StudentRow[];
 }) {
   const [students, setStudents] = useState(initialStudents);
   const [classFilter, setClassFilter] = useState("all");
@@ -75,7 +79,8 @@ export function StudentsView({
   }
 
   async function refresh() {
-    const response = await fetch("/api/students");
+    const query = scopeClassId ? `?classId=${scopeClassId}` : "";
+    const response = await fetch(`/api/students${query}`);
     setStudents(await response.json());
   }
 
@@ -326,7 +331,7 @@ export function StudentsView({
           mode="edit"
           student={editingStudent}
           classes={classes}
-          allStudents={students}
+          allStudents={siblingCandidates ?? students}
           isAdmin={isAdmin}
           defaultClassId={selectedClass?.id}
           serverError={error}

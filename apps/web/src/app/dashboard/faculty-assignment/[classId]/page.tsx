@@ -12,7 +12,7 @@ export default async function FacultyAssignmentDetailPage(props: { params: Promi
   const params = await props.params;
   const claims = await requireDashboardRole(["admin"]);
   const classId = Number(params.classId);
-  if (Number.isNaN(classId)) notFound();
+  if (!Number.isInteger(classId)) notFound();
 
   const klass = await prisma.class.findFirst({
     where: { id: classId, schoolId: claims.schoolId },

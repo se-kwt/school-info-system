@@ -264,4 +264,116 @@ describe("StudentsView", () => {
     render(<StudentsView initialStudents={students} classes={classes} isAdmin={true} hideClassFilter />);
     expect(screen.queryByLabelText("Filter by class")).not.toBeInTheDocument();
   });
+
+  it("re-fetches scoped to scopeClassId after a mutation, instead of the whole school", async () => {
+    const scopedStudents = [students[0]];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(scopedStudents), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <StudentsView
+        initialStudents={scopedStudents}
+        classes={[classes[0]]}
+        isAdmin={true}
+        hideClassFilter
+        scopeClassId={1}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/students?classId=1");
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it("does not scope the refetch when scopeClassId is not set", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(students), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<StudentsView initialStudents={students} classes={classes} isAdmin={true} />);
+    await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/students");
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it("uses siblingCandidates (not the scoped student list) to resolve a sibling's display details", async () => {
+    const siblingOnlyInCandidates = {
+      ...students[1],
+      id: 99,
+      name: "Sibling In Other Class",
+      admissionNo: "SCH-99",
+    };
+    const studentWithSibling = {
+      ...students[0],
+      siblings: [
+        {
+          id: 99,
+          name: "Sibling In Other Class",
+          admissionNo: "SCH-99",
+          gender: null,
+          class: { gradeName: "Grade 6", section: "B" },
+        },
+      ],
+    };
+
+    render(
+      <StudentsView
+        initialStudents={[studentWithSibling]}
+        classes={classes}
+        isAdmin={true}
+        hideClassFilter
+        scopeClassId={1}
+        siblingCandidates={[studentWithSibling, siblingOnlyInCandidates]}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
+
+    expect(screen.getByLabelText("Sibling first name")).toHaveValue("Sibling");
+    expect(screen.getByLabelText("Sibling admission number")).toHaveValue("SCH-99");
+  });
+
+  it("shows a blank sibling row when the sibling is absent from siblingCandidates too", async () => {
+    const studentWithMissingSibling = {
+      ...students[0],
+      siblings: [
+        {
+          id: 12345,
+          name: "Untracked Sibling",
+          admissionNo: "SCH-12345",
+          gender: null,
+          class: null,
+        },
+      ],
+    };
+
+    render(
+      <StudentsView
+        initialStudents={[studentWithMissingSibling]}
+        classes={classes}
+        isAdmin={true}
+        hideClassFilter
+        scopeClassId={1}
+        siblingCandidates={[studentWithMissingSibling]}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Existing Student/ }));
+
+    expect(screen.getByLabelText("Sibling first name")).toHaveValue("");
+  });
 });

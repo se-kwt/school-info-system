@@ -8,7 +8,7 @@ export default async function ClassDetailPage(props: { params: Promise<{ id: str
   const params = await props.params;
   const claims = await requireDashboardRole(["admin"]);
   const classId = Number(params.id);
-  if (Number.isNaN(classId)) notFound();
+  if (!Number.isInteger(classId)) notFound();
 
   const klass = await prisma.class.findFirst({
     where: { id: classId, schoolId: claims.schoolId },
@@ -16,7 +16,10 @@ export default async function ClassDetailPage(props: { params: Promise<{ id: str
   });
   if (!klass) notFound();
 
-  const students = await listStudents(prisma, claims.schoolId, { classId });
+  const [students, allStudents] = await Promise.all([
+    listStudents(prisma, claims.schoolId, { classId }),
+    listStudents(prisma, claims.schoolId),
+  ]);
 
   return (
     <div className="p-6">
@@ -28,6 +31,8 @@ export default async function ClassDetailPage(props: { params: Promise<{ id: str
         classes={[{ id: klass.id, gradeName: klass.grade.name, section: klass.section }]}
         isAdmin={true}
         hideClassFilter
+        scopeClassId={classId}
+        siblingCandidates={allStudents}
       />
     </div>
   );

@@ -47,12 +47,19 @@ export async function GET(request: Request) {
 
     const page = pageParam ? Number(pageParam) : undefined;
     const pageSize = pageSizeParam ? Number(pageSizeParam) : undefined;
+    const classIdParam = searchParams.get("classId");
+    const classId = classIdParam ? Number(classIdParam) : undefined;
 
-    const options = (page && pageSize && !isNaN(page) && !isNaN(pageSize))
-      ? { page, pageSize }
-      : undefined;
+    const options = {
+      ...(page && pageSize && !isNaN(page) && !isNaN(pageSize) ? { page, pageSize } : {}),
+      ...(classId !== undefined && !isNaN(classId) ? { classId } : {}),
+    };
 
-    const students = await listStudents(prisma, claims.schoolId, options);
+    const students = await listStudents(
+      prisma,
+      claims.schoolId,
+      Object.keys(options).length > 0 ? options : undefined
+    );
     return NextResponse.json(students);
   } catch (err) {
     if (err instanceof AuthError) {

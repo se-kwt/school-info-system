@@ -37,7 +37,7 @@ export async function listStudents(
   const students = await prisma.student.findMany({
     where: {
       schoolId,
-      ...(options?.classId
+      ...(options?.classId !== undefined
         ? { enrollments: { some: { academicYearId: activeYear?.id ?? -1, classId: options.classId } } }
         : {}),
     },
