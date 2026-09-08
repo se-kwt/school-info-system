@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
 import { requireDashboardRole } from "@/lib/auth/require-dashboard-role";
-import { listSubjects } from "@/lib/school-setup/subjects";
-import { listClassFaculty } from "@/lib/school-setup/class-teachers";
-import { listStaff } from "@/lib/school-setup/staff";
+import { listStudents } from "@/lib/school-setup/students";
 import { prisma } from "@/lib/prisma";
-import { FacultyAssignmentView } from "@/components/school-setup/FacultyAssignmentView";
+import { StudentsView } from "@/components/school-setup/StudentsView";
 
 export default async function ClassDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -18,21 +16,19 @@ export default async function ClassDetailPage(props: { params: Promise<{ id: str
   });
   if (!klass) notFound();
 
-  const [subjectsResult, facultyResult, staff] = await Promise.all([
-    listSubjects(prisma, { gradeId: klass.gradeId, schoolId: claims.schoolId }),
-    listClassFaculty(prisma, { classId, schoolId: claims.schoolId }),
-    listStaff(prisma, claims.schoolId),
-  ]);
-  const subjects = subjectsResult.ok ? subjectsResult.subjects : [];
-  const assignments = facultyResult.ok ? facultyResult.assignments : [];
-  const teachers = staff.filter((s) => s.role === "teacher" && s.status === "active").map((s) => ({ id: s.id, name: s.name, status: s.status }));
+  const students = await listStudents(prisma, claims.schoolId, { classId });
 
   return (
     <div className="p-6">
       <h1 className="text-xl font-semibold text-gray-800">
-        {klass.grade.name} {klass.section} — Faculty
+        {klass.grade.name} {klass.section} — Students
       </h1>
-      <FacultyAssignmentView classId={classId} subjects={subjects} teachers={teachers} initialAssignments={assignments} />
+      <StudentsView
+        initialStudents={students}
+        classes={[{ id: klass.id, gradeName: klass.grade.name, section: klass.section }]}
+        isAdmin={true}
+        hideClassFilter
+      />
     </div>
   );
 }
