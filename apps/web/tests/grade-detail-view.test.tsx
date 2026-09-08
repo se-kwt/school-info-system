@@ -13,7 +13,7 @@ const subjects = [
 describe("GradeDetailView", () => {
   afterEach(() => cleanup());
 
-  it("renders a back link to Grades and a card per subject with its syllabus version count", () => {
+  it("renders a back link to Subjects and a card per subject with its syllabus version count", () => {
     render(<GradeDetailView gradeId={1} gradeName="Grade 1" initialSubjects={subjects} />);
     expect(screen.getByRole("link", { name: /subjects/i })).toHaveAttribute("href", "/dashboard/subjects");
     expect(screen.getByRole("link", { name: "Mathematics" })).toBeInTheDocument();

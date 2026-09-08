@@ -18,6 +18,7 @@ describe("GradesView", () => {
   it("renders a card per grade with subject names and class count badge", () => {
     render(<GradesView initialGrades={grades} academicYears={academicYears} />);
     expect(screen.getByText("Grade 1")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Grade 1" })).not.toBeInTheDocument();
     expect(screen.getByText("English, Math")).toBeInTheDocument();
     expect(screen.getByText("No subjects yet")).toBeInTheDocument();
     expect(screen.getByText("Classes 2")).toBeInTheDocument();

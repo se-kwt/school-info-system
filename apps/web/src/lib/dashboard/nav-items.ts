@@ -5,7 +5,6 @@ export type IconName =
   | "Layers"
   | "Building2"
   | "BookMarked"
-  | "ScrollText"
   | "Clock"
   | "CalendarClock"
   | "GraduationCap"
