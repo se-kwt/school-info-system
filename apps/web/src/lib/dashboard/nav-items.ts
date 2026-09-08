@@ -106,22 +106,7 @@ const NAV_TREE: NavSectionDef[] = [
           { href: "/dashboard/classes/add", label: "Add Class", roles: ["admin"] },
         ],
       },
-      {
-        label: "Subjects",
-        icon: "BookMarked",
-        children: [
-          { href: "/dashboard/subjects", label: "All Subjects", roles: ["admin"] },
-          { href: "/dashboard/subjects/add", label: "Add Subject", roles: ["admin"] },
-        ],
-      },
-      {
-        label: "Syllabus",
-        icon: "ScrollText",
-        children: [
-          { href: "/dashboard/syllabus", label: "All Syllabus", roles: ["admin"] },
-          { href: "/dashboard/syllabus/add", label: "Add Syllabus", roles: ["admin"] },
-        ],
-      },
+      { href: "/dashboard/subjects", label: "Subjects", icon: "BookMarked", roles: ["admin"] },
       {
         label: "Periods",
         icon: "Clock",
