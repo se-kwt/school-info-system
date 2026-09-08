@@ -24,6 +24,7 @@ import {
   CalendarDays,
   Bell,
   FileBarChart,
+  UserCog,
   Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -48,6 +49,7 @@ const ICON_MAP: Record<IconName, LucideIcon> = {
   CalendarDays,
   Bell,
   FileBarChart,
+  UserCog,
   Settings,
 };
 

@@ -18,6 +18,7 @@ export type IconName =
   | "CalendarDays"
   | "Bell"
   | "FileBarChart"
+  | "UserCog"
   | "Settings";
 
 type Role = SessionClaims["role"];
@@ -213,6 +214,7 @@ const NAV_TREE: NavSectionDef[] = [
         ],
       },
       { href: "/dashboard/academic-calendar", label: "Academic Calendar", icon: "CalendarDays", roles: ["admin"] },
+      { href: "/dashboard/faculty-assignment", label: "Faculty Assignment", icon: "UserCog", roles: ["admin"] },
     ],
   },
   {
