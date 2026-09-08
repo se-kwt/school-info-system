@@ -131,10 +131,10 @@ export function GradeDetailView({
   return (
     <div className="flex flex-col gap-4">
       <Link
-        href="/dashboard/grades"
+        href="/dashboard/subjects"
         className="flex w-fit items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-700"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> Grades
+        <ArrowLeft className="h-3.5 w-3.5" /> Subjects
       </Link>
 
       <PageHeader
@@ -173,7 +173,7 @@ export function GradeDetailView({
             <EntityCard
               key={subject.id}
               icon={BookOpen}
-              href={`/dashboard/grades/${gradeId}/subjects/${subject.id}`}
+              href={`/dashboard/subjects/${gradeId}/${subject.id}`}
               title={subject.name}
               subtitle={versionLabel(subject.versionCount)}
               footerBadge={subject.isElective ? "Elective" : undefined}
@@ -211,7 +211,7 @@ export function GradeDetailView({
               <tr key={subject.id}>
                 <td className="border-b border-gray-100 py-2">
                   <Link
-                    href={`/dashboard/grades/${gradeId}/subjects/${subject.id}`}
+                    href={`/dashboard/subjects/${gradeId}/${subject.id}`}
                     className="text-blue-600 underline"
                   >
                     {subject.name}
