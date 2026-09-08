@@ -12,6 +12,7 @@ import type { ClassRow } from "./ClassesView";
 interface AcademicYearOption {
   id: number;
   name: string;
+  status: "upcoming" | "active" | "archived";
 }
 
 const PAGE_SIZE = 8;
@@ -32,13 +33,30 @@ export function FacultyAssignmentClassesView({
   initialClasses: ClassRow[];
   academicYears: AcademicYearOption[];
 }) {
+  const [classes, setClasses] = useState(initialClasses);
   const [search, setSearch] = useState("");
+  const [yearFilter, setYearFilter] = useState(() =>
+    String(academicYears.find((year) => year.status === "active")?.id ?? "all")
+  );
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
 
+  async function refresh(academicYearIdFilter: string) {
+    const params = new URLSearchParams();
+    if (academicYearIdFilter !== "all") params.set("academicYearId", academicYearIdFilter);
+    const response = await fetch(`/api/classes?${params.toString()}`);
+    setClasses(await response.json());
+  }
+
+  async function handleYearFilterChange(value: string) {
+    setYearFilter(value);
+    setPage(1);
+    await refresh(value);
+  }
+
   const filteredClasses = useMemo(
-    () => initialClasses.filter((klass) => classTitle(klass).toLowerCase().includes(search.toLowerCase())),
-    [initialClasses, search]
+    () => classes.filter((klass) => classTitle(klass).toLowerCase().includes(search.toLowerCase())),
+    [classes, search]
   );
   const totalPages = Math.max(1, Math.ceil(filteredClasses.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -59,6 +77,12 @@ export function FacultyAssignmentClassesView({
           setPage(1);
         }}
         searchLabel="Search classes..."
+        filterValue={yearFilter}
+        onFilterChange={handleYearFilterChange}
+        filterOptions={[
+          { value: "all", label: "All Years" },
+          ...academicYears.map((year) => ({ value: String(year.id), label: year.name })),
+        ]}
         view={view}
         onViewChange={setView}
       />
@@ -73,7 +97,9 @@ export function FacultyAssignmentClassesView({
               icon={UserCog}
               href={`/dashboard/faculty-assignment/${klass.id}`}
               title={classTitle(klass)}
-              subtitle={academicYears.find((year) => year.id === klass.academicYearId)?.name ?? String(klass.academicYearId)}
+              subtitle={
+                academicYears.find((year) => year.id === klass.academicYearId)?.name ?? String(klass.academicYearId)
+              }
               tagLine={enrollmentLabel(klass)}
               menuItems={[]}
             />

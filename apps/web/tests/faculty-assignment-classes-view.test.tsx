@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FacultyAssignmentClassesView } from "../src/components/school-setup/FacultyAssignmentClassesView";
@@ -10,7 +10,7 @@ const classes = [
   { id: 2, gradeId: 2, gradeName: "Grade 2", section: "B", academicYearId: 1, archived: false, capacity: null, room: null, enrolledCount: 20 },
 ];
 
-const academicYears = [{ id: 1, name: "2026-27" }];
+const academicYears = [{ id: 1, name: "2026-27", status: "active" as const }];
 
 describe("FacultyAssignmentClassesView", () => {
   afterEach(() => cleanup());
@@ -52,13 +52,13 @@ describe("FacultyAssignmentClassesView", () => {
 
   it("shows the academic year name on each card", () => {
     render(<FacultyAssignmentClassesView initialClasses={classes} academicYears={academicYears} />);
-    expect(screen.getAllByText("2026-27")).toHaveLength(classes.length);
+    expect(screen.getAllByText("2026-27", { ignore: "option" })).toHaveLength(classes.length);
   });
 
   it("distinguishes identically-named grade/section cards from different academic years", () => {
     const twoYears = [
-      { id: 1, name: "2025-26" },
-      { id: 2, name: "2026-27" },
+      { id: 1, name: "2025-26", status: "archived" as const },
+      { id: 2, name: "2026-27", status: "active" as const },
     ];
     const sameNameClasses = [
       { id: 10, gradeId: 1, gradeName: "Grade 1", section: "A", academicYearId: 1, archived: false, capacity: 30, room: null, enrolledCount: 25 },
@@ -67,13 +67,57 @@ describe("FacultyAssignmentClassesView", () => {
 
     render(<FacultyAssignmentClassesView initialClasses={sameNameClasses} academicYears={twoYears} />);
 
-    expect(screen.getByText("2025-26")).toBeInTheDocument();
-    expect(screen.getByText("2026-27")).toBeInTheDocument();
+    expect(screen.getByText("2025-26", { ignore: "option" })).toBeInTheDocument();
+    expect(screen.getByText("2026-27", { ignore: "option" })).toBeInTheDocument();
     const links = screen.getAllByRole("link", { name: "Grade 1 · Section A" });
     expect(links).toHaveLength(2);
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
       "/dashboard/faculty-assignment/10",
       "/dashboard/faculty-assignment/20",
     ]);
+  });
+
+  it("defaults the year filter to the active academic year", () => {
+    render(<FacultyAssignmentClassesView initialClasses={classes} academicYears={academicYears} />);
+    expect(screen.getByLabelText("Filter by academic year")).toHaveValue("1");
+  });
+
+  it("falls back to All Years when no academic year is active", () => {
+    const noActiveYear = [{ id: 1, name: "2026-27", status: "upcoming" as const }];
+    render(<FacultyAssignmentClassesView initialClasses={classes} academicYears={noActiveYear} />);
+    expect(screen.getByLabelText("Filter by academic year")).toHaveValue("all");
+  });
+
+  it("refetches classes scoped to the selected year when the filter changes", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            id: 30,
+            gradeId: 1,
+            gradeName: "Grade 1",
+            section: "C",
+            academicYearId: 2,
+            archived: false,
+            capacity: 30,
+            room: null,
+            enrolledCount: 5,
+          },
+        ]),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const twoYears = [
+      { id: 1, name: "2025-26", status: "active" as const },
+      { id: 2, name: "2026-27", status: "upcoming" as const },
+    ];
+    render(<FacultyAssignmentClassesView initialClasses={classes} academicYears={twoYears} />);
+    await userEvent.selectOptions(screen.getByLabelText("Filter by academic year"), "2");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/classes?academicYearId=2");
+    expect(await screen.findByRole("link", { name: "Grade 1 · Section C" })).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 });
