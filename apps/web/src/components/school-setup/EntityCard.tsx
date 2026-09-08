@@ -15,7 +15,7 @@ export function EntityCard({
   blockedActions,
 }: {
   icon: LucideIcon;
-  href: string;
+  href?: string;
   title: string;
   subtitle: string;
   tagLine?: string;
@@ -31,12 +31,16 @@ export function EntityCard({
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
           <Icon className="h-5 w-5" />
         </span>
-        <KebabMenu label={`Actions for ${title}`} items={menuItems} />
+        {menuItems.length > 0 && <KebabMenu label={`Actions for ${title}`} items={menuItems} />}
       </div>
       <div>
-        <Link href={href} className="text-sm font-bold text-neutral-900 hover:underline">
-          {title}
-        </Link>
+        {href ? (
+          <Link href={href} className="text-sm font-bold text-neutral-900 hover:underline">
+            {title}
+          </Link>
+        ) : (
+          <span className="text-sm font-bold text-neutral-900">{title}</span>
+        )}
         <p className="text-[11px] text-neutral-400">{subtitle}</p>
       </div>
       {tagLine && <p className="line-clamp-1 text-[11px] text-neutral-500">{tagLine}</p>}

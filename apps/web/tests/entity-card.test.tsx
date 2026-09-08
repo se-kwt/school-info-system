@@ -93,4 +93,30 @@ describe("EntityCard", () => {
     expect(screen.getByText("Classes 2")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
+
+  it("renders the title as plain text when href is absent", () => {
+    render(
+      <EntityCard
+        icon={Layers}
+        title="Grade 1"
+        subtitle="6 Subjects • 2 Classes"
+        menuItems={[]}
+      />
+    );
+    expect(screen.queryByRole("link", { name: "Grade 1" })).not.toBeInTheDocument();
+    expect(screen.getByText("Grade 1")).toBeInTheDocument();
+  });
+
+  it("omits the kebab menu button when menuItems is empty", () => {
+    render(
+      <EntityCard
+        icon={Layers}
+        href="/dashboard/grades/1"
+        title="Grade 1"
+        subtitle="6 Subjects • 2 Classes"
+        menuItems={[]}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "Actions for Grade 1" })).not.toBeInTheDocument();
+  });
 });
