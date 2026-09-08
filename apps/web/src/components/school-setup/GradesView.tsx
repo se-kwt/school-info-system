@@ -21,6 +21,7 @@ export interface GradeRow {
 interface AcademicYearOption {
   id: number;
   name: string;
+  status: "upcoming" | "active" | "archived";
 }
 
 type ModalState = { id: number } | null;
@@ -36,7 +37,9 @@ export function GradesView({
 }) {
   const [grades, setGrades] = useState(initialGrades);
   const [search, setSearch] = useState("");
-  const [yearFilter, setYearFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState(() =>
+    String(academicYears.find((year) => year.status === "active")?.id ?? "all")
+  );
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
   const [modalState, setModalState] = useState<ModalState>(null);

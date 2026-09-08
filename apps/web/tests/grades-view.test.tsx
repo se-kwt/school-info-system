@@ -5,7 +5,7 @@ import { render, screen, cleanup, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GradesView } from "../src/components/school-setup/GradesView";
 
-const academicYears = [{ id: 1, name: "2026-27" }];
+const academicYears = [{ id: 1, name: "2026-27", status: "active" as const }];
 
 const grades = [
   { id: 1, name: "Grade 1", subjectCount: 2, classCount: 2, subjectNames: ["English", "Math"] },
@@ -102,5 +102,16 @@ describe("GradesView", () => {
     expect(await screen.findByText("Grade 1")).toBeInTheDocument();
     expect(screen.queryByText("No grades found")).not.toBeInTheDocument();
     vi.unstubAllGlobals();
+  });
+
+  it("defaults the year filter to the active academic year", () => {
+    render(<GradesView initialGrades={grades} academicYears={academicYears} />);
+    expect(screen.getByLabelText("Filter by academic year")).toHaveValue("1");
+  });
+
+  it("falls back to All Years when no academic year is active", () => {
+    const noActiveYear = [{ id: 1, name: "2026-27", status: "upcoming" as const }];
+    render(<GradesView initialGrades={grades} academicYears={noActiveYear} />);
+    expect(screen.getByLabelText("Filter by academic year")).toHaveValue("all");
   });
 });
