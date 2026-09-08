@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireDashboardRole } from "@/lib/auth/require-dashboard-role";
-import { getNavItemsForRole, WORKSPACE_NAV_ITEMS } from "@/lib/dashboard/nav-items";
+import { getNavSectionsForRole } from "@/lib/dashboard/nav-items";
 import { getClassesForTeacher } from "@/lib/data/scoped-queries";
 import { listClasses } from "@/lib/school-setup/classes";
 import { getActiveAcademicYear } from "@/lib/academic-years";
@@ -14,7 +14,7 @@ export default async function DashboardLayout({
   const claims = await requireDashboardRole(["teacher", "admin", "accountant"]);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: claims.userId } });
   const school = await prisma.school.findUniqueOrThrow({ where: { id: claims.schoolId } });
-  const navItems = getNavItemsForRole(claims.role);
+  const sections = getNavSectionsForRole(claims.role);
   const activeYear = await getActiveAcademicYear(prisma, claims.schoolId);
 
   const pinnedClasses =
@@ -34,8 +34,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-[#F8F9FA]">
       <Sidebar
-        navItems={navItems}
-        workspaceItems={WORKSPACE_NAV_ITEMS}
+        sections={sections}
         pinnedClasses={pinnedClasses}
         userName={user.name}
         userInitials={initials}
