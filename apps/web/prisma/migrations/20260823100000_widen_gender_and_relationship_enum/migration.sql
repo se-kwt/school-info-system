@@ -4,10 +4,20 @@ ALTER TYPE "Gender" ADD VALUE 'other';
 -- CreateEnum
 CREATE TYPE "GuardianRelationship" AS ENUM ('father', 'mother', 'guardian', 'grandparent', 'sibling', 'other');
 
--- Converts ParentStudent.relationship from String to the GuardianRelationship
--- enum. Existing values are NOT migrated -- the column is dropped and recreated
--- with the default. No live data as of 2026-08-22. A real migration would map
--- lower(trim(relationship)) onto the enum with a fallback to 'guardian'.
--- AlterTable
-ALTER TABLE "ParentStudent" DROP COLUMN "relationship",
-ADD COLUMN     "relationship" "GuardianRelationship" NOT NULL DEFAULT 'guardian';
+-- Converts ParentStudent.relationship from text to the GuardianRelationship
+-- enum, preserving existing values by mapping lower(trim(relationship)) onto
+-- the enum with a fallback to 'guardian' for anything that doesn't match.
+ALTER TABLE "ParentStudent"
+  ALTER COLUMN "relationship" DROP DEFAULT,
+  ALTER COLUMN "relationship" TYPE "GuardianRelationship" USING (
+    CASE lower(trim("relationship"))
+      WHEN 'father' THEN 'father'
+      WHEN 'mother' THEN 'mother'
+      WHEN 'guardian' THEN 'guardian'
+      WHEN 'grandparent' THEN 'grandparent'
+      WHEN 'sibling' THEN 'sibling'
+      WHEN 'other' THEN 'other'
+      ELSE 'guardian'
+    END
+  )::"GuardianRelationship",
+  ALTER COLUMN "relationship" SET DEFAULT 'guardian';
